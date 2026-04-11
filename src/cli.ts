@@ -11,10 +11,11 @@
  *   nyx tokens examples/todo.nyx
  */
 
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { resolve, dirname } from 'path';
 import { parse } from './index.js';
 import { Lexer } from './lexer.js';
+import { Compiler } from './compiler.js';
 
 const [,, command, file] = process.argv;
 
@@ -23,12 +24,13 @@ if (!command || !file) {
 🦞 NyxCode v0.1.0
 
 Usage:
-  nyx parse <file.nyx>    Parse file → AST (JSON)
-  nyx tokens <file.nyx>   Tokenize file → Token list
+  nyx parse <file.nyx>     Parse file → AST (JSON)
+  nyx tokens <file.nyx>    Tokenize file → Token list
+  nyx build <file.nyx>     Compile file → HTML output
 
 Examples:
   nyx parse examples/hello.nyx
-  nyx tokens examples/hello.nyx
+  nyx build examples/hello.nyx
 `);
   process.exit(0);
 }
@@ -53,8 +55,21 @@ try {
     for (const t of tokens) {
       console.log(`${t.line}:${t.col.toString().padEnd(4)} ${t.type.padEnd(15)} ${t.value}`);
     }
+  } else if (command === 'build') {
+    const ast = parse(source);
+    const compiler = new Compiler({ pretty: true });
+    const output = compiler.compile(ast);
+    
+    // Write to dist/ or stdout
+    const outDir = resolve('dist-site');
+    mkdirSync(outDir, { recursive: true });
+    writeFileSync(resolve(outDir, 'index.html'), output.html);
+    console.log(`✅ Built: ${outDir}/index.html`);
+    console.log(`   HTML: ${output.html.length} bytes`);
+    if (output.css) console.log(`   CSS:  ${output.css.length} bytes`);
+    if (output.js) console.log(`   JS:   ${output.js.length} bytes`);
   } else {
-    console.error(`❌ Unknown command: ${command}. Use 'parse' or 'tokens'.`);
+    console.error(`❌ Unknown command: ${command}. Use 'parse', 'tokens', or 'build'.`);
     process.exit(1);
   }
 } catch (e: any) {
