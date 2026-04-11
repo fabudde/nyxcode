@@ -182,9 +182,11 @@ The answer: 70% fewer tokens, zero boilerplate, and a language that makes AI cod
 
 ## Created By
 
-**Fabian Budde** & **Nyx** 🦞
+**Fabian Budde** 🐻 — Vision & Language Design
+**Nyx** 🦞 — Implementation & Coordination
+**Tyto** 🦉 — Security Advisor
 
-A human and an AI, building the language that bridges both worlds.
+A human and two AIs, building the language that bridges both worlds.
 
 ## License
 
