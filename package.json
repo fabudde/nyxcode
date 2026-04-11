@@ -1,0 +1,21 @@
+{
+  "name": "nyxcode",
+  "version": "0.1.0",
+  "description": "NyxCode — The AI-native programming language for the web",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "nyx": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "parse": "node dist/cli.js",
+    "test": "node --test dist/tests/"
+  },
+  "author": "Fabian Budde & Nyx",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
