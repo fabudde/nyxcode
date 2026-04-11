@@ -1,0 +1,50 @@
+page / {
+  style {
+    bg #0a0a0f
+    color #e0e0e0
+    padding 4rem 2rem
+    text-align center
+    min-height 100vh
+  }
+
+  container {
+    style { max-width 700px, margin 0 auto }
+
+    h1 "NyxCode"
+    p "The AI-native programming language for the web."
+
+    grid cols=3 gap=2rem {
+      card {
+        style { padding 1.5rem, border-radius 12px }
+        h2 "70%"
+        p "fewer tokens"
+      }
+      card {
+        style { padding 1.5rem, border-radius 12px }
+        h2 "0"
+        p "boilerplate"
+      }
+      card {
+        style { padding 1.5rem, border-radius 12px }
+        h2 "4"
+        p "lines for a full page"
+      }
+    }
+
+    section {
+      style { border-radius 12px, padding 2rem, margin 3rem 0, text-align left }
+      p "page /dashboard {"
+      p "  auth required"
+      p "  data users = query \"SELECT * FROM users\""
+      p "  each users -> card { h3 .name, p .email }"
+      p "}"
+    }
+
+    row gap=1rem {
+      link "GitHub" href="https://github.com/fabudde/nyxcode"
+      link "Language Spec" href="https://github.com/fabudde/nyxcode/blob/main/SPEC.md"
+    }
+
+    p "Created by Fabian Budde, Nyx, and Tyto"
+  }
+}

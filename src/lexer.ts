@@ -30,9 +30,14 @@ export class Lexer {
 
       const ch = this.peek();
 
-      // Skip comments
+      // Hex colors (#fff, #0a0a0f) vs comments (# text)
       if (ch === '#') {
-        this.skipLineComment();
+        const next = this.peekNext();
+        if (next && (this.isAlphaNumeric(next))) {
+          this.readHexColor();
+        } else {
+          this.skipLineComment();
+        }
         continue;
       }
 
@@ -47,6 +52,12 @@ export class Lexer {
       // Strings
       if (ch === '"') {
         this.readString();
+        continue;
+      }
+
+      // Hex colors (#fff, #0a0a0f)
+      if (ch === '#') {
+        this.readHexColor();
         continue;
       }
 
@@ -162,6 +173,17 @@ export class Lexer {
 
     this.advance(); // consume closing "
     this.tokens.push({ type: TokenType.String, value, line: startLine, col: startCol });
+  }
+
+  private readHexColor(): void {
+    const startCol = this.col;
+    let value = this.advance(); // consume #
+
+    while (!this.isAtEnd() && (this.isAlphaNumeric(this.peek()))) {
+      value += this.advance();
+    }
+
+    this.tokens.push({ type: TokenType.Identifier, value, line: this.line, col: startCol });
   }
 
   private readNumber(): void {

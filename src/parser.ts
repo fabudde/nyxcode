@@ -254,7 +254,12 @@ export class Parser {
       case TokenType.Data: return this.parseData();
       case TokenType.Each: return this.parseEach();
       case TokenType.When: return this.parseWhen();
-      case TokenType.Style: return this.parseStyle();
+      case TokenType.Style:
+        // Check if it's style="..." (attribute) or style { } (block)
+        if (this.peekAt(1)?.type === TokenType.Equals) {
+          return this.parseElement(); // treat as element attribute
+        }
+        return this.parseStyle();
       case TokenType.Form: return this.parseForm();
       case TokenType.Auth: return this.parseAuth();
       case TokenType.On: return this.parseOn();
@@ -425,17 +430,47 @@ export class Parser {
     return { type: 'Style', raw, properties, responsive, hover, line: start.line, col: start.col };
   }
 
+  /** Known CSS shorthand property names in NyxCode */
+  private static CSS_PROPERTIES = new Set([
+    'bg', 'background', 'color', 'text', 'padding', 'margin', 'border',
+    'border-radius', 'radius', 'shadow', 'box-shadow', 'flex', 'grid',
+    'display', 'position', 'top', 'left', 'right', 'bottom',
+    'width', 'height', 'max-width', 'max-height', 'min-width', 'min-height',
+    'font-family', 'font-size', 'font-weight', 'line-height',
+    'text-align', 'text-decoration', 'text-transform',
+    'opacity', 'overflow', 'z-index', 'cursor', 'transition',
+    'transform', 'animation', 'gap', 'justify-content', 'align-items',
+    'flex-direction', 'flex-wrap', 'grid-template-columns',
+    'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+    'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
+  ]);
+
   private parseStyleProperty(): StyleProperty {
     const name = this.consumeIdentifier();
     let value = '';
 
-    // Consume everything until comma, newline, }, or @
+    // Consume value tokens until we hit:
+    // - comma (property separator in single-line blocks)
+    // - } (end of style block)
+    // - @ (responsive block)
+    // - another CSS property name (multi-line separator)
+    // - 'hover' keyword
     while (!this.isAtEnd()) {
       const next = this.peek();
       if (next.type === TokenType.RightBrace || next.type === TokenType.At) break;
       if (next.type === TokenType.Comma) { this.advance(); break; }
-      if (next.type === TokenType.Identifier && (next.value === 'hover' || ELEMENT_TAGS.has(next.value))) break;
+      if (next.value === 'hover') break;
+      // If we see an identifier that's a known CSS property, it's the NEXT property
+      if (next.type === TokenType.Identifier && Parser.CSS_PROPERTIES.has(next.value) && value.length > 0) break;
+      // Handle hyphenated identifiers like "text-align" - consume as one
       value += (value ? ' ' : '') + this.advance().value;
+      // Check for hyphenated continuation
+      if (this.peek()?.type === TokenType.Identifier && this.peek()?.value === '-') {
+        value += this.advance().value; // consume -
+        if (this.peek()?.type === TokenType.Identifier) {
+          value += this.advance().value; // consume next part
+        }
+      }
     }
 
     return { name, value: value.trim() };
@@ -573,12 +608,16 @@ export class Parser {
         const path = '.' + this.consumeIdentifier();
         content = { type: 'PropertyAccess', path, line: next.line, col: next.col };
       }
-      // Attribute: key=value
-      else if (next.type === TokenType.Identifier && this.peekAt(1)?.type === TokenType.Equals) {
+      // Attribute: key=value or key="complex value" (including keyword tokens like style=)
+      else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form) && this.peekAt(1)?.type === TokenType.Equals) {
         const name = this.advance().value;
         this.advance(); // =
-        const value = this.advance().value;
-        attributes.push({ name, value });
+        const valToken = this.peek();
+        if (valToken.type === TokenType.String) {
+          attributes.push({ name, value: this.advance().value });
+        } else {
+          attributes.push({ name, value: this.advance().value });
+        }
       }
       // Shorthand attribute (no value): required, bold, etc.
       else if (next.type === TokenType.Identifier && !ELEMENT_TAGS.has(next.value) && !this.isKeyword(next)) {

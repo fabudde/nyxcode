@@ -41,6 +41,7 @@ export class Compiler {
   private js: string[] = [];
   private componentId: number = 0;
   private indent: number = 0;
+  private pageClass: string = '';
 
   constructor(options: Partial<CompilerOptions> = {}) {
     this.options = {
@@ -78,7 +79,15 @@ export class Compiler {
   private compilePage(page: PageNode): string {
     let content = '';
 
+    // First style block in a page applies to body
+    const pageStyle = page.body.find(s => s.type === 'Style') as StyleBlock | undefined;
+    if (pageStyle) {
+      this.compileStyleWithClass(pageStyle, 'nyx-page');
+      this.pageClass = 'nyx-page';
+    }
+
     for (const stmt of page.body) {
+      if (stmt === pageStyle) continue; // Already handled
       content += this.compileStatement(stmt);
     }
 
@@ -89,7 +98,12 @@ export class Compiler {
 
   private compileStatement(stmt: Statement): string {
     switch (stmt.type) {
-      case 'Element': return this.compileElement(stmt);
+      case 'Element':
+        // Skip elements that are just "style" with attributes (inline style artifacts)
+        if ((stmt as ElementNode).tag === 'style' && (stmt as ElementNode).attributes.length > 0) {
+          return '';
+        }
+        return this.compileElement(stmt as ElementNode);
       case 'Data': return this.compileData(stmt);
       case 'Each': return this.compileEach(stmt);
       case 'When': return this.compileWhen(stmt);
@@ -105,9 +119,48 @@ export class Compiler {
 
   private compileElement(el: ElementNode): string {
     const tag = this.mapTag(el.tag);
-    const attrs = this.compileAttributes(el.attributes);
     const content = this.compileContent(el.content);
-    const children = el.children.map(c => this.compileStatement(c)).join('');
+    
+    // Check for style block in children — generates scoped class
+    let scopeClass = '';
+    const styleChild = el.children.find(c => c.type === 'Style') as StyleBlock | undefined;
+    if (styleChild) {
+      scopeClass = `nyx-${this.nextId('s')}`;
+      this.compileStyleWithClass(styleChild, scopeClass);
+    }
+
+    // Handle layout elements (grid, row) — convert attrs to style
+    let extraStyle = '';
+    if (el.tag === 'grid') {
+      const cols = el.attributes.find(a => a.name === 'cols');
+      const gap = el.attributes.find(a => a.name === 'gap');
+      extraStyle = `display:grid;grid-template-columns:repeat(${cols?.value || 3},1fr)`;
+      if (gap) extraStyle += `;gap:${gap.value}`;
+    } else if (el.tag === 'row') {
+      extraStyle = 'display:flex';
+      const gap = el.attributes.find(a => a.name === 'gap');
+      if (gap) extraStyle += `;gap:${gap.value}`;
+    }
+
+    // Merge extra style with existing style attribute
+    const filteredAttrs = el.attributes.filter(a => !['cols', 'gap'].includes(a.name));
+    if (extraStyle) {
+      const existingStyle = filteredAttrs.find(a => a.name === 'style');
+      if (existingStyle) {
+        existingStyle.value = extraStyle + ';' + existingStyle.value;
+      } else {
+        filteredAttrs.push({ name: 'style', value: extraStyle });
+      }
+    }
+
+    let attrs = this.compileAttributes(filteredAttrs);
+    if (scopeClass) {
+      attrs = ` class="${scopeClass}"${attrs}`;
+    }
+
+    // Filter out style blocks from children rendering
+    const nonStyleChildren = el.children.filter(c => c.type !== 'Style');
+    const children = nonStyleChildren.map(c => this.compileStatement(c)).join('');
 
     if (this.isVoidElement(tag)) {
       return `${this.ind()}<${tag}${attrs}${content ? ` value="${this.escapeHtml(content)}"` : ''} />\n`;
@@ -118,6 +171,41 @@ export class Compiler {
     }
 
     return `${this.ind()}<${tag}${attrs}>${content}</${tag}>\n`;
+  }
+
+  private compileStyleWithClass(style: StyleBlock, className: string): void {
+    let cssBlock = `.${className} {\n`;
+    for (const prop of style.properties) {
+      const cssProp = this.mapCSSProperty(prop.name);
+      if (cssProp.includes(':')) {
+        // Complex mapping like 'flex' -> 'display: flex; gap'
+        cssBlock += `  ${cssProp}: ${prop.value};\n`;
+      } else {
+        cssBlock += `  ${cssProp}: ${prop.value};\n`;
+      }
+    }
+    cssBlock += '}\n';
+
+    if (style.hover) {
+      cssBlock += `.${className}:hover {\n`;
+      for (const prop of style.hover) {
+        cssBlock += `  ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+      }
+      cssBlock += '}\n';
+    }
+
+    if (style.responsive) {
+      for (const r of style.responsive) {
+        const bp = this.mapBreakpoint(r.breakpoint);
+        cssBlock += `@media (max-width: ${bp}) {\n  .${className} {\n`;
+        for (const prop of r.properties) {
+          cssBlock += `    ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+        }
+        cssBlock += '  }\n}\n';
+      }
+    }
+
+    this.css.push(cssBlock);
   }
 
   private compileContent(content: string | Expression | undefined): string {
@@ -147,6 +235,11 @@ export class Compiler {
         // Convert NyxCode action to JS
         const jsAction = this.actionToJS(attr.value as string);
         parts.push(`onclick="${jsAction}"`);
+      } else if (attr.name === 'style') {
+        // Inline style passthrough
+        parts.push(`style="${attr.value}"`);
+      } else if (attr.name === 'href') {
+        parts.push(`href="${attr.value}"`);
       } else {
         const val = typeof attr.value === 'string' ? attr.value : '';
         if (val === 'true') {
@@ -362,7 +455,7 @@ export class Compiler {
 ${css ? '    ' + css.split('\n').join('\n    ') : ''}
   </style>
 </head>
-<body>
+<body${this.pageClass ? ` class="${this.pageClass}"` : ''}>
 ${body}${js ? `
   <script>
 ${js}
@@ -397,14 +490,13 @@ ${js}
       'text': 'span',
       'link': 'a',
       'icon': 'i',
+      'slot': 'div',
     };
     return mapping[tag] || tag;
   }
 
   private mapAttrName(name: string): string {
     const mapping: Record<string, string> = {
-      'cols': 'data-cols',
-      'gap': 'data-gap',
       'format': 'data-format',
     };
     return mapping[name] || name;
