@@ -1,0 +1,21 @@
+page /dashboard {
+  auth required
+  data stats = query "SELECT count(*) as users, sum(revenue) as revenue FROM analytics"
+  data recent = query "SELECT * FROM orders ORDER BY created DESC LIMIT 5"
+  
+  h1 "Dashboard"
+  
+  grid cols=3 gap=1rem {
+    card { metric "Users" .stats.users icon=users }
+    card { metric "Revenue" .stats.revenue format=currency icon=dollar }
+    card { metric "Orders" .recent.length icon=cart }
+  }
+  
+  h2 "Recent Orders"
+  table recent {
+    col "Customer" .customer_name
+    col "Amount" .amount format=currency
+    col "Status" -> badge .status
+    col "Date" .created format=relative
+  }
+}

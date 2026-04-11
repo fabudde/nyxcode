@@ -1,0 +1,45 @@
+page /todos {
+  auth required
+  data todos = query "SELECT * FROM todos WHERE user_id = $auth.id"
+  
+  h1 "My Todos"
+  
+  form addTodo {
+    input title required placeholder="What needs doing?"
+    submit "Add" -> post /api/todos { title }
+  }
+  
+  each todos -> row {
+    checkbox .done on change -> patch /api/todos/$id { done: !.done }
+    text .title
+    button "x" on click -> delete /api/todos/$id
+  }
+}
+
+table todos {
+  id auto
+  user_id ref users.id
+  title string required
+  done bool default=false
+  created timestamp auto
+}
+
+api POST /todos {
+  auth required
+  validate { title string min=1 }
+  query "INSERT INTO todos (user_id, title) VALUES ($auth.id, $title)"
+  respond 201
+}
+
+api PATCH /todos/:id {
+  auth required owner
+  validate { done bool }
+  query "UPDATE todos SET done = $done WHERE id = $id"
+  respond 200
+}
+
+api DELETE /todos/:id {
+  auth required owner
+  query "DELETE FROM todos WHERE id = $id"
+  respond 204
+}

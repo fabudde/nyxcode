@@ -1,0 +1,6 @@
+page / {
+  style { bg gradient(purple, blue), text white center, padding 4rem }
+  h1 "Hello, NyxCode"
+  p "The language AI was waiting for."
+  button "Get Started" -> navigate /docs
+}
