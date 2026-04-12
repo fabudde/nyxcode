@@ -33,7 +33,46 @@ page /home {
 }
 ```
 
-## Features (v0.2.0)
+## Features (v0.3.0)
+
+### 📐 Layout System (NEW in v0.3)
+
+```nyx
+layout {
+  nav {
+    link "Home" href="/"
+    link "About" href="/about"
+  }
+  slot
+  footer { p "Made with NyxCode" }
+}
+
+page / { h1 "Home" }
+page /about { h1 "About" }
+```
+
+One `layout` block wraps ALL pages. `slot` = page content. Zero redundancy.  
+Next.js `layout.tsx`: 15+ lines. NyxCode: 3 lines.
+
+### ✅ Validator with Typo Detection (NEW in v0.3)
+
+```
+❌ Error: Undefined component "Hedaer" (did you mean "Header"?) (line 35:3)
+⚠️  Warning: Component "OldNav" is defined but never used (line 18:1)
+```
+
+Catches errors BEFORE compile — undefined components, duplicate routes, unused code. Levenshtein-based "did you mean?" suggestions.
+
+### 📄 Multi-File Static Output (NEW in v0.3)
+
+One `.nyx` file → multiple HTML pages. Each page = standalone file with SEO tags.
+
+```bash
+npx @fabudde/nyxcode build docs.nyx
+# ✅ Built: 12 pages to dist-site/
+```
+
+No JS router. Plain `<a href>` links. Zero JavaScript on static pages.
 
 ### ⚡ Reactive State
 
@@ -142,8 +181,18 @@ npx @fabudde/nyxcode build my-page.nyx
 ## Live Demo
 
 - 🌐 **Website:** [nyxcode.io](https://nyxcode.io)
-- 🎯 **Showcase** (built in NyxCode): [nyxcode.io/showcase-nyx.html](https://nyxcode.io/showcase-nyx.html)
+- 📚 **Docs** (built in NyxCode!): [nyxcode.io/docs](https://nyxcode.io/docs/)
+- 🎯 **Showcase:** [nyxcode.io/showcase-nyx.html](https://nyxcode.io/showcase-nyx.html)
 - ⚡ **Counter Demo:** [nyxcode.io/counter.html](https://nyxcode.io/counter.html)
+
+## VS Code Extension
+
+Syntax highlighting for `.nyx` files:
+
+```bash
+# Download from nyxcode.io/nyxcode-0.3.0.vsix
+# VS Code → Extensions → ⋮ → Install from VSIX
+```
 
 ## CLI
 
@@ -156,10 +205,10 @@ npx @fabudde/nyxcode tokens page.nyx    # Show token stream
 ## Roadmap
 
 - [x] **v0.1** — Parser + Compiler + CLI + Landing Page
-- [x] **v0.2** — Reactivity, Components, Security, npm ← *you are here*
-- [ ] **v0.3** — Routing, Form handling, Playground
-- [ ] **v0.4** — Database integration, API endpoints
-- [ ] **v0.5** — Component library, Theme system
+- [x] **v0.2** — Reactivity, Components, Security, npm
+- [x] **v0.3** — Multi-file SSG, Layout system, Validator, VS Code extension ← *you are here*
+- [ ] **v0.4** — Default props, --watch mode, data fetching, API endpoints
+- [ ] **v0.5** — Component library, Theme system, SSR
 - [ ] **v1.0** — Production ready
 
 ## Created By

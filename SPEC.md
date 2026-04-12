@@ -2,7 +2,7 @@
 
 > **Vision:** NyxCode is a language that completely replaces TypeScript/Next.js — but significantly more token-efficient and built for AIs.
 >
-> **Status:** v0.2 shipped. v0.3 in development (multi-file static output, smart JS inclusion).
+> **Status:** v0.3 shipped. Layout system, multi-file SSG, validator, VS Code extension.
 
 ## 1. File Structure
 
@@ -323,7 +323,93 @@ Each component usage gets a unique class. If `Card` is used 3 times, each gets `
 
 > **v0.3 optimization:** Hash-based deduplication will share classes for identical style blocks.
 
-## 6. Operators
+## 6. Layout System (v0.3)
+
+### 6.1 Basic Layout
+
+```nyx
+layout {
+  nav {
+    link "Home" href="/"
+    link "About" href="/about"
+  }
+  slot
+  footer { p "Built with NyxCode" }
+}
+```
+
+`layout` wraps ALL pages. `slot` marks where page content is inserted.
+
+### 6.2 Nested Slot
+
+`slot` works at any nesting depth:
+
+```nyx
+layout {
+  Navbar
+  section {
+    style { margin-left 260px, padding 3rem 4rem }
+    slot
+  }
+  Footer
+}
+```
+
+### 6.3 Layout via Import
+
+Layouts can live in separate files:
+
+```nyx
+use "./layout.nyx"
+
+page / { h1 "Home" }
+page /about { h1 "About" }
+```
+
+### 6.4 Layout CSS
+
+Layout styles are compiled once and shared across all pages (not duplicated per-page).
+
+### 6.5 Constraints
+
+- Only ONE layout per file (validator error otherwise)
+- `slot` MUST appear inside a layout or component (validator error otherwise)
+- Layout `head` injections are applied to every page
+
+## 7. Validation (v0.3)
+
+The validator runs BEFORE the compiler.
+
+### 7.1 Errors (block compilation)
+
+| Error | Example |
+|-------|--------|
+| Undefined component | `Hedaer` → "did you mean Header?" (Levenshtein ≤ 2) |
+| Duplicate page routes | Two `page /about { }` blocks |
+| Duplicate component names | Two `component Card { }` blocks |
+| Multiple layouts | More than one `layout { }` |
+| Slot outside layout/component | `slot` in a page body |
+| Missing slot in layout | `layout { }` without `slot` |
+
+### 7.2 Warnings (compile continues)
+
+| Warning | Example |
+|---------|--------|
+| Unused component | Defined but never referenced |
+| Empty page | `page /x { }` with no content |
+| Duplicate styles | Same property twice in one block |
+| Unknown HTML tag | `dvi` → "did you mean div?" |
+
+### 7.3 CLI Output
+
+```
+❌ Error: Undefined component "Hedaer" (did you mean "Header"?) (line 35:3)
+⚠️  Warning: Component "OldNav" is defined but never used (line 18:1)
+
+6 error(s) found. Compilation aborted.
+```
+
+## 8. Operators
 
 | Operator | Meaning |
 |----------|---------|
@@ -412,11 +498,11 @@ For AI coding platforms (Lovable, Bolt, Cursor, v0), this means:
 ### Shipped
 - [x] **v0.1** — Lexer, Parser, Compiler, CLI, Landing Page, GitHub Release
 - [x] **v0.2** — Reactive State, Components, Security Hardening, npm Package, Animations, Responsive, head injection
+- [x] **v0.3** — Multi-file SSG, Layout system (`layout { slot }`), Validator (Levenshtein typo detection), VS Code extension, multi-file imports, style dedup
 
 ### Planned
-- [ ] **v0.3** — Routing (multi-page), Form handling, Playground (browser editor), Style dedup
-- [ ] **v0.4** — Data fetching (`data = get /api/...`), API endpoints, Database queries
-- [ ] **v0.5** — Component library, Theme system (`$primary`, `$spacing.md`)
+- [ ] **v0.4** — Default props, `--watch` mode, data fetching (`data = get /api/...`), API endpoints
+- [ ] **v0.5** — Component library, Theme system (`$primary`, `$spacing.md`), Database queries
 - [ ] **v0.6** — Server-side rendering, Hydration
 - [ ] **v1.0** — Production ready
 
@@ -435,9 +521,10 @@ For AI coding platforms (Lovable, Bolt, Cursor, v0), this means:
 
 ```
 Program     = TopLevel*
-TopLevel    = Page | Component | UseStatement
+TopLevel    = Page | Component | Layout | UseStatement
 Page        = "page" Path "{" Body "}"
 Component   = "component" Name "{" ("props" Ident+)? Body "}"
+Layout      = "layout" "{" Body "}"
 UseStatement = "use" StringLiteral
 Body        = Statement*
 Statement   = Element | Style | State | Computed | Effect | Animate | Head | Each | When | Comment
