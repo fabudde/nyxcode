@@ -52,6 +52,7 @@ export class Compiler {
   private importResolver?: (path: string) => Program | null;
   private headInjections: string[] = [];
   private animations: string[] = [];
+  private styleCache: Map<string, string> = new Map(); // hash -> className for dedup
 
   constructor(options: Partial<CompilerOptions> = {}) {
     this.options = {
@@ -97,10 +98,14 @@ export class Compiler {
       this.components.set(comp.name, comp);
     }
 
-    // For now, compile the first page (multi-page routing comes later)
+    // Multi-page: compile ALL pages
     let html = '';
-    if (pages.length > 0) {
+    if (pages.length === 1) {
+      // Single page — no router needed
       html = this.compilePage(pages[0]);
+    } else if (pages.length > 1) {
+      // Multi-page — generate SPA router
+      html = this.compileMultiPage(pages);
     }
 
     const css = this.css.join('\n');
@@ -131,6 +136,57 @@ export class Compiler {
     }
 
     return content;
+  }
+
+  /** Compile multiple pages into SPA with client-side router */
+  private compileMultiPage(pages: PageNode[]): string {
+    let html = '';
+
+    // Compile each page into a hidden div
+    for (const page of pages) {
+      const route = page.path;
+      const pageId = `nyx-page-${route.replace(/\//g, '-').replace(/^-/, '') || 'home'}`;
+
+      // Compile page style
+      const pageStyle = page.body.find(s => s.type === 'Style') as StyleBlock | undefined;
+      if (pageStyle) {
+        this.compileStyleWithClass(pageStyle, pageId);
+      }
+
+      html += `${this.ind()}<div id="${pageId}" class="nyx-route${pageStyle ? ' ' + pageId : ''}" data-route="${route}" style="display:none">\n`;
+      this.indent++;
+      for (const stmt of page.body) {
+        if (stmt === pageStyle) continue;
+        html += this.compileStatement(stmt);
+      }
+      this.indent--;
+      html += `${this.ind()}</div>\n`;
+    }
+
+    // Add router script
+    this.js.push(`
+  // NyxCode SPA Router
+  const __routes = document.querySelectorAll('.nyx-route');
+  function __navigate(path) {
+    __routes.forEach(r => r.style.display = r.dataset.route === path ? '' : 'none');
+    history.pushState(null, '', path);
+  }
+  // Handle initial route
+  const __initPath = location.pathname || '/';
+  let __found = false;
+  __routes.forEach(r => {
+    if (r.dataset.route === __initPath) { r.style.display = ''; __found = true; }
+  });
+  if (!__found && __routes.length > 0) __routes[0].style.display = '';
+  // Handle popstate (back/forward)
+  window.addEventListener('popstate', () => __navigate(location.pathname));
+  // Intercept link clicks with data-navigate
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('[data-navigate]');
+    if (link) { e.preventDefault(); __navigate(link.dataset.navigate); }
+  });`);
+
+    return html;
   }
 
   // --- Statement compilation ---
@@ -199,6 +255,14 @@ export class Compiler {
         existingStyle.value = extraStyle + ';' + existingStyle.value;
       } else {
         filteredAttrs.push({ name: 'style', value: extraStyle });
+      }
+    }
+
+    // For link elements with internal href (starts with /), add data-navigate for SPA routing
+    if (el.tag === 'link') {
+      const hrefAttr = filteredAttrs.find(a => a.name === 'href');
+      if (hrefAttr && typeof hrefAttr.value === 'string' && hrefAttr.value.startsWith('/')) {
+        filteredAttrs.push({ name: 'data-navigate', value: hrefAttr.value });
       }
     }
 
@@ -537,11 +601,10 @@ export class Compiler {
       if (stmt.type === 'Element') {
         const el = stmt as ElementNode;
         if (el.tag === 'input') {
-          const type = el.attributes.find(a => a.name === 'type')?.value || 'text';
-          const placeholder = el.attributes.find(a => a.name === 'placeholder')?.value || '';
-          const required = el.attributes.some(a => a.name === 'required');
-          const name = (el.content && typeof el.content !== 'string' && el.content.type === 'StringLiteral') ? (el.content as any).value : el.tag;
-          html += `${this.ind()}<input type="${type}" name="${name}" placeholder="${placeholder}"${required ? ' required' : ''} />\n`;
+          // Just compile as a normal element — attributes handle everything
+          html += this.compileElement(el);
+        } else if (el.tag === 'textarea') {
+          html += this.compileElement(el);
         } else if (el.tag === 'submit') {
           const text = (el.content && typeof el.content !== 'string' && el.content.type === 'StringLiteral') ? (el.content as any).value : 'Submit';
           html += `${this.ind()}<button type="submit">${text}</button>\n`;
@@ -571,14 +634,21 @@ export class Compiler {
       props[attr.name] = typeof attr.value === 'string' ? attr.value : '';
     }
 
-    // Generate scoped wrapper with component class
-    const scopeClass = `nyx-${this.nextId('c')}`;
-
-    // Compile component's style blocks
-    for (const stmt of comp.body) {
-      if (stmt.type === 'Style') {
-        this.compileStyleWithClass(stmt as StyleBlock, scopeClass);
+    // Style dedup: reuse class if identical style already emitted
+    let scopeClass = "";
+    const styleStmt = comp.body.find(s => s.type === "Style") as StyleBlock | undefined;
+    if (styleStmt) {
+      const hash = this.hashStyle(styleStmt);
+      const cached = this.styleCache.get(hash);
+      if (cached) {
+        scopeClass = cached;
+      } else {
+        scopeClass = `nyx-${this.nextId("c")}`;
+        this.compileStyleWithClass(styleStmt, scopeClass);
+        this.styleCache.set(hash, scopeClass);
       }
+    } else {
+      scopeClass = `nyx-${this.nextId("c")}`;
     }
 
     // Compile children passed to this component (for slot substitution)
@@ -970,6 +1040,17 @@ ${reactiveRuntime}
     return mapping[name] || name;
   }
 
+
+  /** Generate a hash string from style block properties for dedup */
+  private hashStyle(style: StyleBlock): string {
+    let key = style.properties.map(p => `${p.name}:${p.value}`).join(';');
+    if (style.hover) key += '|h:' + style.hover.map(p => `${p.name}:${p.value}`).join(';');
+    if (style.focus) key += '|f:' + style.focus.map(p => `${p.name}:${p.value}`).join(';');
+    if (style.active) key += '|a:' + style.active.map(p => `${p.name}:${p.value}`).join(';');
+    if (style.pseudoElements) key += '|pe:' + style.pseudoElements.map(pe => pe.selector + ':' + pe.properties.map(p => `${p.name}:${p.value}`).join(';')).join('|');
+    if (style.responsive) key += '|r:' + style.responsive.map(r => r.breakpoint + ':' + r.properties.map(p => `${p.name}:${p.value}`).join(';')).join('|');
+    return key;
+  }
   private mapBreakpoint(bp: string): string {
     const breakpoints: Record<string, string> = {
       'mobile': '768px',
