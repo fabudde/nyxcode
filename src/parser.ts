@@ -23,6 +23,7 @@ import {
   ThemeSection, ValidateStatement, ValidateField, RespondStatement,
   LimitStatement, QueryStatement, ResponsiveBlock, SecurityNode, SecurityRule,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
+  HeadStatement, AnimateStatement,
 } from './ast.js';
 
 /** Set of tags that are recognized as built-in elements */
@@ -242,6 +243,58 @@ export class Parser {
     return { type: 'Use', path, line: start.line, col: start.col };
   }
 
+  /**
+   * Parse `head "..."` — raw HTML string injected into <head>.
+   * Use for fonts, meta tags, third-party CSS.
+   * Example: head "<link href='https://fonts.googleapis.com/...' rel='stylesheet'>"
+   */
+  private parseHead(): HeadStatement {
+    const start = this.consume(TokenType.Head);
+    const content = this.consume(TokenType.String).value;
+    return { type: 'Head', content, line: start.line, col: start.col };
+  }
+
+  /**
+   * Parse `animate name { ... }` — @keyframes definition.
+   * Content between { } is raw CSS keyframe body.
+   * Reconstructs proper CSS formatting from tokens.
+   */
+  private parseAnimate(): AnimateStatement {
+    const start = this.consume(TokenType.Animate);
+    const name = this.consumeIdentifier();
+    this.consume(TokenType.LeftBrace);
+    let content = '';
+    let depth = 1;
+    let lastType = '';
+    while (!this.isAtEnd() && depth > 0) {
+      const tok = this.advance();
+      if (tok.type === TokenType.LeftBrace) { depth++; content += '{ '; lastType = '{'; }
+      else if (tok.type === TokenType.RightBrace) { depth--; if (depth > 0) { content += '} '; lastType = '}'; } }
+      else if (tok.value === ':') { content += ': '; lastType = ':'; }
+      else if (tok.value === ';') { content += '; '; lastType = ';'; }
+      else if (tok.type === TokenType.Comma) { content += ', '; lastType = ','; }
+      else {
+        // Don't add space after { or : or ( or numbers (for 50% etc)
+        if (lastType === '{' || lastType === ':' || lastType === '(') {
+          content += tok.value;
+        } else if (tok.type === TokenType.LeftParen) {
+          content += tok.value;
+          lastType = '(';
+          continue;
+        } else if (tok.type === TokenType.RightParen) {
+          content += tok.value;
+        } else if (tok.value === '%') {
+          // Attach % directly to preceding number (50% not 50 %)
+          content += tok.value;
+        } else {
+          content += (content && lastType !== '{' && lastType !== ':' ? ' ' : '') + tok.value;
+        }
+        lastType = tok.type;
+      }
+    }
+    return { type: 'Animate', name, content: content.trim(), line: start.line, col: start.col };
+  }
+
   // --- Body parsing (statements inside { }) ---
 
   private parseBody(): Statement[] {
@@ -278,6 +331,8 @@ export class Parser {
       case TokenType.State: return this.parseState();
       case TokenType.Effect: return this.parseEffect();
       case TokenType.Computed: return this.parseComputed();
+      case TokenType.Head: return this.parseHead();
+      case TokenType.Animate: return this.parseAnimate();
       case TokenType.Identifier:
         return this.parseElement();
       case TokenType.Else: return null; // handled by parseWhen
@@ -966,7 +1021,8 @@ export class Parser {
       t.type === TokenType.Respond || t.type === TokenType.Limit ||
       t.type === TokenType.Query || t.type === TokenType.Else ||
       t.type === TokenType.State || t.type === TokenType.Effect ||
-      t.type === TokenType.Computed ||
+      t.type === TokenType.Computed || t.type === TokenType.Head ||
+      t.type === TokenType.Animate ||
       (t.type === TokenType.Identifier && ELEMENT_TAGS.has(t.value)) ||
       // Uppercase identifiers are component invocations (e.g., Card, Header)
       (t.type === TokenType.Identifier && t.value[0] >= 'A' && t.value[0] <= 'Z');

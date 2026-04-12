@@ -93,7 +93,22 @@ export type Statement =
   | StateStatement
   | EffectStatement
   | ComputedStatement
-  | RawExpression;
+  | RawExpression
+  | HeadStatement
+  | AnimateStatement;
+
+/** `head { ... }` — inject into <head>: fonts, meta, raw CSS */
+export interface HeadStatement extends BaseNode {
+  type: 'Head';
+  content: string; // Raw HTML to inject into <head>
+}
+
+/** `animate name { from { ... } to { ... } }` — @keyframes */
+export interface AnimateStatement extends BaseNode {
+  type: 'Animate';
+  name: string;
+  content: string; // Raw keyframe CSS
+}
 
 /** `data varname = get/query/post ...` */
 export interface DataStatement extends BaseNode {

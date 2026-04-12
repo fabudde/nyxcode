@@ -16,6 +16,7 @@ import {
   FormStatement, AuthStatement, ElementNode, Expression,
   StyleProperty, ResponsiveBlock, Attribute,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
+  HeadStatement, AnimateStatement,
 } from './ast.js';
 
 export interface CompilerOptions {
@@ -49,6 +50,8 @@ export class Compiler {
   private hasReactivity: boolean = false;
   private components: Map<string, ComponentNode> = new Map();
   private importResolver?: (path: string) => Program | null;
+  private headInjections: string[] = [];
+  private animations: string[] = [];
 
   constructor(options: Partial<CompilerOptions> = {}) {
     this.options = {
@@ -150,6 +153,8 @@ export class Compiler {
       case 'State': return this.compileState(stmt as StateStatement);
       case 'Effect': return this.compileEffect(stmt as EffectStatement);
       case 'Computed': return this.compileComputed(stmt as ComputedStatement);
+      case 'Head': this.headInjections.push((stmt as HeadStatement).content); return '';
+      case 'Animate': this.animations.push(`@keyframes ${(stmt as AnimateStatement).name} { ${(stmt as AnimateStatement).content} }`); return '';
       default: return '';
     }
   }
@@ -827,15 +832,18 @@ export class Compiler {
     const scriptContent = [js, reactiveRuntime].filter(Boolean).join('\n');
     const hasScript = scriptContent.trim().length > 0 || renderCalls.length > 0;
 
+    const headExtra = this.headInjections.length > 0 ? '\n  ' + this.headInjections.join('\n  ') : '';
+    const animCSS = this.animations.length > 0 ? '\n    ' + this.animations.join('\n    ') : '';
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NyxCode App</title>
+  <title>NyxCode App</title>${headExtra}
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, sans-serif; }
+    body { font-family: system-ui, -apple-system, sans-serif; }${animCSS}
 ${css ? '    ' + css.split('\n').join('\n    ') : ''}
   </style>
 </head>
