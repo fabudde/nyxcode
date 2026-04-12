@@ -7,6 +7,7 @@ use "./components/testimonial.nyx"
 page /showcase {
   head "<link rel='preconnect' href='https://fonts.googleapis.com'>"
   head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400&display=swap' rel='stylesheet'>"
+  head "<style>body button{background:rgba(102,126,234,0.15);border:1px solid rgba(102,126,234,0.3);color:white;padding:0.8rem 2rem;border-radius:12px;font-size:1.2rem;cursor:pointer;transition:all 0.2s;margin:0.3rem}body button:hover{background:rgba(102,126,234,0.3);transform:scale(1.05)}body h1,body h2,body h3{margin-bottom:0.5rem}body .nyx-page p{margin-bottom:0.5rem;opacity:0.85}.counter-num{font-size:5rem;font-weight:800;background:linear-gradient(135deg,#667eea,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin:1rem 0}.stat-num{font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,#667eea,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}.feature-card h3{color:#e0e0f0}.feature-card .icon{font-size:2rem;margin-bottom:0.8rem}.testimonial-quote{font-style:italic;line-height:1.6;margin-bottom:0.8rem}.testimonial-author{color:#667eea;font-weight:600}.testimonial-role{color:#8080a0;font-size:0.8rem}</style>"
 
   animate drift {
     to { transform: translate(30px, 30px); }
