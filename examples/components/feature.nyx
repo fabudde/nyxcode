@@ -1,0 +1,13 @@
+component Feature {
+  props icon title description
+  style {
+    bg white
+    radius 16px
+    padding 2rem
+    shadow 0 4px 20px rgba(0, 0, 0, 0.08)
+    text-align center
+  }
+  h2 .icon
+  h3 .title
+  p .description
+}

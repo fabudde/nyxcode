@@ -1,0 +1,9 @@
+component Stat {
+  props number label
+  style {
+    text-align center
+    padding 1.5rem
+  }
+  h2 .number
+  p .label
+}

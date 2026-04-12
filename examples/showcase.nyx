@@ -1,0 +1,103 @@
+# NyxCode Showcase
+
+use "./components/hero.nyx"
+use "./components/feature.nyx"
+use "./components/stat.nyx"
+use "./components/testimonial.nyx"
+use "./components/card.nyx"
+
+page /showcase {
+  style {
+    bg #0a0a1a
+    color #e0e0f0
+    font-family system-ui
+    margin 0
+    padding 0
+  }
+
+  Hero title="NyxCode" subtitle="The AI-native programming language. 68% fewer tokens. Zero config." cta_text="Get Started"
+
+  section {
+    style {
+      display flex
+      justify-content center
+      gap 3rem
+      padding 3rem 2rem
+      bg #12122a
+    }
+    Stat number="68%" label="fewer lines than React"
+    Stat number="v0.2" label="with reactivity"
+    Stat number="0" label="config files needed"
+    Stat number="MIT" label="open source forever"
+  }
+
+  section {
+    style {
+      display grid
+      grid-template-columns repeat(3, 1fr)
+      gap 1.5rem
+      padding 4rem 2rem
+      max-width 1000px
+      margin 0 auto
+    }
+    Feature icon="⚡" title="State in 1 Line" description="state count = 0. Reactive, bindable, auto-updating."
+    Feature icon="🧩" title="Components" description="Import, reuse, compose. Props and scoped styles."
+    Feature icon="🎨" title="3-Tier Styling" description="Shorthand, style blocks, or raw CSS escape hatch."
+    Feature icon="🔒" title="Secure by Default" description="No eval. Auto-escape. CSRF. SQL injection impossible."
+    Feature icon="🤖" title="AI-Native" description="Every token matters. 60% less cost for AI platforms."
+    Feature icon="📦" title="Zero Config" description="File equals route. No webpack. No tsconfig. Just .nyx."
+  }
+
+  section {
+    style {
+      padding 4rem 2rem
+      max-width 600px
+      margin 0 auto
+      text-align center
+    }
+    h2 "Try It Live"
+    p "This counter is reactive NyxCode."
+
+    state clicks = 0
+    h1 clicks
+    p "clicks"
+    button "+" -> clicks = clicks + 1
+    button "-" -> clicks = clicks - 1
+    button "Reset" -> clicks = 0
+  }
+
+  section {
+    style {
+      padding 4rem 2rem
+      max-width 800px
+      margin 0 auto
+      display grid
+      grid-template-columns repeat(2, 1fr)
+      gap 1.5rem
+    }
+    Testimonial quote="First Molt = Lobster wirft Schale ab. Das ist perfekt." author="Kiro" role="Wolf"
+    Testimonial quote="Security-as-Language-Constraint. Unsicher ist unmoeglich." author="Tyto" role="Security Advisor"
+    Testimonial quote="Eine eigene Sprache erfunden. In 2 Stunden." author="Fabian" role="Co-Creator"
+    Testimonial quote="Das Rudel baut Dinge die es noch nicht gibt." author="Kiro" role="Wolf"
+  }
+
+  section {
+    style {
+      bg linear-gradient(135deg, #667eea, #764ba2)
+      padding 4rem 2rem
+      text-align center
+      color white
+    }
+    h2 "Start Building"
+    p "npx nyx build your-page.nyx"
+  }
+
+  footer {
+    style {
+      padding 2rem
+      text-align center
+      color #505070
+    }
+    p "Built with NyxCode by Nyx, Fabian, and Tyto. MIT License."
+  }
+}
