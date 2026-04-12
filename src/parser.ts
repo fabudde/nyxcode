@@ -857,10 +857,10 @@ export class Parser {
 
     // Parse content and attributes
     while (!this.isAtEnd() && !this.check(TokenType.RightBrace)) {
-      // Check if next is a new statement — but for components, key=value is NOT a new statement
+      // Check if next is a new statement — but key=value is an attribute, NOT a new statement
       if (this.isStatementStart()) {
-        if (isComponentCall && this.peekAt(1)?.type === TokenType.Equals) {
-          // This is an attribute of the component, not a new statement
+        if (this.peekAt(1)?.type === TokenType.Equals) {
+          // This is an attribute (style="...", class="...", etc), not a new statement
         } else {
           break;
         }
@@ -878,7 +878,8 @@ export class Parser {
         content = { type: 'PropertyAccess', path, line: next.line, col: next.col };
       }
       // Attribute: key=value or key="complex value" (including keyword tokens like style=)
-      else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form) && this.peekAt(1)?.type === TokenType.Equals) {
+      // Attribute: key=value — handle keywords that can also be attribute names
+      else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form || next.type === TokenType.Data || next.type === TokenType.State) && this.peekAt(1)?.type === TokenType.Equals) {
         const name = this.advance().value;
         this.advance(); // =
         const valToken = this.peek();

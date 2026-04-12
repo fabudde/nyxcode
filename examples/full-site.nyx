@@ -1,0 +1,132 @@
+# Full Website Demo — All NyxCode v0.2 features
+# Proves NyxCode can build real websites
+
+use "./components/hero.nyx"
+use "./components/feature.nyx"
+
+page /full {
+  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap' rel='stylesheet'>"
+  head "<meta name='description' content='NyxCode Full Website Demo'>"
+
+  animate fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  animate glow {
+    0% { box-shadow: 0 0 5px rgba(102, 126, 234, 0.3); }
+    50% { box-shadow: 0 0 20px rgba(102, 126, 234, 0.6); }
+    100% { box-shadow: 0 0 5px rgba(102, 126, 234, 0.3); }
+  }
+
+  style {
+    bg #0a0a1a
+    color #e0e0f0
+    font-family Inter
+    margin 0
+  }
+
+  # Navigation
+  nav {
+    style {
+      display flex
+      justify-content space-between
+      align-items center
+      padding 1rem 2rem
+      bg rgba(10, 10, 26, 0.9)
+      backdrop-filter blur(10px)
+      border-bottom 1px solid rgba(255, 255, 255, 0.05)
+      position sticky
+      top 0
+      z-index 100
+    }
+    span "NyxCode" style="font-weight: 800; font-size: 1.2rem; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
+    row {
+      style {
+        display flex
+        gap 2rem
+      }
+      link "Features" href="#features" style="color: #8080a0; text-decoration: none;"
+      link "Demo" href="#demo" style="color: #8080a0; text-decoration: none;"
+      link "GitHub" href="https://github.com/fabudde/nyxcode" style="color: #667eea; text-decoration: none; font-weight: 600;"
+    }
+  }
+
+  # Hero Section
+  section {
+    style {
+      bg linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)
+      padding 8rem 2rem
+      text-align center
+      color white
+      position relative
+      overflow hidden
+
+      before {
+        position absolute
+        top -50%
+        left -50%
+        width 200%
+        height 200%
+        bg radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px)
+        background-size 30px 30px
+      }
+    }
+    h1 "Build websites with 68% fewer tokens" style="font-size: 3.5rem; font-weight: 800; position: relative; max-width: 700px; margin: 0 auto 1rem;"
+    p "The AI-native programming language for the web." style="font-size: 1.3rem; opacity: 0.9; position: relative;"
+  }
+
+  # Features Grid
+  section id="features" {
+    style {
+      display grid
+      grid-template-columns repeat(3, 1fr)
+      gap 1.5rem
+      padding 5rem 2rem
+      max-width 1000px
+      margin 0 auto
+
+      @mobile {
+        grid-template-columns 1fr
+        padding 3rem 1rem
+      }
+    }
+    Feature icon="⚡" title="Reactive State" description="state count = 0. Reactive, two-way bindable, auto-updating."
+    Feature icon="🧩" title="Components" description="Import, reuse, compose. Props and scoped styles."
+    Feature icon="🎨" title="Pseudo-Elements" description="before { } and after { } for decorations and overlays."
+    Feature icon="🎭" title="Hover & Focus" description="hover { transform scale(1.05) } — scoped interactions."
+    Feature icon="🔒" title="Secure by Default" description="No eval. Auto-escape. Tyto-approved security."
+    Feature icon="📱" title="Responsive" description="@mobile { } breakpoints built into every style block."
+  }
+
+  # Interactive Demo
+  section id="demo" {
+    style {
+      padding 5rem 2rem
+      text-align center
+      max-width 500px
+      margin 0 auto
+    }
+    h2 "Live Counter" style="font-size: 2rem; margin-bottom: 0.5rem;"
+    p "Compiled from NyxCode. Reactive state, zero framework." style="color: #8080a0; margin-bottom: 2rem;"
+
+    state clicks = 0
+    h1 clicks style="font-size: 5rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
+    button "+" -> clicks = clicks + 1
+    button "-" -> clicks = clicks - 1
+    button "Reset" -> clicks = 0
+  }
+
+  # Footer
+  footer {
+    style {
+      padding 3rem 2rem
+      text-align center
+      color #505070
+      font-size 0.85rem
+      border-top 1px solid rgba(255, 255, 255, 0.05)
+    }
+    p "Built with NyxCode by Nyx, Fabian & Tyto. MIT License."
+    p "nyxcode.io" style="margin-top: 0.5rem; color: #667eea;"
+  }
+}
