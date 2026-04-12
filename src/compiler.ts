@@ -613,9 +613,21 @@ export class Compiler {
   function __nyxBind() {
     document.querySelectorAll('[data-nyx-bind]').forEach(el => {
       const expr = el.getAttribute('data-nyx-bind');
+      // SECURITY: Safe expression evaluator — only allows property access (state.X, computed.X)
+      // No new Function(), no eval(). Tyto's Security Review 2026-04-12 🦉🔒
+      const safeEval = (expr) => {
+        const parts = expr.split('.');
+        if (parts[0] === 'state' && parts.length === 2 && __nyx.subscribers.has(parts[1])) {
+          return __nyx.state[parts[1]];
+        }
+        if (parts[0] === 'computed' && parts.length === 2 && parts[1] in __nyx.computedDefs) {
+          return __nyx.computed[parts[1]];
+        }
+        return '';
+      };
       const update = () => {
         try {
-          const val = new Function('state', 'computed', 'return ' + expr)(__nyx.state, __nyx.computed);
+          const val = safeEval(expr);
           if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
             el.value = val;
           } else {
@@ -635,6 +647,7 @@ export class Compiler {
     // Bind inputs with data-nyx-model (two-way binding)
     document.querySelectorAll('[data-nyx-model]').forEach(el => {
       const name = el.getAttribute('data-nyx-model');
+      if (!__nyx.subscribers.has(name)) return; // SECURITY: Reject unknown state keys (Tyto Review 🦉🔒)
       el.addEventListener('input', (e) => {
         __nyx.state[name] = e.target.value;
       });
@@ -651,8 +664,9 @@ export class Compiler {
       const template = el.getAttribute('data-nyx-template');
       const update = () => {
         const items = __nyx.state[config.collection] || [];
+        const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         el.innerHTML = items.map((item, i) => {
-          return template.replace(/\{\{(\w+)\}\}/g, (_, key) => item[key] ?? item ?? '');
+          return template.replace(/\{\{(\w+)\}\}/g, (_, key) => esc(item[key] ?? item ?? ''));
         }).join('');
       };
       __nyx.subscribe(config.collection, update);
