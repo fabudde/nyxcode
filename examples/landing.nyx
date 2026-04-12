@@ -19,8 +19,8 @@ page / {
     grid cols=3 gap=1.5rem {
       card {
         style { padding 2rem 1rem, border-radius 16px }
-        h2 "76%"
-        p "fewer lines than React"
+        h2 "68%"
+        p "fewer lines vs React"
       }
       card {
         style { padding 2rem 1rem, border-radius 16px }
@@ -29,7 +29,7 @@ page / {
       }
       card {
         style { padding 2rem 1rem, border-radius 16px }
-        h2 "50"
+        h2 "121"
         p "lines for this entire page"
       }
     }
@@ -43,13 +43,13 @@ page / {
     grid cols=2 gap=1.5rem {
       card {
         style { border-radius 12px, text-align left }
-        h3 "React — 20 lines · 82 tokens"
+        h3 "React — 20 lines"
         p "import React, { useState, useEffect } from 'react';"
         p "export default function UserList() { ... }"
       }
       card {
         style { border-radius 12px, text-align left }
-        h3 "NyxCode — 4 lines · 25 tokens"
+        h3 "NyxCode — 4 lines"
         p "page /users {"
         p "  data users = get /api/users"
         p "  each users -> card { h3 .name, p .email }"
@@ -63,9 +63,9 @@ page / {
     style { max-width 600px, margin 4rem auto, padding 0 2rem, text-align center }
     h2 "Real Numbers"
     p "Measured on this landing page — same output, three implementations."
-    p "NyxCode:        50 lines |  1,147 bytes | 1 file"
-    p "HTML/CSS:      125 lines |  4,216 bytes | 1 file | -60%"
-    p "React+CSS:     209 lines |  4,526 bytes | 2 files | -76%"
+    p "NyxCode:        121 lines |  3,676 bytes | 1 file"
+    p "HTML/CSS:       129 lines | 11,228 bytes | 1 file  | -68% bytes"
+    p "React+CSS:      372 lines |  8,842 bytes | 2+ files | -68% lines"
   }
 
   # Features

@@ -10,11 +10,11 @@ The [nyxcode.io](https://nyxcode.io) landing page — same visual output:
 
 | | Lines | Bytes | Files | vs NyxCode |
 |---|---|---|---|---|
-| **NyxCode** | **50** | **1,147** | **1** | — |
-| HTML/CSS | 125 | 4,216 | 1 | 2.5x more |
-| React (TSX+CSS) | 209 | 4,526 | 2 | 4.2x more |
+| **NyxCode** | **121** | **3,676** | **1** | — |
+| HTML/CSS | 129 | 11,228 | 1 | 3.1x more bytes |
+| React (TSX+CSS) | 372 | 8,842 | 2+ | 3.1x more lines |
 
-**76% fewer lines than React. 60% fewer than HTML.**
+**68% fewer lines than React. 68% fewer bytes than HTML.**
 
 ### What's New
 
