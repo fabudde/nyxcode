@@ -1378,9 +1378,12 @@ ${reactiveRuntime}
         // Convert "count + 1" to "__nyx.state.count = __nyx.state.count + 1"
         // Convert "count = 0" to "__nyx.state.count = 0"
         if (action.includes('=')) {
-          const [lhs, rhs] = action.split('=').map(s => s.trim());
+          const [lhs, ...rhsParts] = action.split('=');
+          const rhs = rhsParts.join('=').trim();
           const rhsResolved = this.resolveStateRefs(rhs);
-          return `__nyx.state.${lhs.trim()} = ${rhsResolved}`;
+          // Use single quotes for strings inside onclick (which uses double quotes)
+          const rhsFinal = rhsResolved.replace(/"/g, "'");
+          return `__nyx.state.${lhs.trim()} = ${rhsFinal}`;
         } else {
           // Shorthand: "count + 1" means increment
           const resolved = this.resolveStateRefs(action);

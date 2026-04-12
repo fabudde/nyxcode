@@ -684,7 +684,12 @@ export class Parser {
       } else if (cur.type === TokenType.RightBrace) {
         break;
       } else {
-        action += (action ? ' ' : '') + this.advance().value;
+        const tok = this.advance();
+        if (tok.type === TokenType.String) {
+          action += (action ? ' ' : '') + '"' + tok.value + '"';
+        } else {
+          action += (action ? ' ' : '') + tok.value;
+        }
       }
     }
 
@@ -940,7 +945,13 @@ export class Parser {
           } else if (cur.type === TokenType.RightBrace) {
             break; // end of parent block
           } else {
-            action += (action ? ' ' : '') + this.advance().value;
+            const tok = this.advance();
+            // Preserve quotes around string values so the compiler can generate correct JS
+            if (tok.type === TokenType.String) {
+              action += (action ? ' ' : '') + '"' + tok.value + '"';
+            } else {
+              action += (action ? ' ' : '') + tok.value;
+            }
           }
         }
         attributes.push({ name: 'onClick', value: action.trim() });
