@@ -1,0 +1,61 @@
+layout {
+  head "<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#0b0b14;color:#b8b8d8;font-family:system-ui,-apple-system,sans-serif;line-height:1.75;min-height:100vh;display:flex;flex-direction:column}a{color:#667eea;text-decoration:none}a:hover{color:#9fa8da}</style>"
+  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap' rel='stylesheet'>"
+  nav {
+    style {
+      background #08080f
+      padding 1rem 2rem
+      display flex
+      gap 2rem
+      border-bottom 1px solid rgba(255,255,255,0.06)
+    }
+    link "NyxCode" href="/"
+    link "Home" href="/"
+    link "About" href="/about"
+    link "Contact" href="/contact"
+  }
+  section {
+    style {
+      padding 3rem 2rem
+      max-width 800px
+      flex 1
+    }
+    slot
+  }
+  footer {
+    style {
+      background #08080f
+      padding 1.5rem 2rem
+      text-align center
+      border-top 1px solid rgba(255,255,255,0.06)
+      color #4a4a6a
+      font-size 0.85rem
+    }
+    p "2026 NyxCode"
+  }
+}
+
+page / {
+  h1 "Welcome to NyxCode" style="font-size:2.2rem;font-weight:800;color:#f0f0ff;margin-bottom:0.5rem"
+  p "This page uses a shared layout. Nav and footer come from the layout block." style="color:#7878a8;font-size:1.05rem;margin-bottom:2rem"
+  div {
+    style {
+      background rgba(102,126,234,0.05)
+      border 1px solid rgba(102,126,234,0.1)
+      border-radius 12px
+      padding 1.5rem
+    }
+    p "This entire site is ~50 lines of NyxCode. The same in Next.js would be ~100 lines across 6 files." style="color:#8888b8;margin:0"
+  }
+}
+
+page /about {
+  h1 "About NyxCode" style="font-size:2.2rem;font-weight:800;color:#f0f0ff;margin-bottom:0.5rem"
+  p "A token-efficient language built for AIs. Replaces TypeScript/Next.js with 70% fewer tokens." style="color:#7878a8;font-size:1.05rem"
+}
+
+page /contact {
+  h1 "Contact" style="font-size:2.2rem;font-weight:800;color:#f0f0ff;margin-bottom:0.5rem"
+  p "GitHub: github.com/fabudde/nyxcode" style="color:#9898b8"
+  p "npm: @fabudde/nyxcode" style="color:#9898b8"
+}

@@ -1,6 +1,8 @@
-# NyxCode Language Specification v0.2
+# NyxCode Language Specification v0.3
 
-> **Status:** v0.2 features are implemented and shipped. v0.3+ features marked as planned.
+> **Vision:** NyxCode is a language that completely replaces TypeScript/Next.js — but significantly more token-efficient and built for AIs.
+>
+> **Status:** v0.2 shipped. v0.3 in development (multi-file static output, smart JS inclusion).
 
 ## 1. File Structure
 

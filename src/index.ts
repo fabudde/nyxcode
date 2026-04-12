@@ -6,6 +6,7 @@
 
 export { Lexer } from './lexer.js';
 export { Parser } from './parser.js';
+export { Validator } from './validator.js';
 export * from './ast.js';
 export * from './tokens.js';
 

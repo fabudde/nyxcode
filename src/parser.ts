@@ -23,7 +23,7 @@ import {
   ThemeSection, ValidateStatement, ValidateField, RespondStatement,
   LimitStatement, QueryStatement, ResponsiveBlock, SecurityNode, SecurityRule,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
-  HeadStatement, AnimateStatement, PseudoElementBlock,
+  HeadStatement, AnimateStatement, PseudoElementBlock, LayoutNode,
 } from './ast.js';
 
 /** Set of tags that are recognized as built-in elements */
@@ -73,9 +73,10 @@ export class Parser {
       case TokenType.Theme: return this.parseTheme();
       case TokenType.Security: return this.parseSecurity();
       case TokenType.Use: return this.parseUse();
+      case TokenType.Layout: return this.parseLayout();
       case TokenType.EOF: return null;
       default:
-        throw this.error(`Unexpected token '${token.value}' at top level. Expected: page, component, api, table, store, theme, or security.`);
+        throw this.error(`Unexpected token '${token.value}' at top level. Expected: page, component, api, table, store, theme, security, or layout.`);
     }
   }
 
@@ -241,6 +242,14 @@ export class Parser {
     const start = this.consume(TokenType.Use);
     const path = this.consume(TokenType.String).value;
     return { type: 'Use', path, line: start.line, col: start.col };
+  }
+
+  private parseLayout(): LayoutNode {
+    const start = this.consume(TokenType.Layout);
+    this.consume(TokenType.LeftBrace);
+    const body = this.parseBody();
+    this.consume(TokenType.RightBrace);
+    return { type: 'Layout', body, line: start.line, col: start.col };
   }
 
   /**

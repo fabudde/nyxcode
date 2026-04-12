@@ -1,0 +1,11 @@
+use "./shared-layout.nyx"
+
+page / {
+  h1 "Home via Imported Layout"
+  p "The layout was imported from another file."
+}
+
+page /other {
+  h1 "Other Page"
+  p "Same imported layout, different content."
+}

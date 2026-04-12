@@ -1,0 +1,19 @@
+layout {
+  header {
+    style {
+      background #2d2d4e
+      padding 0.5rem 1rem
+      color white
+    }
+    p "Imported Layout Header"
+  }
+  slot
+  footer {
+    style {
+      background #2d2d4e
+      padding 0.5rem 1rem
+      text-align center
+    }
+    p "Imported Footer"
+  }
+}

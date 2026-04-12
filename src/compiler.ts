@@ -16,7 +16,7 @@ import {
   FormStatement, AuthStatement, ElementNode, Expression,
   StyleProperty, ResponsiveBlock, Attribute, PseudoElementBlock,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
-  HeadStatement, AnimateStatement,
+  HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
 export interface CompilerOptions {
@@ -53,6 +53,8 @@ export class Compiler {
   private headInjections: string[] = [];
   private animations: string[] = [];
   private styleCache: Map<string, string> = new Map(); // hash -> className for dedup
+  private staticMode: boolean = false; // When true, don't emit data-navigate on links
+  private layout: LayoutNode | null = null; // Layout wrapping all pages
 
   constructor(options: Partial<CompilerOptions> = {}) {
     this.options = {
@@ -71,19 +73,29 @@ export class Compiler {
   }
 
   /**
-   * Compile the full program.
+   * Result type for multi-file output.
    */
-  compile(program: Program): CompilerOutput {
-    // Process `use` imports first — load third-party components
+  public static readonly MULTI_FILE = true;
+
+  /**
+   * Compile multi-page programs into separate standalone HTML files.
+   * Returns an array of {path, html} objects, one per page.
+   */
+  compileMultiFile(program: Program): Array<{path: string, html: string}> {
+    // Process `use` imports first
     const uses = program.body.filter(n => n.type === 'Use') as UseStatement[];
     for (const use of uses) {
       if (this.importResolver) {
         const imported = this.importResolver(use.path);
         if (imported) {
-          // Register all components from the imported file
           for (const node of imported.body) {
             if (node.type === 'Component') {
               this.components.set((node as ComponentNode).name, node as ComponentNode);
+            } else if (node.type === 'Layout') {
+              // Import layout from third-party file
+              if (!this.layout) {
+                this.layout = node as LayoutNode;
+              }
             }
           }
         }
@@ -92,6 +104,119 @@ export class Compiler {
 
     const pages = program.body.filter(n => n.type === 'Page') as PageNode[];
     const components = program.body.filter(n => n.type === 'Component') as ComponentNode[];
+    const layouts = program.body.filter(n => n.type === 'Layout') as LayoutNode[];
+
+    // Validate: max one layout per file
+    if (layouts.length > 1) {
+      throw new Error('[NyxCode Compiler Error] Only one layout per file is allowed.');
+    }
+    if (layouts.length === 1 && !this.layout) {
+      this.layout = layouts[0];
+    } else if (layouts.length === 1 && this.layout) {
+      throw new Error('[NyxCode Compiler Error] Only one layout per file is allowed (including imports).');
+    }
+
+    // Register inline components
+    for (const comp of components) {
+      this.components.set(comp.name, comp);
+    }
+
+    // If we have a layout, compile its CSS once (shared across all pages)
+    // and cache the layout HTML template with <!--SLOT--> placeholder
+    let layoutCssBlocks: string[] = [];
+    let layoutHeadInjections: string[] = [];
+    let layoutHtmlTemplate: string | null = null;
+    if (this.layout) {
+      // Do a single compile to collect layout CSS, head injections + HTML template
+      this.css = [];
+      this.js = [];
+      this.headInjections = [];
+      this.componentId = 0;
+      this.indent = 0;
+      this.staticMode = true;
+      layoutHtmlTemplate = this.compileLayoutBody(this.layout.body, '<!--SLOT-->');
+      this.staticMode = false;
+      layoutCssBlocks = [...this.css];
+      layoutHeadInjections = [...this.headInjections];
+    }
+
+    const results: Array<{path: string, html: string}> = [];
+
+    for (const page of pages) {
+      // Reset per-page state
+      this.css = [...layoutCssBlocks]; // Start with layout CSS (already compiled once)
+      this.js = [];
+      this.componentId = this.layout ? 1000 : 0; // Offset to avoid ID collisions
+      this.indent = 0;
+      this.pageClass = '';
+      this.stateVars = new Map();
+      this.computedVars = new Map();
+      this.effects = [];
+      this.hasReactivity = false;
+      this.headInjections = [...layoutHeadInjections]; // Start with layout head injections
+      this.animations = [];
+      // Keep components and styleCache across pages for dedup
+
+      let bodyHtml: string;
+      if (layoutHtmlTemplate) {
+        // Compile page content, then insert into layout template
+        const pageContent = this.compilePageStatic(page);
+        bodyHtml = layoutHtmlTemplate.replace('<!--SLOT-->', pageContent);
+      } else {
+        bodyHtml = this.compilePageStatic(page);
+      }
+
+      const css = this.css.join('\n');
+      const js = this.js.length > 0 ? this.buildJS() : '';
+
+      // Extract page title from first h1
+      const pageTitle = this.extractPageTitle(page) || this.pathToTitle(page.path);
+
+      // Build standalone HTML document
+      const html = this.buildStandaloneHTML(bodyHtml, css, js, page.path, pageTitle);
+      results.push({ path: page.path, html });
+    }
+
+    this.layout = null; // Reset for next compilation
+    return results;
+  }
+
+  /**
+   * Compile the full program (legacy single-file output).
+   */
+  compile(program: Program): CompilerOutput {
+    // Process `use` imports first — load third-party components + layouts
+    const uses = program.body.filter(n => n.type === 'Use') as UseStatement[];
+    for (const use of uses) {
+      if (this.importResolver) {
+        const imported = this.importResolver(use.path);
+        if (imported) {
+          for (const node of imported.body) {
+            if (node.type === 'Component') {
+              this.components.set((node as ComponentNode).name, node as ComponentNode);
+            } else if (node.type === 'Layout') {
+              if (!this.layout) {
+                this.layout = node as LayoutNode;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const pages = program.body.filter(n => n.type === 'Page') as PageNode[];
+    const components = program.body.filter(n => n.type === 'Component') as ComponentNode[];
+    const layouts = program.body.filter(n => n.type === 'Layout') as LayoutNode[];
+
+    // Validate: max one layout
+    if (layouts.length > 1) {
+      throw new Error('[NyxCode Compiler Error] Only one layout per file is allowed.');
+    }
+    if (layouts.length === 1 && !this.layout) {
+      this.layout = layouts[0];
+    } else if (layouts.length === 1 && this.layout) {
+      throw new Error('[NyxCode Compiler Error] Only one layout per file is allowed (including imports).');
+    }
 
     // Register inline components too
     for (const comp of components) {
@@ -101,16 +226,15 @@ export class Compiler {
     // Multi-page: compile ALL pages
     let html = '';
     if (pages.length === 1) {
-      // Single page — no router needed
       html = this.compilePage(pages[0]);
     } else if (pages.length > 1) {
-      // Multi-page — generate SPA router
       html = this.compileMultiPage(pages);
     }
 
     const css = this.css.join('\n');
     const js = this.js.length > 0 ? this.buildJS() : '';
 
+    this.layout = null; // Reset
     return {
       html: this.buildHTML(html, css, js),
       css,
@@ -136,6 +260,138 @@ export class Compiler {
     }
 
     return content;
+  }
+
+  /**
+   * Compile a single page for static multi-file output.
+   * NO SPA router. NO data-navigate. Standalone page.
+   */
+  private compilePageStatic(page: PageNode): string {
+    let content = '';
+
+    // First style block in a page applies to body
+    const pageStyle = page.body.find(s => s.type === 'Style') as StyleBlock | undefined;
+    if (pageStyle) {
+      this.compileStyleWithClass(pageStyle, 'nyx-page');
+      this.pageClass = 'nyx-page';
+    }
+
+    // Temporarily set static mode to suppress data-navigate on links
+    this.staticMode = true;
+    for (const stmt of page.body) {
+      if (stmt === pageStyle) continue;
+      content += this.compileStatement(stmt);
+    }
+    this.staticMode = false;
+
+    return content;
+  }
+
+  /**
+   * Compile layout body, replacing `slot` elements with the given slotContent.
+   * Returns the HTML string for the layout wrapping the page content.
+   */
+  private layoutSlotContent: string | null = null;
+
+  private compileLayoutBody(body: Statement[], slotContent: string): string {
+    let html = '';
+    const savedStaticMode = this.staticMode;
+    this.staticMode = true;
+    this.layoutSlotContent = slotContent;
+
+    for (const stmt of body) {
+      if (stmt.type === 'Element' && (stmt as ElementNode).tag === 'slot') {
+        // Replace slot with page content
+        html += slotContent;
+      } else {
+        html += this.compileStatement(stmt);
+      }
+    }
+
+    this.layoutSlotContent = null;
+    this.staticMode = savedStaticMode;
+    return html;
+  }
+
+  /**
+   * Extract the first h1 text content from a page for SEO title.
+   */
+  private extractPageTitle(page: PageNode): string | null {
+    for (const stmt of page.body) {
+      const title = this.findH1InStatement(stmt);
+      if (title) return title;
+    }
+    return null;
+  }
+
+  private findH1InStatement(stmt: Statement): string | null {
+    if (stmt.type === 'Element') {
+      const el = stmt as ElementNode;
+      if (el.tag === 'h1' && el.content) {
+        if (typeof el.content === 'string') return el.content;
+        if (el.content.type === 'StringLiteral') return (el.content as any).value;
+      }
+      // Recurse into children
+      for (const child of el.children) {
+        const found = this.findH1InStatement(child);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Convert a URL path to a human-readable title.
+   */
+  private pathToTitle(path: string): string {
+    if (path === '/' || path === '/docs') return 'Documentation';
+    const last = path.split('/').filter(Boolean).pop() || 'Page';
+    return last.charAt(0).toUpperCase() + last.slice(1);
+  }
+
+  /**
+   * Build a standalone HTML document for static multi-file output.
+   * Includes SEO meta tags, no router JS.
+   */
+  private buildStandaloneHTML(body: string, css: string, js: string, pagePath: string, pageTitle: string): string {
+    const reactiveRuntime = this.buildReactiveRuntime();
+    const renderCalls = this.js.filter(j => j.includes('function render_')).map(j => {
+      const match = j.match(/function (render_\w+)/);
+      return match ? `${match[1]}();` : '';
+    }).filter(Boolean).join('\n    ');
+
+    const scriptContent = [js, reactiveRuntime].filter(Boolean).join('\n');
+    const hasScript = scriptContent.trim().length > 0 || renderCalls.length > 0;
+
+    const headExtra = this.headInjections.length > 0 ? '\n  ' + this.headInjections.join('\n  ') : '';
+    const animCSS = this.animations.length > 0 ? '\n    ' + this.animations.join('\n    ') : '';
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NyxCode - ${this.escapeHtml(pageTitle)}</title>
+  <meta name="description" content="NyxCode documentation - ${this.escapeHtml(pageTitle)}">
+  <link rel="canonical" href="https://nyxcode.io${pagePath}">` + headExtra + `
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; }` + animCSS + `
+` + (css ? '    ' + css.split('\n').join('\n    ') : '') + `
+  </style>
+</head>
+<body` + (this.pageClass ? ` class="${this.pageClass}"` : '') + `>
+` + body + (hasScript ? `
+  <script>
+` + js + (renderCalls ? `
+  // Render function \u2014 re-renders all dynamic sections
+  function render() {
+    ${renderCalls}
+  }` : '') + `
+` + reactiveRuntime + `
+  </script>` : '') + `
+</body>
+</html>`;
   }
 
   /** Compile multiple pages into SPA with client-side router */
@@ -218,6 +474,11 @@ export class Compiler {
   // --- Element compilation ---
 
   private compileElement(el: ElementNode): string {
+    // In layout mode: replace slot with page content at ANY depth
+    if (el.tag === 'slot' && this.layoutSlotContent !== null) {
+      return this.layoutSlotContent;
+    }
+
     // Check if this element is a component invocation (e.g., Header title="My App")
     if (this.components.has(el.tag)) {
       return this.compileComponentUsage(el);
@@ -259,7 +520,8 @@ export class Compiler {
     }
 
     // For link elements with internal href (starts with /), add data-navigate for SPA routing
-    if (el.tag === 'link') {
+    // Skip in static mode — links are plain <a href> without JS
+    if (el.tag === 'link' && !this.staticMode) {
       const hrefAttr = filteredAttrs.find(a => a.name === 'href');
       if (hrefAttr && typeof hrefAttr.value === 'string' && hrefAttr.value.startsWith('/')) {
         filteredAttrs.push({ name: 'data-navigate', value: hrefAttr.value });
@@ -357,11 +619,11 @@ export class Compiler {
 
   private compileContent(content: string | Expression | undefined): string {
     if (!content) return '';
-    if (typeof content === 'string') return this.escapeHtml(content);
+    if (typeof content === 'string') return this.escapeContent(content);
 
     switch (content.type) {
       case 'StringLiteral':
-        return this.escapeHtml(content.value);
+        return this.escapeContent(content.value);
       case 'PropertyAccess':
         return `\${${this.propertyToJS(content.path)}}`;
       case 'NumberLiteral':
@@ -673,7 +935,7 @@ export class Compiler {
         continue;
       }
       if (stmt.type === 'Element') {
-        html += this.compileElementWithProps(stmt as ElementNode, props);
+        html += this.compileElementWithProps(stmt as ElementNode, props, slotHtml);
       } else {
         html += this.compileStatement(stmt);
       }
@@ -689,24 +951,26 @@ export class Compiler {
    * Compile an element with prop substitution.
    * Replaces .propName with the actual prop value.
    */
-  private compileElementWithProps(el: ElementNode, props: Record<string, string>): string {
+  private compileElementWithProps(el: ElementNode, props: Record<string, string>, slotHtml?: string): string {
+    // Slot substitution: if this element IS a slot, return the slot content
+    if (el.tag === 'slot' && slotHtml) {
+      return slotHtml;
+    }
     const tag = this.mapTag(el.tag);
     let content = '';
 
     if (el.content) {
       if (typeof el.content === 'string') {
-        content = this.escapeHtml(el.content);
+        content = this.escapeContent(el.content);
       } else if (el.content.type === 'StringLiteral') {
-        content = this.escapeHtml((el.content as any).value);
+        content = this.escapeContent((el.content as any).value);
       } else if (el.content.type === 'PropertyAccess') {
-        // .title → props['title']
         const propName = (el.content as any).path.replace(/^\./, '');
-        content = this.escapeHtml(props[propName] ?? '');
+        content = this.escapeContent(props[propName] ?? '');
       } else if (el.content.type === 'Identifier') {
-        // Check if it's a prop name
         const name = (el.content as any).name;
         if (props[name]) {
-          content = this.escapeHtml(props[name]);
+          content = this.escapeContent(props[name]);
         } else {
           content = this.compileContent(el.content);
         }
@@ -715,11 +979,45 @@ export class Compiler {
       }
     }
 
-    const attrs = this.compileAttributes(el.attributes);
+    // Check for style block in children — generates scoped class (same as compileElement)
+    let scopeClass = '';
+    const styleChild = el.children.find(c => c.type === 'Style') as StyleBlock | undefined;
+    if (styleChild) {
+      scopeClass = `nyx-${this.nextId('s')}`;
+      this.compileStyleWithClass(styleChild, scopeClass);
+    }
 
-    // Recurse into children
-    const children = el.children.map(c => {
-      if (c.type === 'Element') return this.compileElementWithProps(c as ElementNode, props);
+    // Build attributes, substituting prop references in values
+    const filteredAttrs = el.attributes.map(a => {
+      let val = a.value;
+      if (typeof val === 'string') {
+        for (const [propName, propVal] of Object.entries(props)) {
+          if (val === '.' + propName) {
+            val = propVal;
+          }
+        }
+      }
+      return { name: a.name, value: val };
+    });
+
+    // For link elements with internal href, add data-navigate for SPA routing
+    // Skip in static mode — links are plain <a href> without JS
+    if (el.tag === 'link' && !this.staticMode) {
+      const hrefAttr = filteredAttrs.find(a => a.name === 'href');
+      if (hrefAttr && typeof hrefAttr.value === 'string' && hrefAttr.value.startsWith('/')) {
+        filteredAttrs.push({ name: 'data-navigate', value: hrefAttr.value });
+      }
+    }
+
+    let attrs = this.compileAttributes(filteredAttrs);
+    if (scopeClass) {
+      attrs = ` class="${scopeClass}"${attrs}`;
+    }
+
+    // Filter out style blocks from children, recurse into the rest
+    const nonStyleChildren = el.children.filter(c => c.type !== 'Style');
+    const children = nonStyleChildren.map(c => {
+      if (c.type === 'Element') return this.compileElementWithProps(c as ElementNode, props, slotHtml);
       return this.compileStatement(c);
     }).join('');
 
@@ -1128,6 +1426,14 @@ ${reactiveRuntime}
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  private escapeContent(str: string): string {
+    // For text content between tags, quotes don't need escaping
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
   private isVoidElement(tag: string): boolean {

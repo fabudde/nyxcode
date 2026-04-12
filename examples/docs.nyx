@@ -1,0 +1,578 @@
+# NyxCode Documentation — Built with NyxCode
+# Refactored: layout wraps all pages, zero redundancy.
+
+component Sidebar {
+  props unused
+  nav {
+    style {
+      position fixed
+      top 0
+      left 0
+      width 260px
+      height 100vh
+      bg #08080f
+      border-right 1px solid rgba(255, 255, 255, 0.04)
+      padding 1.25rem 0.75rem
+      overflow-y auto
+      z-index 100
+    }
+    section style="padding: 0 0.75rem;" {
+      span "NyxCode" style="font-size: 1.4rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: block; margin-bottom: 0.2rem;"
+      span "v0.3.0" style="font-size: 0.65rem; color: #404060; display: block; margin-bottom: 1.75rem;"
+    }
+    p "GETTING STARTED" style="font-size: 0.6rem; font-weight: 700; color: #353555; letter-spacing: 0.1em; margin: 1.75rem 0.75rem 0.5rem; text-transform: uppercase;"
+    link "Introduction" href="/docs"
+    link "Installation" href="/docs/install"
+    link "Quick Start" href="/docs/quickstart"
+    p "LANGUAGE" style="font-size: 0.6rem; font-weight: 700; color: #353555; letter-spacing: 0.1em; margin: 1.75rem 0.75rem 0.5rem; text-transform: uppercase;"
+    link "Pages & Routing" href="/docs/routing"
+    link "Styling" href="/docs/styling"
+    link "Components" href="/docs/components"
+    link "Layouts" href="/docs/layouts"
+    link "Reactivity" href="/docs/state"
+    p "ADVANCED" style="font-size: 0.6rem; font-weight: 700; color: #353555; letter-spacing: 0.1em; margin: 1.75rem 0.75rem 0.5rem; text-transform: uppercase;"
+    link "Pseudo-Elements" href="/docs/pseudo"
+    link "Animations" href="/docs/animations"
+    link "Forms" href="/docs/forms"
+    link "Security" href="/docs/security"
+    section style="position: absolute; bottom: 0; left: 0; right: 0; padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.03);" {
+      link "GitHub" href="https://github.com/fabudde/nyxcode" style="font-size: 0.78rem;"
+      link "npm" href="https://npmjs.com/package/@fabudde/nyxcode" style="font-size: 0.78rem;"
+    }
+  }
+}
+
+component CodeBlock {
+  props unused
+  section {
+    style {
+      bg #06060d
+      border 1px solid rgba(255, 255, 255, 0.03)
+      radius 10px
+      padding 1.25rem 1.5rem
+      margin 1.25rem 0
+      overflow-x auto
+    }
+    slot
+  }
+}
+
+component Tip {
+  props title
+  section {
+    style {
+      bg rgba(102, 126, 234, 0.03)
+      border-left 3px solid #667eea
+      border-radius 0 8px 8px 0
+      padding 1rem 1.5rem
+      margin 1.5rem 0
+    }
+    p .title style="font-weight: 600; color: #7888ee; margin-bottom: 0.3rem; font-size: 0.9rem;"
+  }
+}
+
+component FeatureRow {
+  props emoji title description
+  section {
+    style {
+      display flex
+      gap 1rem
+      align-items flex-start
+      padding 0.75rem 0
+    }
+    span .emoji style="font-size: 1.4rem; flex-shrink: 0; margin-top: 0.1rem;"
+    section {
+      p .title style="font-weight: 600; color: #d0d0f0; margin-bottom: 0.15rem; font-size: 0.95rem;"
+      p .description style="color: #7070a0; font-size: 0.88rem; margin: 0; line-height: 1.5;"
+    }
+  }
+}
+
+component PageNav {
+  props prevText prevHref nextText nextHref
+  section {
+    style {
+      padding 1.5rem 0
+      margin-top 2rem
+      border-top 1px solid rgba(255, 255, 255, 0.03)
+      display flex
+      justify-content space-between
+      align-items center
+    }
+    link .prevText href=.prevHref style="color: #505070; text-decoration: none; font-size: 0.9rem;"
+    link .nextText href=.nextHref style="color: #667eea; font-weight: 600; text-decoration: none; font-size: 0.9rem;"
+  }
+}
+
+# ============================================================
+# LAYOUT — wraps every page with Sidebar + base styles
+# ============================================================
+layout {
+  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap' rel='stylesheet'>"
+  head "<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#0b0b14;color:#b8b8d8;font-family:'Inter',system-ui,-apple-system,sans-serif;line-height:1.75;overflow-x:hidden}nav a{display:block;color:#5a5a88;text-decoration:none;font-size:0.85rem;padding:0.4rem 0.75rem;margin:1px 0;border-radius:6px;transition:all 0.15s ease;font-weight:450}nav a:hover{color:#c0c0e8;background:rgba(102,126,234,0.06)}::selection{background:rgba(102,126,234,0.25);color:#fff}::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#1a1a30;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#2a2a50}h1{font-size:2.2rem;font-weight:800;color:#f0f0ff;margin-bottom:0.15rem;letter-spacing:-0.025em}h2{font-size:1.45rem;font-weight:700;color:#e0e0ff;margin:2.5rem 0 0.75rem;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,0.03)}pre{background:#06060d;border:1px solid rgba(255,255,255,0.03);border-radius:10px;padding:1.25rem 1.5rem;margin:1.25rem 0;overflow-x:auto;color:#b0b0d8;font-family:'JetBrains Mono',monospace;font-size:0.82rem;line-height:1.75;white-space:pre}</style>"
+  Sidebar unused=""
+  section {
+    style {
+      margin-left 260px
+      padding 3rem 4rem 5rem
+      max-width 760px
+      min-height 100vh
+      @mobile {
+        margin-left 0
+        padding 1.5rem
+      }
+    }
+    slot
+  }
+}
+
+# ============================================================
+# PAGE: Introduction
+# ============================================================
+page /docs {
+  head "<style>nav a[href='/docs']{color:#c0c0f0;background:rgba(102,126,234,0.08)}</style>"
+
+  h1 "Introduction" style="font-size: 2.2rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.025em;"
+  p "The AI-native programming language for the web." style="color: #5568dd; font-size: 1.1rem; margin-bottom: 2.5rem; font-weight: 400;"
+  p "NyxCode compiles to HTML, CSS, and JavaScript. It was designed for one purpose: let AI generate websites with maximum efficiency." style="color: #9090b0; margin-bottom: 0.75rem;"
+  p "Every syntax decision optimizes for token count. Every feature exists because websites need it." style="color: #9090b0; margin-bottom: 2rem;"
+
+  h2 "Why NyxCode?" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "AI code-generation platforms burn tokens outputting React boilerplate. NyxCode cuts that by 60-70%. Same website. Fraction of the cost." style="color: #9090b0; margin-bottom: 1.25rem;"
+
+  CodeBlock unused="" {
+    p "page / {\n  h1 \"Hello World\"\n  p \"Built with NyxCode.\"\n  link \"Learn more\" href=\"/docs\"\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  p "Five lines. Compiles to a complete HTML page with DOCTYPE, charset, viewport meta, and clean markup." style="color: #7070a0; font-size: 0.88rem; margin-top: 1rem; margin-bottom: 2.5rem;"
+
+  h2 "Features" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+
+  FeatureRow emoji="⚡" title="Reactive State" description="state, computed, effect — signal-based reactivity without a virtual DOM."
+  FeatureRow emoji="🧩" title="Components" description="Props, scoped styles, slots. Define once, compose everywhere."
+  FeatureRow emoji="🎨" title="3-Tier Styling" description="Inline, style blocks (hover/focus/before/after/@mobile), or raw CSS."
+  FeatureRow emoji="🔀" title="SPA Routing" description="Multiple pages, one file. Client-side navigation, zero config."
+  FeatureRow emoji="🔒" title="Security" description="No eval(). State allowlist. Auto HTML escaping."
+  FeatureRow emoji="📦" title="Zero Dependencies" description="npm install, one command build. Nothing else needed."
+
+  h2 "Benchmarks" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Real benchmark — full landing page with hero, features, counter, footer:" style="color: #8080a0; margin-bottom: 1.25rem;"
+
+  section {
+    style {
+      display grid
+      grid-template-columns 1fr 1fr
+      gap 1rem
+      margin 1.25rem 0
+      @mobile {
+        grid-template-columns 1fr
+      }
+    }
+    section {
+      style {
+        bg rgba(102, 126, 234, 0.04)
+        border 1px solid rgba(102, 126, 234, 0.08)
+        radius 12px
+        padding 2rem
+        text-align center
+      }
+      p "NYXCODE" style="font-size: 0.65rem; color: #667eea; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 0.75rem;"
+      p "132" style="font-size: 3rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.03em; line-height: 1;"
+      p "lines · 3.8 KB" style="color: #5060a0; font-size: 0.8rem;"
+    }
+    section {
+      style {
+        bg rgba(255, 255, 255, 0.01)
+        border 1px solid rgba(255, 255, 255, 0.03)
+        radius 12px
+        padding 2rem
+        text-align center
+      }
+      p "HTML + CSS + JS" style="font-size: 0.65rem; color: #505070; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 0.75rem;"
+      p "368" style="font-size: 3rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.03em; line-height: 1;"
+      p "lines · 11.4 KB" style="color: #5060a0; font-size: 0.8rem;"
+    }
+  }
+
+  p "64% fewer lines. 67% fewer bytes. Identical output." style="text-align: center; color: #667eea; font-weight: 600; margin: 1.5rem 0 2.5rem; font-size: 0.95rem;"
+
+  PageNav prevText="" prevHref="/" nextText="Installation →" nextHref="/install"
+}
+
+# ============================================================
+# PAGE: Installation
+# ============================================================
+page /docs/install {
+  head "<style>nav a[href='/docs/install']{color:#c0c0f0;background:rgba(102,126,234,0.08)}</style>"
+
+  h1 "Installation" style="font-size: 2.2rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.025em;"
+  p "Up and running in 30 seconds." style="color: #5568dd; font-size: 1.1rem; margin-bottom: 2.5rem;"
+
+  h2 "npm" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  CodeBlock unused="" {
+    p "npm install -g @fabudde/nyxcode" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  p "Or run without installing:" style="color: #7070a0; margin: 1rem 0 0.5rem; font-size: 0.9rem;"
+  CodeBlock unused="" {
+    p "npx @fabudde/nyxcode build page.nyx" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "From source" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  CodeBlock unused="" {
+    p "git clone https://github.com/fabudde/nyxcode.git\ncd nyxcode\nnpm install &amp;&amp; npm run build &amp;&amp; npm link" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Verify" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  CodeBlock unused="" {
+    p "nyxcode --version\n# @fabudde/nyxcode 0.3.0" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  Tip title="Shortcut"
+
+  PageNav prevText="← Introduction" prevHref="/" nextText="Quick Start →" nextHref="/quickstart"
+}
+
+# ============================================================
+# PAGE: Quick Start
+# ============================================================
+page /docs/quickstart {
+  head "<style>nav a[href='/docs/quickstart']{color:#c0c0f0;background:rgba(102,126,234,0.08)}</style>"
+
+  h1 "Quick Start" style="font-size: 2.2rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.025em;"
+  p "Your first page in 60 seconds." style="color: #5568dd; font-size: 1.1rem; margin-bottom: 2.5rem;"
+
+  h2 "1. Create hello.nyx" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  CodeBlock unused="" {
+    p "page / {\n  style {\n    bg #0a0a1a\n    color white\n    font-family system-ui\n    padding 2rem\n  }\n\n  h1 \"Hello, NyxCode!\"\n  p \"My first reactive page.\"\n\n  state clicks = 0\n  button \"Click me\" -> clicks = clicks + 1\n  p clicks\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "2. Build" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  CodeBlock unused="" {
+    p "nyxcode build hello.nyx\n# ✅ Built: dist-site/index.html" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "3. Open in browser" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Open dist-site/index.html. Reactive counter works instantly." style="color: #9090b0; margin-bottom: 1.5rem;"
+
+  Tip title="No config needed"
+
+  h2 "What happened?" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "NyxCode compiled your 14-line file into a self-contained HTML page with scoped CSS, a reactive signal runtime, event handlers, and proper document structure." style="color: #9090b0; margin-bottom: 1.5rem;"
+
+  PageNav prevText="← Installation" prevHref="/install" nextText="Routing →" nextHref="/routing"
+}
+
+# ============================================================
+# PAGE: Pages & Routing
+# ============================================================
+page /docs/routing {
+  head "<style>nav a[href='/docs/routing']{color:#c0c0f0;background:rgba(102,126,234,0.08)}</style>"
+
+  h1 "Pages & Routing" style="font-size: 2.2rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.025em;"
+  p "Multi-page SPAs from a single file." style="color: #5568dd; font-size: 1.1rem; margin-bottom: 2.5rem;"
+
+  h2 "Single page" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  CodeBlock unused="" {
+    p "page / {\n  h1 \"Home\"\n  p \"Welcome!\"\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Multiple pages" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Define multiple pages in one file. NyxCode compiles to a single-page app:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "page / {\n  h1 \"Home\"\n  link \"About\" href=\"/about\"\n}\n\npage /about {\n  h1 \"About\"\n  link \"Back\" href=\"/\"\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  Tip title="Zero-config routing"
+
+  h2 "How it works" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Each page compiles to a hidden div. A 20-line router shows/hides pages based on the URL. History API handles browser back/forward. External links leave the SPA normally." style="color: #9090b0; margin-bottom: 1rem;"
+
+  PageNav prevText="← Quick Start" prevHref="/quickstart" nextText="Styling →" nextHref="/styling"
+}
+
+# ============================================================
+# PAGE: Styling
+# ============================================================
+page /docs/styling {
+  head "<style>nav a[href='/docs/styling']{color:#c0c0f0;background:rgba(102,126,234,0.08)}</style>"
+
+  h1 "Styling" style="font-size: 2.2rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.025em;"
+  p "Three tiers. Use what you need." style="color: #5568dd; font-size: 1.1rem; margin-bottom: 2.5rem;"
+
+  h2 "Tier 1 — Inline" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Raw CSS on any element:" style="color: #9090b0; margin-bottom: 0.5rem;"
+  CodeBlock unused="" {
+    p "h1 \"Hello\" style=\"color: red; font-size: 3rem;\"" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Tier 2 — Style Blocks" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Scoped CSS with shorthand properties, pseudo-classes, pseudo-elements, and breakpoints:" style="color: #9090b0; margin-bottom: 0.5rem;"
+  CodeBlock unused="" {
+    p "section {\n  style {\n    bg #1a1a2e\n    padding 2rem\n    radius 12px\n    transition all 0.3s ease\n\n    hover {\n      transform translateY(-4px)\n      shadow 0 8px 20px rgba(0, 0, 0, 0.3)\n    }\n\n    before {\n      height 3px\n      bg linear-gradient(90deg, #667eea, #f093fb)\n    }\n\n    @mobile { padding 1rem }\n    @tablet { padding 1.5rem }\n  }\n  h1 \"Styled!\"\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  Tip title="Shorthand map"
+
+  h2 "Tier 3 — Raw CSS" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  CodeBlock unused="" {
+    p "head \"&lt;style&gt;\n  .custom { backdrop-filter: blur(10px); }\n&lt;/style&gt;\"" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Deduplication" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Components with identical styles share one CSS class. Use a component 10 times, pay for CSS once." style="color: #9090b0;"
+
+  PageNav prevText="← Routing" prevHref="/routing" nextText="Components →" nextHref="/components"
+}
+
+# ============================================================
+# PAGE: Components
+# ============================================================
+page /docs/components {
+  head "<style>nav a[href='/docs/components']{color:#c0c0f0;background:rgba(102,126,234,0.08)}</style>"
+
+  h1 "Components" style="font-size: 2.2rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.025em;"
+  p "Reusable, composable, scoped." style="color: #5568dd; font-size: 1.1rem; margin-bottom: 2.5rem;"
+
+  h2 "Defining a component" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Components are uppercase identifiers with props and optional scoped styles:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "component Card {\n  props title description\n  style { bg white, radius 12px, padding 2rem }\n  h3 .title\n  p .description\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Using components" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Pass props as attributes. Uppercase names are auto-detected as component calls:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "Card title=\"NyxCode\" description=\"AI-native language.\"" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "External files" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Import components from other .nyx files with the use keyword:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "use \"./components/card.nyx\"\n\npage / {\n  Card title=\"Hello\" description=\"World\"\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Slots" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Components can accept children via the slot keyword:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "component Layout {\n  props unused\n  nav { link \"Home\" href=\"/\" }\n  main { slot }\n  footer { p \"Footer\" }\n}\n\nLayout unused=\"\" {\n  h1 \"Page content goes here\"\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Scoped styles" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Each component instance gets a unique class (nyx-c-N). Styles never leak between components. Identical style blocks are deduplicated." style="color: #9090b0; margin-bottom: 0.75rem;"
+
+  Tip title="Props use .propName syntax inside components. The dot prefix is required."
+
+  PageNav prevText="← Styling" prevHref="/styling" nextText="Reactivity →" nextHref="/state"
+}
+
+# ============================================================
+# PAGE: Reactivity
+# ============================================================
+page /docs/state {
+  head "<style>nav a[href='/docs/state']{color:#c0c0f0;background:rgba(102,126,234,0.08)}</style>"
+
+  h1 "Reactivity" style="font-size: 2.2rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.025em;"
+  p "Signal-based state. No virtual DOM." style="color: #5568dd; font-size: 1.1rem; margin-bottom: 2.5rem;"
+
+  h2 "State" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Declare reactive variables with state. When they change, the DOM auto-updates:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "state count = 0\nstate name = \"Nyx\"" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Computed" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Derived values that recalculate when dependencies change:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "state price = 10\nstate quantity = 3\ncomputed total = price * quantity" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Event binding" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "The -> operator binds click events to state mutations:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "button \"+\" -> count = count + 1\nbutton \"Reset\" -> count = 0" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Two-way binding" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Bind inputs to state with bind=:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "state name = \"\"\ninput bind=name placeholder=\"Enter name\"\np name" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Effect" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Side effects that run when referenced state changes:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "effect { console.log(count) }" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Displaying state" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Use a state variable name as element content. It auto-updates when the value changes:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "state count = 0\nh1 count\np \"Static text\"" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  Tip title="NyxCode uses signal-based reactivity (like SolidJS) — no diffing, no virtual DOM, no re-renders."
+
+  PageNav prevText="← Components" prevHref="/components" nextText="Pseudo-Elements →" nextHref="/pseudo"
+}
+
+# ============================================================
+# PAGE: Pseudo-Elements
+# ============================================================
+page /docs/pseudo {
+  head "<style>nav a[href='/docs/pseudo']{color:#c0c0f0;background:rgba(102,126,234,0.08)}</style>"
+
+  h1 "Pseudo-Elements" style="font-size: 2.2rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.025em;"
+  p "::before and ::after without leaving NyxCode." style="color: #5568dd; font-size: 1.1rem; margin-bottom: 2.5rem;"
+
+  h2 "before and after" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Add pseudo-elements inside style blocks. They compile to scoped ::before and ::after CSS:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "section {\n  style {\n    position relative\n    padding 2rem\n\n    before {\n      content \"\"\n      position absolute\n      top 0\n      left 0\n      width 100%\n      height 3px\n      bg linear-gradient(90deg, #667eea, #f093fb)\n    }\n\n    after {\n      content \"\"\n      position absolute\n      bottom 0\n      right 0\n      width 50px\n      height 50px\n      bg radial-gradient(circle, rgba(102, 126, 234, 0.2), transparent)\n    }\n  }\n  h1 \"Decorated section\"\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Hover and focus" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Pseudo-classes work the same way inside style blocks:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "button {\n  style {\n    bg #667eea\n    color white\n    padding 0.75rem 2rem\n    radius 8px\n    border none\n    cursor pointer\n    transition all 0.2s ease\n\n    hover {\n      bg #7b93ff\n      transform translateY(-2px)\n      shadow 0 4px 12px rgba(102, 126, 234, 0.4)\n    }\n\n    focus {\n      outline 2px solid #667eea\n      outline-offset 2px\n    }\n  }\n  \"Click me\"\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  Tip title="Pseudo-elements compile to real CSS ::before/::after with content:'' auto-added if not specified."
+
+  PageNav prevText="← Reactivity" prevHref="/state" nextText="Animations →" nextHref="/animations"
+}
+
+# ============================================================
+# PAGE: Animations
+# ============================================================
+page /docs/animations {
+  head "<style>nav a[href='/docs/animations']{color:#c0c0f0;background:rgba(102,126,234,0.08)}</style>"
+
+  h1 "Animations" style="font-size: 2.2rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.025em;"
+  p "Keyframes and transitions, built in." style="color: #5568dd; font-size: 1.1rem; margin-bottom: 2.5rem;"
+
+  h2 "Keyframes" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Define keyframe animations with the animate keyword:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "animate pulse {\n  0% { transform: scale(1); opacity: 0.8; }\n  50% { transform: scale(1.05); opacity: 1; }\n  100% { transform: scale(1); opacity: 0.8; }\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  p "This compiles to a standard @keyframes CSS block." style="color: #7070a0; font-size: 0.88rem; margin-top: 1rem; margin-bottom: 2rem;"
+
+  h2 "Using animations" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Reference your animation name in a style block:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "animate fadeIn {\n  from { opacity: 0; transform: translateY(20px); }\n  to { opacity: 1; transform: translateY(0); }\n}\n\nsection {\n  style {\n    animation fadeIn 0.6s ease-out\n  }\n  h1 \"I fade in!\"\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Transitions" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "For simple state transitions, use the transition property in style blocks:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "button {\n  style {\n    transition all 0.3s ease\n    hover {\n      transform scale(1.1)\n    }\n  }\n  \"Hover me\"\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  Tip title="animate compiles to @keyframes. Transitions use CSS transition property. Both are scoped."
+
+  PageNav prevText="← Pseudo-Elements" prevHref="/pseudo" nextText="Forms →" nextHref="/forms"
+}
+
+# ============================================================
+# PAGE: Forms
+# ============================================================
+page /docs/forms {
+  head "<style>nav a[href='/docs/forms']{color:#c0c0f0;background:rgba(102,126,234,0.08)}</style>"
+
+  h1 "Forms" style="font-size: 2.2rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.025em;"
+  p "Inputs, binding, and form state." style="color: #5568dd; font-size: 1.1rem; margin-bottom: 2.5rem;"
+
+  h2 "Text inputs" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Bind inputs to state for two-way data binding:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "state email = \"\"\ninput bind=email type=\"email\" placeholder=\"Enter email\"\np email" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Textarea" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  CodeBlock unused="" {
+    p "state message = \"\"\ntextarea bind=message placeholder=\"Your message\"" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Buttons with actions" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Use the -> operator to handle button clicks:" style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "state submitted = 0\nbutton \"Submit\" -> submitted = 1\np submitted" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "Complete form example" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  CodeBlock unused="" {
+    p "state name = \"\"\nstate email = \"\"\nstate count = 0\n\nsection {\n  style { bg #0a0a1a, padding 2rem, radius 12px }\n  h2 \"Contact Form\"\n  input bind=name placeholder=\"Name\"\n  input bind=email type=\"email\" placeholder=\"Email\"\n  button \"Submit\" -> count = count + 1\n  p count\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  Tip title="CSRF tokens for form submissions are planned for v0.4."
+
+  PageNav prevText="← Animations" prevHref="/animations" nextText="Security →" nextHref="/security"
+}
+
+# ============================================================
+# PAGE: Security
+# ============================================================
+page /docs/layouts {
+  head "<style>nav a[href='/docs/layouts']{color:#c0c0f0;background:rgba(102,126,234,0.08)}</style>"
+
+  h1 "Layouts"
+  p "Share navigation, headers and footers across all pages with zero redundancy." style="color: #7878a8; font-size: 1.05rem; margin-bottom: 2rem;"
+
+  h2 "Basic Layout"
+  p "A layout block wraps every page automatically. Use slot to mark where page content goes:" style="color: #9898b8; margin-bottom: 1rem;"
+  p "layout {\n  nav {\n    link \"Home\" href=\"/\"\n    link \"About\" href=\"/about\"\n  }\n  slot\n  footer {\n    p \"Made with NyxCode\"\n  }\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.75; background: #06060d; border: 1px solid rgba(255,255,255,0.03); border-radius: 10px; padding: 1.25rem 1.5rem;"
+
+  h2 "How It Works"
+  p "The compiler finds the layout block and wraps every page with it. The slot element is replaced with each page's content. Layout CSS is compiled once and shared across all pages — no duplication." style="color: #9898b8; margin-bottom: 1rem;"
+
+  h2 "Nested Slot"
+  p "Slot works at any depth. Wrap it in a section for layout styling:" style="color: #9898b8; margin-bottom: 1rem;"
+  p "layout {\n  Navbar\n  section {\n    style {\n      margin-left 260px\n      padding 3rem 4rem\n    }\n    slot\n  }\n  Footer\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.75; background: #06060d; border: 1px solid rgba(255,255,255,0.03); border-radius: 10px; padding: 1.25rem 1.5rem;"
+
+  h2 "Importing Layouts"
+  p "Layouts can live in separate files and be imported:" style="color: #9898b8; margin-bottom: 1rem;"
+  p "use \"./layout.nyx\"\n\npage / {\n  h1 \"Home\"\n}\n\npage /about {\n  h1 \"About\"\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.75; background: #06060d; border: 1px solid rgba(255,255,255,0.03); border-radius: 10px; padding: 1.25rem 1.5rem;"
+
+  h2 "vs Next.js"
+  p "Next.js layout.tsx: 15+ lines, separate file, needs imports and JSX boilerplate." style="color: #9898b8;"
+  p "NyxCode layout: 3 lines, same file, zero imports." style="color: #9898b8; margin-bottom: 1rem;"
+  p "// Next.js (layout.tsx)\nimport Sidebar from '@/components/Sidebar'\nexport default function Layout({ children }) {\n  return (\n    <div className=\"flex\">\n      <Sidebar />\n      <main>{children}</main>\n    </div>\n  )\n}\n\n// NyxCode (3 lines)\nlayout {\n  Sidebar\n  slot\n}" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.75; background: #06060d; border: 1px solid rgba(255,255,255,0.03); border-radius: 10px; padding: 1.25rem 1.5rem;"
+
+  section style="display: flex; justify-content: space-between; margin-top: 4rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,0.04);" {
+    link "Previous: Components" href="/docs/components" style="padding: 1rem 1.5rem; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; font-size: 0.85rem;"
+    link "Next: Reactivity" href="/docs/state" style="padding: 1rem 1.5rem; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; font-size: 0.85rem;"
+  }
+}
+
+page /docs/security {
+  head "<style>nav a[href='/docs/security']{color:#c0c0f0;background:rgba(102,126,234,0.08)}</style>"
+
+  h1 "Security" style="font-size: 2.2rem; font-weight: 800; color: #f0f0ff; margin-bottom: 0.15rem; letter-spacing: -0.025em;"
+  p "Secure by default. Audited by Tyto." style="color: #5568dd; font-size: 1.1rem; margin-bottom: 2.5rem;"
+
+  h2 "No eval()" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "NyxCode never uses eval() or new Function(). The runtime uses a safe property-access-only evaluator. Expressions are validated against known state keys before execution." style="color: #9090b0; margin-bottom: 1.5rem;"
+
+  h2 "State key allowlist" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "Only declared state and computed variables can be accessed. Attempts to access __proto__, constructor, or other prototype properties are silently ignored." style="color: #9090b0; margin-bottom: 0.75rem;"
+  CodeBlock unused="" {
+    p "// Generated runtime validates:\nif (!__nyx.subscribers.has(name)) return;" style="white-space: pre; color: #b0b0d8; margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.75; tab-size: 2;"
+  }
+
+  h2 "HTML escaping" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "All dynamic content is rendered via textContent, not innerHTML. XSS via user input in templates is structurally impossible." style="color: #9090b0; margin-bottom: 1.5rem;"
+
+  h2 "Audit status" style="font-size: 1.45rem; font-weight: 700; color: #e0e0ff;"
+  p "All three findings from Tyto's security review (February 2026) have been resolved:" style="color: #9090b0; margin-bottom: 0.75rem;"
+
+  FeatureRow emoji="🔴" title="CRITICAL: new Function() replaced" description="safeEval() replaces eval/new Function entirely. No arbitrary code execution."
+  FeatureRow emoji="🟡" title="MEDIUM: State-key allowlist" description="Only declared state/computed keys can be accessed at runtime."
+  FeatureRow emoji="🟡" title="MEDIUM: HTML escaping" description="All dynamic content uses textContent. XSS is structurally impossible."
+
+  Tip title="Security is not optional. Insecure patterns are compiler errors, not warnings."
+
+  PageNav prevText="← Forms" prevHref="/forms" nextText="" nextHref="/security"
+}

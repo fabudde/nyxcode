@@ -1,0 +1,60 @@
+# NyxCode Validator Test — Intentional errors and warnings
+# This file should produce multiple errors and warnings
+
+# ERROR: Duplicate component name
+component Header {
+  nav {
+    h1 "Header"
+  }
+}
+
+component Header {
+  nav {
+    h2 "Duplicate Header!"
+  }
+}
+
+# WARNING: Unused component
+component OldNav {
+  nav {
+    link "Home" href="/"
+  }
+}
+
+# ERROR: Duplicate page route
+page /about {
+  h1 "About Page"
+}
+
+page /about {
+  h1 "Duplicate About Page!"
+}
+
+# ERROR: Undefined component (typo — should suggest "Header")
+page / {
+  Hedaer
+  p "Welcome"
+  # ERROR: Undefined component (no similar name)
+  Zxywqr
+  # ERROR: slot outside layout/component
+  slot
+}
+
+# WARNING: Empty page
+page /empty {
+}
+
+# ERROR: Multiple layouts
+layout {
+  nav {
+    h1 "Layout 1"
+  }
+  slot
+}
+
+layout {
+  nav {
+    h1 "Layout 2"
+  }
+  slot
+}

@@ -18,7 +18,7 @@ export interface Program extends BaseNode {
   body: TopLevelNode[];
 }
 
-export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement;
+export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode;
 
 /** `page /path { ... }` */
 export interface PageNode extends BaseNode {
@@ -73,6 +73,12 @@ export interface SecurityNode extends BaseNode {
 export interface UseStatement extends BaseNode {
   type: 'Use';
   path: string;
+}
+
+/** `layout { ... slot ... }` — wraps every page */
+export interface LayoutNode extends BaseNode {
+  type: 'Layout';
+  body: Statement[];
 }
 
 // --- Statements (inside pages/components) ---
