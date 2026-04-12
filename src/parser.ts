@@ -22,6 +22,7 @@ import {
   Identifier as IdentNode, PropDef, ColumnDef, StoreField,
   ThemeSection, ValidateStatement, ValidateField, RespondStatement,
   LimitStatement, QueryStatement, ResponsiveBlock, SecurityNode, SecurityRule,
+  StateStatement, EffectStatement, ComputedStatement,
 } from './ast.js';
 
 /** Set of tags that are recognized as built-in elements */
@@ -267,6 +268,9 @@ export class Parser {
       case TokenType.Respond: return this.parseRespond();
       case TokenType.Limit: return this.parseLimitStmt();
       case TokenType.Query: return this.parseQuery();
+      case TokenType.State: return this.parseState();
+      case TokenType.Effect: return this.parseEffect();
+      case TokenType.Computed: return this.parseComputed();
       case TokenType.Identifier:
         return this.parseElement();
       case TokenType.Else: return null; // handled by parseWhen
@@ -586,6 +590,109 @@ export class Parser {
     return { type: 'Query', sql, line: start.line, col: start.col };
   }
 
+  /**
+   * Parse: `state name = value`
+   * Reactive state variable. When mutated, all referencing DOM nodes update.
+   */
+  private parseState(): StateStatement {
+    const start = this.consume(TokenType.State);
+    const name = this.consumeIdentifier();
+    this.consume(TokenType.Equals);
+
+    // Parse initial value — could be string, number, array, or expression
+    const token = this.peek();
+    let initialValue: Expression | string;
+
+    if (token.type === TokenType.String) {
+      initialValue = { type: 'StringLiteral', value: this.advance().value, line: token.line, col: token.col };
+    } else if (token.type === TokenType.Number) {
+      initialValue = { type: 'NumberLiteral', value: parseFloat(this.advance().value), line: token.line, col: token.col };
+    } else if (token.type === TokenType.LeftBracket) {
+      // Array literal: [item1, item2]
+      initialValue = this.consumeArrayLiteral();
+    } else if (token.type === TokenType.LeftBrace) {
+      // Object literal: { key: value }
+      initialValue = this.consumeObjectLiteral();
+    } else {
+      // Identifier or expression
+      initialValue = this.advance().value;
+    }
+
+    return { type: 'State', name, initialValue, line: start.line, col: start.col };
+  }
+
+  /**
+   * Parse: `effect { ... }`
+   * Side effect block. Dependencies auto-detected from referenced state vars.
+   */
+  private parseEffect(): EffectStatement {
+    const start = this.consume(TokenType.Effect);
+    const body = this.consumeBlock();
+    return { type: 'Effect', body, line: start.line, col: start.col };
+  }
+
+  /**
+   * Parse: `computed name = expression`
+   * Derived value that auto-updates when dependencies change.
+   */
+  private parseComputed(): ComputedStatement {
+    const start = this.consume(TokenType.Computed);
+    const name = this.consumeIdentifier();
+    this.consume(TokenType.Equals);
+
+    // Collect ALL tokens until newline-separated statement or closing brace
+    // Must handle complex JS: __nyx.state.count, arr.length, obj.prop etc.
+    let expression = '';
+    let parenDepth = 0;
+    while (!this.isAtEnd()) {
+      const next = this.peek();
+      // Stop at closing brace (end of parent block) unless inside parens
+      if (next.type === TokenType.RightBrace && parenDepth === 0) break;
+      // Stop at new element tags (h1, p, button, etc.) — these start new statements
+      if (parenDepth === 0 && next.type === TokenType.Identifier && ELEMENT_TAGS.has(next.value)) break;
+      // Stop at top-level keywords that start NEW statements (but NOT 'state' which can appear in expressions)
+      if (parenDepth === 0 && [
+        TokenType.Data, TokenType.Each, TokenType.When, TokenType.Style,
+        TokenType.Form, TokenType.Auth, TokenType.On, TokenType.Validate,
+        TokenType.Respond, TokenType.Limit, TokenType.Query, TokenType.Else,
+        TokenType.State, TokenType.Effect, TokenType.Computed,
+      ].includes(next.type) && expression.length > 0 && !expression.endsWith('.')) break;
+      if (next.type === TokenType.LeftParen) parenDepth++;
+      if (next.type === TokenType.RightParen) parenDepth--;
+      expression += this.advance().value;
+    }
+
+    return { type: 'Computed', name, expression: expression.trim(), line: start.line, col: start.col };
+  }
+
+  /** Consume an array literal like [1, 2, 3] or ["a", "b"] */
+  private consumeArrayLiteral(): string {
+    let result = this.advance().value; // [
+    let depth = 1;
+    while (depth > 0 && !this.isAtEnd()) {
+      const t = this.advance();
+      if (t.type === TokenType.LeftBracket) depth++;
+      else if (t.type === TokenType.RightBracket) depth--;
+      result += t.value;
+      if (depth > 0 && t.type === TokenType.Comma) result += ' ';
+    }
+    return result;
+  }
+
+  /** Consume an object literal like { key: value } */
+  private consumeObjectLiteral(): string {
+    let result = this.advance().value; // {
+    let depth = 1;
+    while (depth > 0 && !this.isAtEnd()) {
+      const t = this.advance();
+      if (t.type === TokenType.LeftBrace) depth++;
+      else if (t.type === TokenType.RightBrace) depth--;
+      if (depth > 0) result += t.value + ' ';
+    }
+    result += '}';
+    return result;
+  }
+
   private parseElement(): ElementNode {
     const start = this.peek();
     const tag = this.consumeIdentifier();
@@ -619,9 +726,14 @@ export class Parser {
           attributes.push({ name, value: this.advance().value });
         }
       }
-      // Shorthand attribute (no value): required, bold, etc.
+      // Identifier after element: could be content reference (state/computed var) or shorthand attribute
       else if (next.type === TokenType.Identifier && !ELEMENT_TAGS.has(next.value) && !this.isKeyword(next)) {
-        attributes.push({ name: this.advance().value, value: 'true' });
+        // If no content yet, treat first lone identifier as content reference
+        if (!content && !this.peekAt(1)?.type?.toString().includes('Equals')) {
+          content = { type: 'Identifier', name: this.advance().value, line: next.line, col: next.col } as any;
+        } else {
+          attributes.push({ name: this.advance().value, value: 'true' });
+        }
       }
       // Children block: { ... }
       else if (next.type === TokenType.LeftBrace) {
@@ -821,6 +933,8 @@ export class Parser {
       t.type === TokenType.On || t.type === TokenType.Validate ||
       t.type === TokenType.Respond || t.type === TokenType.Limit ||
       t.type === TokenType.Query || t.type === TokenType.Else ||
+      t.type === TokenType.State || t.type === TokenType.Effect ||
+      t.type === TokenType.Computed ||
       (t.type === TokenType.Identifier && ELEMENT_TAGS.has(t.value));
   }
 

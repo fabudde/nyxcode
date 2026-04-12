@@ -84,6 +84,9 @@ export type Statement =
   | RespondStatement
   | LimitStatement
   | QueryStatement
+  | StateStatement
+  | EffectStatement
+  | ComputedStatement
   | RawExpression;
 
 /** `data varname = get/query/post ...` */
@@ -246,6 +249,27 @@ export interface Identifier extends BaseNode {
 export interface RawExpression extends BaseNode {
   type: 'RawExpression';
   value: string;
+}
+
+/** `state name = initialValue` — reactive state variable */
+export interface StateStatement extends BaseNode {
+  type: 'State';
+  name: string;
+  initialValue: Expression | string;
+}
+
+/** `effect { ... }` — side effect that runs when dependencies change */
+export interface EffectStatement extends BaseNode {
+  type: 'Effect';
+  body: string;
+  dependencies?: string[]; // auto-detected from body
+}
+
+/** `computed name = expression` — derived reactive value */
+export interface ComputedStatement extends BaseNode {
+  type: 'Computed';
+  name: string;
+  expression: string;
 }
 
 // --- Supporting types ---

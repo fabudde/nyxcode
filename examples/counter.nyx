@@ -1,0 +1,28 @@
+# NyxCode Reactive Counter — v0.2 Demo
+# This would be ~40 lines in React. It's 15 in NyxCode.
+
+page /counter {
+  style {
+    bg #1a1a2e
+    color #e0e0e0
+    padding 4rem
+    text-align center
+    font-family system-ui
+  }
+
+  h1 "NyxCode Reactive Counter 🦞"
+
+  state count = 0
+  state name = "World"
+
+  h2 count
+  p "clicks so far"
+
+  button "+" -> count = count + 1
+  button "-" -> count = count - 1
+  button "Reset" -> count = 0
+
+  h3 "Two-way binding:"
+  input bind="name" placeholder="Your name"
+  p name
+}

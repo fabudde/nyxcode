@@ -1,0 +1,29 @@
+# NyxCode Reactive Todo App
+# State, computed, two-way binding.
+# ~80 lines in React. 20 in NyxCode.
+
+page /todos {
+  style {
+    bg #0f172a
+    color #e2e8f0
+    padding 3rem
+    max-width 500px
+    margin 0 auto
+    font-family system-ui
+  }
+
+  h1 "NyxCode Todo 🦞"
+
+  state count = 0
+  state task = ""
+  computed remaining = __nyx.state.count
+
+  input bind="task" placeholder="What needs to be done?"
+  button "Add Task" -> count = count + 1
+
+  h2 count
+  p "tasks added"
+
+  h3 "Current input:"
+  p task
+}

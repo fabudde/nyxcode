@@ -49,9 +49,9 @@ export class Lexer {
         continue;
       }
 
-      // Strings
-      if (ch === '"') {
-        this.readString();
+      // Strings (double or single quotes)
+      if (ch === '"' || ch === "'") {
+        this.readString(ch);
         continue;
       }
 
@@ -141,13 +141,13 @@ export class Lexer {
 
   // --- Token readers ---
 
-  private readString(): void {
+  private readString(quote: string = '"'): void {
     const startLine = this.line;
     const startCol = this.col;
-    this.advance(); // consume opening "
+    this.advance(); // consume opening quote
 
     let value = '';
-    while (!this.isAtEnd() && this.peek() !== '"') {
+    while (!this.isAtEnd() && this.peek() !== quote) {
       if (this.peek() === '\\') {
         this.advance(); // consume backslash
         const escaped = this.advance();
@@ -171,7 +171,7 @@ export class Lexer {
       throw this.error(`Unterminated string`, startLine, startCol);
     }
 
-    this.advance(); // consume closing "
+    this.advance(); // consume closing quote
     this.tokens.push({ type: TokenType.String, value, line: startLine, col: startCol });
   }
 
@@ -314,6 +314,11 @@ export class Lexer {
           this.emit(TokenType.GreaterThan, '>', startCol);
         }
         break;
+
+      case '+':
+      case '%':
+      case ';':
+        this.emit(TokenType.Identifier, ch, startCol); break;
 
       default:
         throw this.error(`Unexpected character: '${ch}'`, this.line, startCol);

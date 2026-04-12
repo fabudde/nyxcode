@@ -34,6 +34,9 @@ export enum TokenType {
   Limit = 'Limit',
   Security = 'Security',
   Animate = 'Animate',
+  State = 'State',
+  Effect = 'Effect',
+  Computed = 'Computed',
 
   // Operators & Punctuation
   LeftBrace = 'LeftBrace',       // {
@@ -91,6 +94,9 @@ export const KEYWORDS: Record<string, TokenType> = {
   limit: TokenType.Limit,
   security: TokenType.Security,
   animate: TokenType.Animate,
+  state: TokenType.State,
+  effect: TokenType.Effect,
+  computed: TokenType.Computed,
 };
 
 export interface Token {
