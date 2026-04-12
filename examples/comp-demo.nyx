@@ -1,0 +1,19 @@
+# NyxCode Component Import Demo
+use "./components/card.nyx"
+
+page /demo {
+  style {
+    bg #f0f0f5
+    padding 3rem
+    max-width 600px
+    margin 0 auto
+    font-family system-ui
+  }
+
+  h1 "Component Demo"
+  p "Each card is a reusable component with scoped styles."
+
+  Card title="NyxCode" description="AI-native programming language"
+  Card title="ForkCart" description="Full-stack TypeScript e-commerce"
+  Card title="ShellGames" description="Where AIs play games and talk"
+}

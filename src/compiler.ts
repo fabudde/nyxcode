@@ -15,7 +15,7 @@ import {
   DataStatement, EachStatement, WhenStatement, StyleBlock,
   FormStatement, AuthStatement, ElementNode, Expression,
   StyleProperty, ResponsiveBlock, Attribute,
-  StateStatement, EffectStatement, ComputedStatement,
+  StateStatement, EffectStatement, ComputedStatement, UseStatement,
 } from './ast.js';
 
 export interface CompilerOptions {
@@ -47,6 +47,8 @@ export class Compiler {
   private computedVars: Map<string, string> = new Map(); // name -> expression
   private effects: string[] = [];
   private hasReactivity: boolean = false;
+  private components: Map<string, ComponentNode> = new Map();
+  private importResolver?: (path: string) => Program | null;
 
   constructor(options: Partial<CompilerOptions> = {}) {
     this.options = {
@@ -57,11 +59,40 @@ export class Compiler {
   }
 
   /**
+   * Set a resolver function for `use` imports.
+   * The resolver takes a path and returns a parsed Program, or null.
+   */
+  setImportResolver(resolver: (path: string) => Program | null): void {
+    this.importResolver = resolver;
+  }
+
+  /**
    * Compile the full program.
    */
   compile(program: Program): CompilerOutput {
+    // Process `use` imports first — load third-party components
+    const uses = program.body.filter(n => n.type === 'Use') as UseStatement[];
+    for (const use of uses) {
+      if (this.importResolver) {
+        const imported = this.importResolver(use.path);
+        if (imported) {
+          // Register all components from the imported file
+          for (const node of imported.body) {
+            if (node.type === 'Component') {
+              this.components.set((node as ComponentNode).name, node as ComponentNode);
+            }
+          }
+        }
+      }
+    }
+
     const pages = program.body.filter(n => n.type === 'Page') as PageNode[];
     const components = program.body.filter(n => n.type === 'Component') as ComponentNode[];
+
+    // Register inline components too
+    for (const comp of components) {
+      this.components.set(comp.name, comp);
+    }
 
     // For now, compile the first page (multi-page routing comes later)
     let html = '';
@@ -126,6 +157,11 @@ export class Compiler {
   // --- Element compilation ---
 
   private compileElement(el: ElementNode): string {
+    // Check if this element is a component invocation (e.g., Header title="My App")
+    if (this.components.has(el.tag)) {
+      return this.compileComponentUsage(el);
+    }
+
     const tag = this.mapTag(el.tag);
     const content = this.compileContent(el.content);
     
@@ -466,6 +502,97 @@ export class Compiler {
     this.indent--;
     html += `${this.ind()}</form>\n`;
     return html;
+  }
+
+  // --- Component compilation ---
+
+  /**
+   * Compile a component usage: `Header title="My App" logo="🦞"`
+   * Inlines the component's body with props substituted.
+   */
+  private compileComponentUsage(el: ElementNode): string {
+    const comp = this.components.get(el.tag)!;
+
+    // Build props map from attributes
+    const props: Record<string, string> = {};
+    for (const attr of el.attributes) {
+      props[attr.name] = typeof attr.value === 'string' ? attr.value : '';
+    }
+
+    // Generate scoped wrapper with component class
+    const scopeClass = `nyx-${this.nextId('c')}`;
+
+    // Compile component's style blocks
+    for (const stmt of comp.body) {
+      if (stmt.type === 'Style') {
+        this.compileStyleWithClass(stmt as StyleBlock, scopeClass);
+      }
+    }
+
+    // Compile component body, substituting prop references
+    let html = `${this.ind()}<div class="${scopeClass}">\n`;
+    this.indent++;
+
+    for (const stmt of comp.body) {
+      if (stmt.type === 'Style') continue; // Already handled
+      if (stmt.type === 'Element') {
+        html += this.compileElementWithProps(stmt as ElementNode, props);
+      } else {
+        html += this.compileStatement(stmt);
+      }
+    }
+
+    this.indent--;
+    html += `${this.ind()}</div>\n`;
+
+    return html;
+  }
+
+  /**
+   * Compile an element with prop substitution.
+   * Replaces .propName with the actual prop value.
+   */
+  private compileElementWithProps(el: ElementNode, props: Record<string, string>): string {
+    const tag = this.mapTag(el.tag);
+    let content = '';
+
+    if (el.content) {
+      if (typeof el.content === 'string') {
+        content = this.escapeHtml(el.content);
+      } else if (el.content.type === 'StringLiteral') {
+        content = this.escapeHtml((el.content as any).value);
+      } else if (el.content.type === 'PropertyAccess') {
+        // .title → props['title']
+        const propName = (el.content as any).path.replace(/^\./, '');
+        content = this.escapeHtml(props[propName] ?? '');
+      } else if (el.content.type === 'Identifier') {
+        // Check if it's a prop name
+        const name = (el.content as any).name;
+        if (props[name]) {
+          content = this.escapeHtml(props[name]);
+        } else {
+          content = this.compileContent(el.content);
+        }
+      } else {
+        content = this.compileContent(el.content);
+      }
+    }
+
+    const attrs = this.compileAttributes(el.attributes);
+
+    // Recurse into children
+    const children = el.children.map(c => {
+      if (c.type === 'Element') return this.compileElementWithProps(c as ElementNode, props);
+      return this.compileStatement(c);
+    }).join('');
+
+    if (this.isVoidElement(tag)) {
+      return `${this.ind()}<${tag}${attrs} />\n`;
+    }
+    if (children) {
+      return `${this.ind()}<${tag}${attrs}>\n${this.indented(() => children)}${this.ind()}</${tag}>\n`;
+    }
+    return `${this.ind()}<${tag}${attrs}>${content}</${tag}>\n`;
   }
 
   // --- Reactivity compilation ---

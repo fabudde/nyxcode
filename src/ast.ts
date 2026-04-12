@@ -18,7 +18,7 @@ export interface Program extends BaseNode {
   body: TopLevelNode[];
 }
 
-export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode;
+export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement;
 
 /** `page /path { ... }` */
 export interface PageNode extends BaseNode {
@@ -67,6 +67,12 @@ export interface ThemeNode extends BaseNode {
 export interface SecurityNode extends BaseNode {
   type: 'Security';
   rules: SecurityRule[];
+}
+
+/** `use "./component.nyx"` — import third-party component */
+export interface UseStatement extends BaseNode {
+  type: 'Use';
+  path: string;
 }
 
 // --- Statements (inside pages/components) ---

@@ -37,6 +37,7 @@ export enum TokenType {
   State = 'State',
   Effect = 'Effect',
   Computed = 'Computed',
+  Use = 'Use',
 
   // Operators & Punctuation
   LeftBrace = 'LeftBrace',       // {
@@ -97,6 +98,7 @@ export const KEYWORDS: Record<string, TokenType> = {
   state: TokenType.State,
   effect: TokenType.Effect,
   computed: TokenType.Computed,
+  use: TokenType.Use,
 };
 
 export interface Token {

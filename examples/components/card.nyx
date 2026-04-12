@@ -1,0 +1,13 @@
+# Reusable Card component
+component Card {
+  props title description icon?
+  style {
+    bg white
+    radius 16px
+    padding 1.5rem
+    shadow 0 4px 12px rgba(0, 0, 0, 0.1)
+    margin-bottom 1rem
+  }
+  h3 .title
+  p .description
+}

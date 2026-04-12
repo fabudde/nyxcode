@@ -22,7 +22,7 @@ import {
   Identifier as IdentNode, PropDef, ColumnDef, StoreField,
   ThemeSection, ValidateStatement, ValidateField, RespondStatement,
   LimitStatement, QueryStatement, ResponsiveBlock, SecurityNode, SecurityRule,
-  StateStatement, EffectStatement, ComputedStatement,
+  StateStatement, EffectStatement, ComputedStatement, UseStatement,
 } from './ast.js';
 
 /** Set of tags that are recognized as built-in elements */
@@ -71,6 +71,7 @@ export class Parser {
       case TokenType.Store: return this.parseStore();
       case TokenType.Theme: return this.parseTheme();
       case TokenType.Security: return this.parseSecurity();
+      case TokenType.Use: return this.parseUse();
       case TokenType.EOF: return null;
       default:
         throw this.error(`Unexpected token '${token.value}' at top level. Expected: page, component, api, table, store, theme, or security.`);
@@ -233,6 +234,12 @@ export class Parser {
 
     this.consume(TokenType.RightBrace);
     return { type: 'Security', rules, line: start.line, col: start.col };
+  }
+
+  private parseUse(): UseStatement {
+    const start = this.consume(TokenType.Use);
+    const path = this.consume(TokenType.String).value;
+    return { type: 'Use', path, line: start.line, col: start.col };
   }
 
   // --- Body parsing (statements inside { }) ---
@@ -960,7 +967,9 @@ export class Parser {
       t.type === TokenType.Query || t.type === TokenType.Else ||
       t.type === TokenType.State || t.type === TokenType.Effect ||
       t.type === TokenType.Computed ||
-      (t.type === TokenType.Identifier && ELEMENT_TAGS.has(t.value));
+      (t.type === TokenType.Identifier && ELEMENT_TAGS.has(t.value)) ||
+      // Uppercase identifiers are component invocations (e.g., Card, Header)
+      (t.type === TokenType.Identifier && t.value[0] >= 'A' && t.value[0] <= 'Z');
   }
 
   private isKeyword(token: Token): boolean {

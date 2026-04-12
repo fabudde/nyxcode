@@ -58,6 +58,20 @@ try {
   } else if (command === 'build') {
     const ast = parse(source);
     const compiler = new Compiler({ pretty: true });
+
+    // Set up import resolver for `use` statements
+    const baseDir = dirname(filePath);
+    compiler.setImportResolver((importPath: string) => {
+      try {
+        const resolved = resolve(baseDir, importPath);
+        const importSource = readFileSync(resolved, 'utf-8');
+        return parse(importSource);
+      } catch {
+        console.warn(`⚠️  Could not resolve import: ${importPath}`);
+        return null;
+      }
+    });
+
     const output = compiler.compile(ast);
     
     // Write to dist/ or stdout
