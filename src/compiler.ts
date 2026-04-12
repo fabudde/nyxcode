@@ -259,9 +259,11 @@ export class Compiler {
       }
     }
 
-    // Pseudo-elements: ::before, ::after
+    // Pseudo-elements: ::before, ::after (Tyto Security Review: allowlist enforced)
+    const ALLOWED_PSEUDO_ELEMENTS = ['before', 'after'];
     if (style.pseudoElements) {
       for (const pe of style.pseudoElements) {
+        if (!ALLOWED_PSEUDO_ELEMENTS.includes(pe.selector)) continue; // Security: skip unknown
         cssBlock += `.${className}::${pe.selector} {\n`;
         // Ensure content property exists (required for pseudo-elements)
         const hasContent = pe.properties.some(p => p.name === 'content');
@@ -495,9 +497,11 @@ export class Compiler {
       }
     }
 
-    // Pseudo-elements
+    // Pseudo-elements (Tyto Security Review: allowlist enforced)
+    const ALLOWED_PE = ['before', 'after'];
     if (style.pseudoElements) {
       for (const pe of style.pseudoElements) {
+        if (!ALLOWED_PE.includes(pe.selector)) continue; // Security: skip unknown
         cssBlock += `.${scopeClass}::${pe.selector} {\n`;
         const hasContent = pe.properties.some(p => p.name === 'content');
         if (!hasContent) cssBlock += `  content: '';\n`;
