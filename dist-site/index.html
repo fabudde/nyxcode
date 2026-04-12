@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NyxCode — The AI-Native Programming Language</title>
+  <meta name="description" content="Designed for AI. Optimized for tokens. Built for the web. 68% fewer lines vs React.">
+  <meta property="og:title" content="NyxCode — The AI-Native Programming Language">
+  <meta property="og:description" content="68% fewer lines vs React. Zero boilerplate. Compiles to HTML/CSS/JS.">
+  <meta property="og:url" content="https://nyxcode.io">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #0a0a0f; color: #e0e0e0; min-height: 100vh; overflow-x: hidden; }
+    .hero { text-align: center; padding: 6rem 2rem 4rem; max-width: 800px; margin: 0 auto; }
+    .logo { font-size: 4rem; margin-bottom: 0.5rem; }
+    .title { font-size: 3.5rem; font-weight: 700; background: linear-gradient(135deg, #00d4aa, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1rem; }
+    .subtitle { font-size: 1.3rem; color: #a0a0b0; line-height: 1.6; margin-bottom: 1.5rem; }
+    .version-badge { display: inline-block; padding: 0.4rem 1rem; border-radius: 20px; background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.3); color: #7c3aed; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .nyx-badge { display: inline-block; padding: 0.3rem 0.8rem; border-radius: 20px; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3); color: #00d4aa; font-size: 0.75rem; margin-left: 0.5rem; }
+    .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.5rem; max-width: 600px; margin: 3rem auto; }
+    .stat { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 2rem 1rem; transition: border-color 0.3s; }
+    .stat:hover { border-color: rgba(0,212,170,0.3); }
+    .stat-value { font-size: 2.5rem; font-weight: 700; color: #00d4aa; }
+    .stat-label { color: #707080; font-size: 0.85rem; margin-top: 0.3rem; }
+    .comparison { max-width: 900px; margin: 4rem auto; padding: 0 2rem; }
+    .comparison h2 { text-align: center; font-size: 1.8rem; margin-bottom: 2rem; color: #e0e0e0; }
+    .code-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .code-block { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; }
+    .code-header { padding: 0.8rem 1.2rem; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; }
+    .code-header span { font-size: 0.8rem; font-weight: 600; color: #a0a0b0; }
+    .code-header .lines { font-size: 0.75rem; color: #606070; }
+    .code-body { padding: 1.2rem; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.7; color: #c0c0d0; overflow-x: auto; }
+    .code-body .kw { color: #7c3aed; }
+    .code-body .str { color: #00d4aa; }
+    .code-body .path { color: #f59e0b; }
+    .code-body .dim { color: #505060; }
+    .benchmark { max-width: 600px; margin: 4rem auto; padding: 0 2rem; text-align: center; }
+    .benchmark h2 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+    .benchmark .note { color: #707080; font-size: 0.85rem; margin-bottom: 2rem; }
+    .bench-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .bench-table th { padding: 0.8rem; text-align: left; color: #707080; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: 600; }
+    .bench-table td { padding: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .bench-table tr:first-child td { color: #00d4aa; font-weight: 600; }
+    .bench-table .savings { color: #00d4aa; font-weight: 600; }
+    .features { max-width: 800px; margin: 4rem auto; padding: 0 2rem; }
+    .features h2 { text-align: center; font-size: 1.8rem; margin-bottom: 2rem; }
+    .feature-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 1.5rem; }
+    .feature { padding: 1.5rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; }
+    .feature h3 { font-size: 1rem; color: #e0e0e0; margin-bottom: 0.5rem; }
+    .feature p { font-size: 0.85rem; color: #808090; line-height: 1.5; }
+    .cta { text-align: center; padding: 4rem 2rem; max-width: 600px; margin: 0 auto; }
+    .cta h2 { font-size: 1.8rem; margin-bottom: 1rem; }
+    .cta .install { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 1rem 1.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #00d4aa; margin-bottom: 2rem; display: inline-block; }
+    .buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn { display: inline-block; padding: 0.8rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.95rem; transition: transform 0.2s, box-shadow 0.2s; }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .btn-primary { background: linear-gradient(135deg, #00d4aa, #7c3aed); color: white; }
+    .btn-secondary { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; }
+    .btn-download { background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3); color: #00d4aa; }
+    .footer { text-align: center; padding: 3rem 2rem; color: #505060; font-size: 0.85rem; border-top: 1px solid rgba(255,255,255,0.05); }
+    .footer a { color: #7c3aed; text-decoration: none; }
+    .team { margin-top: 0.5rem; }
+    /* Tablet */
+    @media (max-width: 768px) {
+      .hero { padding: 4rem 1.5rem 3rem; }
+      .title { font-size: 2.5rem; }
+      .subtitle { font-size: 1.1rem; }
+      .stats { grid-template-columns: repeat(3, 1fr); gap: 0.8rem; }
+      .stat { padding: 1.2rem 0.5rem; }
+      .stat-value { font-size: 1.8rem; }
+      .stat-label { font-size: 0.75rem; }
+      .code-grid { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .comparison { padding: 0 1rem; }
+      .cta .install { font-size: 0.75rem; padding: 0.8rem 1rem; word-break: break-all; }
+      .bench-table { font-size: 0.8rem; }
+      .bench-table th, .bench-table td { padding: 0.5rem 0.4rem; }
+      .buttons { gap: 0.8rem; }
+      .btn { padding: 0.7rem 1.5rem; font-size: 0.85rem; }
+    }
+    /* Mobile */
+    @media (max-width: 480px) {
+      .hero { padding: 3rem 1rem 2rem; }
+      .logo { font-size: 3rem; }
+      .title { font-size: 2rem; }
+      .subtitle { font-size: 1rem; }
+      .version-badge { font-size: 0.7rem; display: block; margin-bottom: 0.4rem; }
+      .nyx-badge { margin-left: 0; display: block; margin-top: 0.3rem; }
+      .stats { grid-template-columns: 1fr; max-width: 280px; gap: 0.8rem; }
+      .stat { padding: 1.2rem; }
+      .stat-value { font-size: 2rem; }
+      .comparison h2, .benchmark h2, .features h2, .cta h2 { font-size: 1.4rem; }
+      .code-body { font-size: 0.72rem; padding: 0.8rem; line-height: 1.5; }
+      .code-body[style] { font-size: 0.82rem !important; padding: 1.2rem !important; }
+      .feature { padding: 1.2rem; }
+      .feature h3 { font-size: 0.9rem; }
+      .feature p { font-size: 0.8rem; }
+      .cta .install { font-size: 0.65rem; padding: 0.6rem 0.8rem; }
+      .buttons { flex-direction: column; align-items: center; }
+      .btn { width: 100%; max-width: 280px; text-align: center; padding: 0.9rem 1.5rem; }
+      .bench-table { font-size: 0.75rem; }
+      .bench-table th, .bench-table td { padding: 0.4rem 0.3rem; }
+      .footer { padding: 2rem 1rem; font-size: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+<section class="hero">
+  <div class="logo">🦞</div>
+  <span class="version-badge">v0.1.0 — First Molt</span>
+  <span class="nyx-badge">⚡ Compiled from .nyx source</span>
+  <h1 class="title">NyxCode</h1>
+  <p class="subtitle">The AI-native programming language for the web.<br>Designed for AI. Optimized for tokens. Built for humans.</p>
+  <div class="stats">
+    <div class="stat"><div class="stat-value">68%</div><div class="stat-label">fewer lines vs React</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">boilerplate</div></div>
+    <div class="stat"><div class="stat-value">121</div><div class="stat-label">lines for this entire page</div></div>
+  </div>
+</section>
+<section class="comparison">
+  <h2>Same output. Fewer tokens.</h2>
+  <div class="code-grid">
+    <div class="code-block">
+      <div class="code-header"><span>React</span><span class="lines">20 lines</span></div>
+      <div class="code-body"><span class="dim">import</span> React, { useState, useEffect } <span class="dim">from</span> <span class="str">'react'</span>;<br><br><span class="dim">export default function</span> <span class="kw">UserList</span>() {<br>&nbsp;&nbsp;<span class="dim">const</span> [users, setUsers] = useState([]);<br>&nbsp;&nbsp;useEffect(() =&gt; {<br>&nbsp;&nbsp;&nbsp;&nbsp;fetch(<span class="str">'/api/users'</span>)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.then(r =&gt; r.json())<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.then(setUsers);<br>&nbsp;&nbsp;}, []);<br>&nbsp;&nbsp;<span class="dim">return</span> (<br>&nbsp;&nbsp;&nbsp;&nbsp;&lt;div className=<span class="str">"container"</span>&gt;<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{users.map(u =&gt; (<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div key={u.id}&gt;<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h3&gt;{u.name}&lt;/h3&gt;<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;{u.email}&lt;/p&gt;<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;))}<br>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br>&nbsp;&nbsp;);<br>}</div>
+    </div>
+    <div class="code-block" style="border-color:rgba(0,212,170,0.3)">
+      <div class="code-header" style="background:rgba(0,212,170,0.05)"><span style="color:#00d4aa">NyxCode</span><span class="lines">4 lines</span></div>
+      <div class="code-body" style="font-size:0.95rem;padding:2rem 1.5rem"><span class="kw">page</span> <span class="path">/users</span> {<br>&nbsp;&nbsp;<span class="kw">data</span> users = <span class="kw">get</span> <span class="path">/api/users</span><br>&nbsp;&nbsp;<span class="kw">each</span> users -&gt; card { h3 .name, p .email }<br>}</div>
+    </div>
+  </div>
+</section>
+<section class="benchmark">
+  <h2>Real Numbers</h2>
+  <p class="note">Measured on this landing page — same output, three implementations.</p>
+  <table class="bench-table">
+    <tr><th></th><th>Lines</th><th>Bytes</th><th>Files</th><th>Savings</th></tr>
+    <tr><td>NyxCode</td><td>121</td><td>3,676</td><td>1</td><td class="savings">—</td></tr>
+    <tr><td>HTML/CSS</td><td>129</td><td>11,228</td><td>1</td><td class="savings">-68% bytes</td></tr>
+    <tr><td>React (TSX+CSS)</td><td>372</td><td>8,842</td><td>2+</td><td class="savings">-68% lines</td></tr>
+  </table>
+</section>
+<section class="features">
+  <h2>What makes NyxCode different</h2>
+  <div class="feature-grid">
+    <div class="feature"><h3>🧠 AI-First Design</h3><p>Every syntax decision optimizes for AI code generation. Fewer tokens = cheaper, faster, more fits in context.</p></div>
+    <div class="feature"><h3>🔒 Secure by Default</h3><p>SQL injection, XSS, CSRF — structurally impossible. You can't write insecure NyxCode without explicitly opting in.</p></div>
+    <div class="feature"><h3>🎯 Zero Config</h3><p>No imports, no router config, no webpack. File location = route. One file = one thing.</p></div>
+    <div class="feature"><h3>🌐 Compiles to Standards</h3><p>Output is vanilla HTML + CSS + JS. Works everywhere. No runtime, no framework lock-in.</p></div>
+  </div>
+</section>
+<section class="cta">
+  <h2>Try it now</h2>
+  <div class="install">git clone --branch v0.1.0 https://github.com/fabudde/nyxcode.git</div>
+  <div class="buttons">
+    <a href="https://github.com/fabudde/nyxcode" class="btn btn-primary">GitHub</a>
+    <a href="https://github.com/fabudde/nyxcode/blob/main/SPEC.md" class="btn btn-secondary">Language Spec</a>
+    <a href="/downloads/nyxcode-starter.zip" class="btn btn-download">⬇ Download Starter</a>
+    <a href="/landing.nyx" class="btn btn-secondary">View .nyx Source</a>
+  </div>
+</section>
+<footer class="footer">
+  <p>NyxCode v0.1.0 "First Molt" — Released April 11, 2026</p>
+  <p class="team">Built by <a href="https://github.com/fabudde">Fabian Budde</a> 🐻 · Nyx 🦞 · Tyto 🦉</p>
+  <p style="margin-top:0.5rem"><a href="https://github.com/fabudde/nyxcode/releases/tag/v0.1.0">Release Notes</a> · MIT License</p>
+</footer>
+</body>
+</html>
