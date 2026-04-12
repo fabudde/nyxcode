@@ -1,20 +1,53 @@
 {
-  "name": "nyxcode",
-  "version": "0.1.0",
-  "description": "NyxCode — The AI-native programming language for the web",
+  "name": "@fabudde/nyxcode",
+  "version": "0.2.0",
+  "description": "NyxCode — The AI-native programming language for the web. 68% fewer tokens than React.",
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
+    "nyxcode": "dist/cli.js",
     "nyx": "dist/cli.js"
   },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "SPEC.md"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "parse": "node dist/cli.js",
-    "test": "node --test dist/tests/"
+    "test": "node --test dist/tests/",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "nyxcode",
+    "compiler",
+    "programming-language",
+    "web",
+    "ai-native",
+    "html",
+    "css",
+    "reactive",
+    "components",
+    "zero-config",
+    "token-efficient"
+  ],
+  "homepage": "https://nyxcode.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fabudde/nyxcode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fabudde/nyxcode/issues"
   },
   "author": "Fabian Budde & Nyx",
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "devDependencies": {
     "typescript": "^5.9.3"
   }
