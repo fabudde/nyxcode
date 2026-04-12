@@ -1,0 +1,151 @@
+# NyxCode v0.3 Feature Test — Every feature in one file
+
+component Card {
+  props title description
+  style {
+    bg rgba(255, 255, 255, 0.03)
+    border 1px solid rgba(255, 255, 255, 0.08)
+    radius 12px
+    padding 1.5rem
+    transition all 0.3s ease
+    hover {
+      transform translateY(-3px)
+      shadow 0 8px 20px rgba(0, 0, 0, 0.3)
+      border-color rgba(102, 126, 234, 0.3)
+    }
+    before {
+      position absolute
+      top 0
+      left 0
+      width 100%
+      height 2px
+      bg linear-gradient(90deg, #667eea, #f093fb)
+    }
+  }
+  h3 .title
+  p .description
+  slot
+}
+
+component Badge {
+  props label color
+  span .label style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.75rem; font-weight: 600; background: var(--badge-bg, #667eea22); color: var(--badge-color, #667eea);"
+}
+
+page /test {
+  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap' rel='stylesheet'>"
+  head "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+
+  animate pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+  }
+
+  style {
+    bg #0a0a1a
+    color #e0e0f0
+    font-family Inter, sans-serif
+    margin 0
+    padding 0
+  }
+
+  # Hero with pseudo-element overlay
+  section {
+    style {
+      padding 6rem 2rem
+      text-align center
+      position relative
+      overflow hidden
+      bg linear-gradient(135deg, #0a0a2e 0%, #1a1a3e 100%)
+
+      after {
+        content ""
+        position absolute
+        top 0
+        right -10%
+        width 50%
+        height 100%
+        bg radial-gradient(ellipse, rgba(102, 126, 234, 0.15), transparent 70%)
+        pointer-events none
+      }
+    }
+    h1 "NyxCode v0.3" style="font-size: 3rem; font-weight: 800; position: relative; z-index: 1;"
+    p "Every feature. One file. Zero frameworks." style="color: #8080a0; font-size: 1.1rem; position: relative; z-index: 1;"
+  }
+
+  # Reactive Counter
+  section {
+    style {
+      padding 3rem 2rem
+      text-align center
+      max-width 400px
+      margin 0 auto
+    }
+    h2 "Reactive State"
+    state count = 0
+    p count style="font-size: 4rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 1rem 0;"
+    row {
+      style {
+        display flex
+        gap 0.5rem
+        justify-content center
+      }
+      button "-" -> count = count - 1
+      button "Reset" -> count = 0
+      button "+" -> count = count + 1
+    }
+  }
+
+  # Component Cards with Slots
+  section {
+    style {
+      display grid
+      grid-template-columns repeat(3, 1fr)
+      gap 1.5rem
+      padding 3rem 2rem
+      max-width 1000px
+      margin 0 auto
+      @mobile {
+        grid-template-columns 1fr
+      }
+    }
+    Card title="Pseudo-Elements" description="::before and ::after with auto-generated content property." {
+      Badge label="NEW"
+    }
+    Card title="Focus & Active" description="Full pseudo-class support in style blocks." {
+      Badge label="CSS"
+    }
+    Card title="Component Slots" description="Pass children into components with slot." {
+      Badge label="v0.3"
+    }
+  }
+
+  # Conditional Rendering
+  section {
+    style {
+      padding 3rem 2rem
+      text-align center
+      max-width 500px
+      margin 0 auto
+    }
+    h2 "Conditional Rendering"
+    state visible = true
+    when visible {
+      p "You can see me! 👀" style="padding: 1rem; background: rgba(102, 126, 234, 0.1); border-radius: 8px;"
+    }
+    button "Toggle" -> visible = !visible
+  }
+
+  # Footer
+  footer {
+    style {
+      padding 2rem
+      text-align center
+      color #505070
+      font-size: 0.85rem
+      border-top 1px solid rgba(255, 255, 255, 0.05)
+    }
+    p "Built with NyxCode. MIT License. 🦞"
+  }
+}
