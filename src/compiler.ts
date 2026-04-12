@@ -577,12 +577,27 @@ export class Compiler {
       }
     }
 
+    // Compile children passed to this component (for slot substitution)
+    let slotHtml = '';
+    if (el.children.length > 0) {
+      for (const child of el.children) {
+        slotHtml += this.compileStatement(child);
+      }
+    }
+
     // Compile component body, substituting prop references
     let html = `${this.ind()}<div class="${scopeClass}">\n`;
     this.indent++;
 
     for (const stmt of comp.body) {
       if (stmt.type === 'Style') continue; // Already handled
+      // Slot: replace with children from parent invocation
+      if (stmt.type === 'Element' && (stmt as ElementNode).tag === 'slot') {
+        if (slotHtml) {
+          html += slotHtml;
+        }
+        continue;
+      }
       if (stmt.type === 'Element') {
         html += this.compileElementWithProps(stmt as ElementNode, props);
       } else {

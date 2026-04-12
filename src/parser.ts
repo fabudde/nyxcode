@@ -421,7 +421,10 @@ export class Parser {
     const start = this.consume(TokenType.When);
     const condition = this.parseExpression();
 
-    this.consume(TokenType.Arrow);
+    // Arrow is optional when followed by { }
+    if (this.check(TokenType.Arrow)) {
+      this.advance();
+    }
     const body: Statement[] = [];
 
     if (this.check(TokenType.LeftBrace)) {
@@ -436,7 +439,7 @@ export class Parser {
     let elseBody: Statement[] | undefined;
     if (this.check(TokenType.Else)) {
       this.advance(); // else
-      this.consume(TokenType.Arrow);
+      if (this.check(TokenType.Arrow)) this.advance(); // optional arrow
       elseBody = [];
       if (this.check(TokenType.LeftBrace)) {
         this.consume(TokenType.LeftBrace);
@@ -1012,6 +1015,10 @@ export class Parser {
   private parseProps(): PropDef[] {
     const props: PropDef[] = [];
     while (this.check(TokenType.Identifier)) {
+      // Stop if the identifier is an element tag (it's the start of component body)
+      if (ELEMENT_TAGS.has(this.peek().value)) break;
+      // Stop if the identifier is uppercase (component invocation)
+      if (this.peek().value[0] >= 'A' && this.peek().value[0] <= 'Z') break;
       const name = this.consumeIdentifier();
       const optional = this.check(TokenType.Question);
       if (optional) this.advance();
