@@ -452,15 +452,40 @@ export class Parser {
   private parseStyleProperty(): StyleProperty {
     const name = this.consumeIdentifier();
     let value = '';
+    let parenDepth = 0; // Track parentheses for rgba(), linear-gradient(), etc.
 
     // Consume value tokens until we hit:
-    // - comma (property separator in single-line blocks)
-    // - } (end of style block)
+    // - comma OUTSIDE parens (property separator in single-line blocks)
+    // - } (end of style block) — only at depth 0
     // - @ (responsive block)
-    // - another CSS property name (multi-line separator)
+    // - another CSS property name (multi-line separator) — only at depth 0
     // - 'hover' keyword
     while (!this.isAtEnd()) {
       const next = this.peek();
+
+      // Track parenthesis depth
+      if (next.type === TokenType.LeftParen) {
+        parenDepth++;
+        value += (value ? '' : '') + this.advance().value;
+        continue;
+      }
+      if (next.type === TokenType.RightParen) {
+        parenDepth--;
+        value += this.advance().value;
+        continue;
+      }
+
+      // Inside parentheses: consume EVERYTHING (commas, numbers, identifiers, dots)
+      if (parenDepth > 0) {
+        if (next.type === TokenType.Comma) {
+          value += this.advance().value + ' '; // comma + space inside parens
+        } else {
+          value += this.advance().value;
+        }
+        continue;
+      }
+
+      // Outside parentheses: normal rules
       if (next.type === TokenType.RightBrace || next.type === TokenType.At) break;
       if (next.type === TokenType.Comma) { this.advance(); break; }
       if (next.value === 'hover') break;
