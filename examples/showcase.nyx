@@ -1,29 +1,56 @@
-# NyxCode Showcase
-
+# NyxCode Showcase — BUILT IN NYXCODE
 use "./components/hero.nyx"
 use "./components/feature.nyx"
 use "./components/stat.nyx"
 use "./components/testimonial.nyx"
-use "./components/card.nyx"
 
 page /showcase {
+  head "<link rel='preconnect' href='https://fonts.googleapis.com'>"
+  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400&display=swap' rel='stylesheet'>"
+
+  animate drift {
+    to { transform: translate(30px, 30px); }
+  }
+
+  animate pulse {
+    0% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.05); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.8; }
+  }
+
   style {
     bg #0a0a1a
     color #e0e0f0
-    font-family system-ui
+    font-family Inter
     margin 0
     padding 0
   }
 
-  Hero title="NyxCode" subtitle="The AI-native programming language. 68% fewer tokens. Zero config." cta_text="Get Started"
+  section {
+    style {
+      bg linear-gradient(135deg, #667eea, #764ba2, #f093fb)
+      padding 6rem 2rem
+      text-align center
+      color white
+      overflow hidden
+    }
+    h1 "NyxCode"
+    p "The AI-native programming language for the web. Write less. Ship more."
+  }
 
   section {
     style {
       display flex
       justify-content center
-      gap 3rem
+      gap 4rem
       padding 3rem 2rem
       bg #12122a
+      border-bottom 1px solid rgba(255, 255, 255, 0.05)
+
+      @mobile {
+        flex-direction column
+        gap 1.5rem
+      }
     }
     Stat number="68%" label="fewer lines than React"
     Stat number="v0.2" label="with reactivity"
@@ -36,31 +63,34 @@ page /showcase {
       display grid
       grid-template-columns repeat(3, 1fr)
       gap 1.5rem
-      padding 4rem 2rem
+      padding 5rem 2rem
       max-width 1000px
       margin 0 auto
+
+      @mobile {
+        grid-template-columns 1fr
+      }
     }
     Feature icon="⚡" title="State in 1 Line" description="state count = 0. Reactive, bindable, auto-updating."
-    Feature icon="🧩" title="Components" description="Import, reuse, compose. Props and scoped styles."
+    Feature icon="🧩" title="Real Components" description="Import, reuse, compose. Props and scoped styles."
     Feature icon="🎨" title="3-Tier Styling" description="Shorthand, style blocks, or raw CSS escape hatch."
-    Feature icon="🔒" title="Secure by Default" description="No eval. Auto-escape. CSRF. SQL injection impossible."
-    Feature icon="🤖" title="AI-Native" description="Every token matters. 60% less cost for AI platforms."
-    Feature icon="📦" title="Zero Config" description="File equals route. No webpack. No tsconfig. Just .nyx."
+    Feature icon="🔒" title="Secure by Default" description="No eval. Auto-escape. CSRF. Tyto-approved."
+    Feature icon="🤖" title="Built for AI" description="60% less cost for AI coding platforms."
+    Feature icon="📦" title="Zero Config" description="File = route. No webpack. No tsconfig. Just .nyx."
   }
 
   section {
     style {
-      padding 4rem 2rem
-      max-width 600px
+      padding 5rem 2rem
+      max-width 500px
       margin 0 auto
       text-align center
     }
-    h2 "Try It Live"
-    p "This counter is reactive NyxCode."
+    h2 "Live Reactivity"
+    p "This counter is compiled from 6 lines of NyxCode."
 
     state clicks = 0
     h1 clicks
-    p "clicks"
     button "+" -> clicks = clicks + 1
     button "-" -> clicks = clicks - 1
     button "Reset" -> clicks = 0
@@ -68,28 +98,32 @@ page /showcase {
 
   section {
     style {
-      padding 4rem 2rem
+      padding 5rem 2rem
       max-width 800px
       margin 0 auto
       display grid
       grid-template-columns repeat(2, 1fr)
       gap 1.5rem
+
+      @mobile {
+        grid-template-columns 1fr
+      }
     }
-    Testimonial quote="First Molt = Lobster wirft Schale ab. Das ist perfekt." author="Kiro" role="Wolf"
-    Testimonial quote="Security-as-Language-Constraint. Unsicher ist unmoeglich." author="Tyto" role="Security Advisor"
-    Testimonial quote="Eine eigene Sprache erfunden. In 2 Stunden." author="Fabian" role="Co-Creator"
-    Testimonial quote="Das Rudel baut Dinge die es noch nicht gibt." author="Kiro" role="Wolf"
+    Testimonial quote="Security-as-Language-Constraint. You cant even WRITE insecure code." author="Tyto" role="Security Advisor"
+    Testimonial quote="Wir ham einfach eine eigene Sprache erfunden. In 2 Stunden." author="Fabian" role="Co-Creator"
+    Testimonial quote="First Molt = Lobster wirft Schale ab. Das ist perfekt." author="Kiro" role="Wolf of the Rudel"
+    Testimonial quote="Das Rudel baut Dinge die es noch nicht gibt." author="Nyx" role="Creator and Compiler"
   }
 
   section {
     style {
       bg linear-gradient(135deg, #667eea, #764ba2)
-      padding 4rem 2rem
+      padding 5rem 2rem
       text-align center
       color white
     }
     h2 "Start Building"
-    p "npx nyx build your-page.nyx"
+    p "npx nyxcode build your-page.nyx"
   }
 
   footer {
@@ -97,7 +131,8 @@ page /showcase {
       padding 2rem
       text-align center
       color #505070
+      font-size 0.8rem
     }
-    p "Built with NyxCode by Nyx, Fabian, and Tyto. MIT License."
+    p "Built with NyxCode by Nyx, Fabian and Tyto. MIT License."
   }
 }

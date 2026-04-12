@@ -788,8 +788,19 @@ export class Parser {
     const attributes: Attribute[] = [];
     let children: Statement[] = [];
 
+    // For component invocations (uppercase tag), attributes take priority over statement detection
+    const isComponentCall = tag[0] >= 'A' && tag[0] <= 'Z';
+
     // Parse content and attributes
-    while (!this.isAtEnd() && !this.check(TokenType.RightBrace) && !this.isStatementStart()) {
+    while (!this.isAtEnd() && !this.check(TokenType.RightBrace)) {
+      // Check if next is a new statement — but for components, key=value is NOT a new statement
+      if (this.isStatementStart()) {
+        if (isComponentCall && this.peekAt(1)?.type === TokenType.Equals) {
+          // This is an attribute of the component, not a new statement
+        } else {
+          break;
+        }
+      }
       const next = this.peek();
 
       // String content: h1 "Hello"

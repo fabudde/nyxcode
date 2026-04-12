@@ -2,11 +2,10 @@ component Hero {
   props title subtitle cta_text
   style {
     bg linear-gradient(135deg, #667eea, #764ba2)
-    padding 5rem 2rem
+    padding 6rem 2rem
     text-align center
     color white
   }
   h1 .title
   p .subtitle
-  button .cta_text
 }
