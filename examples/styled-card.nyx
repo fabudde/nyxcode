@@ -1,0 +1,77 @@
+# Styled Card Demo — Hover, Focus, Active, Pseudo-elements
+# Shows NyxCode's full styling power
+
+component StyledCard {
+  props icon title description
+
+  style {
+    bg rgba(255, 255, 255, 0.04)
+    border 1px solid rgba(255, 255, 255, 0.08)
+    radius 16px
+    padding 2rem
+    position relative
+    overflow hidden
+    transition all 0.3s ease
+    cursor pointer
+
+    hover {
+      transform translateY(-4px)
+      border-color rgba(102, 126, 234, 0.4)
+      shadow 0 8px 30px rgba(102, 126, 234, 0.15)
+    }
+
+    active {
+      transform scale(0.98)
+    }
+
+    before {
+      position absolute
+      top 0
+      left 0
+      width 100%
+      height 3px
+      bg linear-gradient(90deg, #667eea, #f093fb)
+      opacity 0
+      transition opacity 0.3s ease
+    }
+  }
+
+  h2 .icon
+  h3 .title
+  p .description
+}
+
+page /styled {
+  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap' rel='stylesheet'>"
+
+  style {
+    bg #0a0a1a
+    color #e0e0f0
+    font-family Inter
+    min-height 100vh
+    padding 4rem 2rem
+  }
+
+  h1 "NyxCode Styling Demo"
+
+  section {
+    style {
+      display grid
+      grid-template-columns repeat(3, 1fr)
+      gap 1.5rem
+      max-width 1000px
+      margin 2rem auto
+
+      @mobile {
+        grid-template-columns 1fr
+      }
+    }
+
+    StyledCard icon="⚡" title="Hover Effects" description="hover { } blocks with transitions."
+    StyledCard icon="🎭" title="Pseudo Elements" description="before { } and after { } blocks."
+    StyledCard icon="🎯" title="Focus & Active" description="focus { } and active { } states."
+    StyledCard icon="📱" title="Responsive" description="@mobile { } breakpoint blocks."
+    StyledCard icon="🎨" title="3-Tier Styling" description="Shorthand, blocks, or raw CSS."
+    StyledCard icon="🔒" title="Scoped by Default" description="No class name conflicts. Ever."
+  }
+}

@@ -23,7 +23,7 @@ import {
   ThemeSection, ValidateStatement, ValidateField, RespondStatement,
   LimitStatement, QueryStatement, ResponsiveBlock, SecurityNode, SecurityRule,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
-  HeadStatement, AnimateStatement,
+  HeadStatement, AnimateStatement, PseudoElementBlock,
 } from './ast.js';
 
 /** Set of tags that are recognized as built-in elements */
@@ -465,6 +465,12 @@ export class Parser {
     const properties: StyleProperty[] = [];
     const responsive: ResponsiveBlock[] = [];
     let hover: StyleProperty[] | undefined;
+    let focus: StyleProperty[] | undefined;
+    let active: StyleProperty[] | undefined;
+    const pseudoElements: PseudoElementBlock[] = [];
+
+    const PSEUDO_CLASSES = new Set(['hover', 'focus', 'active']);
+    const PSEUDO_ELEMENTS = new Set(['before', 'after']);
 
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       if (this.check(TokenType.At)) {
@@ -478,22 +484,39 @@ export class Parser {
         }
         this.consume(TokenType.RightBrace);
         responsive.push({ breakpoint, properties: props });
-      } else if (this.peek().value === 'hover') {
-        // Hover block
-        this.advance();
+      } else if (PSEUDO_CLASSES.has(this.peek().value)) {
+        // Pseudo-class block: hover { }, focus { }, active { }
+        const name = this.advance().value;
         this.consume(TokenType.LeftBrace);
-        hover = [];
+        const props: StyleProperty[] = [];
         while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-          hover.push(this.parseStyleProperty());
+          props.push(this.parseStyleProperty());
         }
         this.consume(TokenType.RightBrace);
+        if (name === 'hover') hover = props;
+        else if (name === 'focus') focus = props;
+        else if (name === 'active') active = props;
+      } else if (PSEUDO_ELEMENTS.has(this.peek().value)) {
+        // Pseudo-element block: before { }, after { }
+        const selector = this.advance().value;
+        this.consume(TokenType.LeftBrace);
+        const props: StyleProperty[] = [];
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          props.push(this.parseStyleProperty());
+        }
+        this.consume(TokenType.RightBrace);
+        pseudoElements.push({ selector, properties: props });
       } else {
         properties.push(this.parseStyleProperty());
       }
     }
 
     this.consume(TokenType.RightBrace);
-    return { type: 'Style', raw, properties, responsive, hover, line: start.line, col: start.col };
+    return {
+      type: 'Style', raw, properties, responsive, hover, focus, active,
+      pseudoElements: pseudoElements.length > 0 ? pseudoElements : undefined,
+      line: start.line, col: start.col
+    };
   }
 
   /** Known CSS shorthand property names in NyxCode */
@@ -509,6 +532,16 @@ export class Parser {
     'flex-direction', 'flex-wrap', 'grid-template-columns',
     'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
     'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
+    'border-color', 'border-width', 'border-style',
+    'border-top', 'border-bottom', 'border-left', 'border-right',
+    'outline', 'outline-color', 'outline-width', 'outline-style',
+    'list-style', 'letter-spacing', 'word-spacing', 'white-space',
+    'overflow-x', 'overflow-y', 'object-fit', 'object-position',
+    'background-color', 'background-image', 'background-size', 'background-position',
+    'text-shadow', 'box-sizing', 'vertical-align', 'user-select',
+    'pointer-events', 'backdrop-filter', 'filter',
+    'grid-gap', 'grid-template-rows', 'grid-column', 'grid-row',
+    'place-items', 'place-content', 'align-content',
   ]);
 
   private parseStyleProperty(): StyleProperty {
@@ -550,12 +583,43 @@ export class Parser {
       // Outside parentheses: normal rules
       if (next.type === TokenType.RightBrace || next.type === TokenType.At) break;
       if (next.type === TokenType.Comma) { this.advance(); break; }
-      if (next.value === 'hover') break;
+      if (['hover', 'focus', 'active', 'before', 'after'].includes(next.value)) break;
       // If we see an identifier that's a known CSS property, it's the NEXT property
-      if (next.type === TokenType.Identifier && Parser.CSS_PROPERTIES.has(next.value) && value.length > 0) break;
-      // Handle hyphenated identifiers like "text-align" - consume as one
-      value += (value ? ' ' : '') + this.advance().value;
-      // Check for hyphenated continuation
+      if (next.type === TokenType.Identifier && value.length > 0) {
+        // Check for hyphenated property: e.g., 'border' + '-' + 'color' = 'border-color'
+        const peek1 = this.peekAt(1);
+        const peek2 = this.peekAt(2);
+        if (peek1?.value === '-' && peek2?.type === TokenType.Identifier) {
+          const hyphenated = next.value + '-' + peek2.value;
+          if (Parser.CSS_PROPERTIES.has(hyphenated)) break;
+        }
+        if (Parser.CSS_PROPERTIES.has(next.value)) break;
+      }
+      // String tokens in style values: preserve quotes (needed for CSS content property)
+      if (next.type === TokenType.String) {
+        const strVal = this.advance().value;
+        value += (value ? ' ' : '') + `"${strVal}"`;
+        continue;
+      }
+      // Handle hyphenated identifiers and values
+      const tok = this.advance();
+      // Minus sign: attach to NEXT value (no space) if at start of value or after space
+      if (tok.value === '-') {
+        // Check if this is a negative value (next is a number) or hyphenated ident
+        if (this.peek()?.type === TokenType.Number || this.peek()?.type === TokenType.Identifier) {
+          value += (value ? ' ' : '') + '-' + this.advance().value;
+          continue;
+        }
+        value += (value ? ' ' : '') + '-';
+        continue;
+      }
+      // Percentage sign: attach to PREVIOUS number (no space)
+      if (tok.value === '%') {
+        value += '%';
+        continue;
+      }
+      value += (value ? ' ' : '') + tok.value;
+      // Check for hyphenated continuation (e.g., text-align, border-radius)
       if (this.peek()?.type === TokenType.Identifier && this.peek()?.value === '-') {
         value += this.advance().value; // consume -
         if (this.peek()?.type === TokenType.Identifier) {

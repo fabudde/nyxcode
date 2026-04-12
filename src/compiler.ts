@@ -14,7 +14,7 @@ import {
   Program, TopLevelNode, PageNode, ComponentNode, Statement,
   DataStatement, EachStatement, WhenStatement, StyleBlock,
   FormStatement, AuthStatement, ElementNode, Expression,
-  StyleProperty, ResponsiveBlock, Attribute,
+  StyleProperty, ResponsiveBlock, Attribute, PseudoElementBlock,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
   HeadStatement, AnimateStatement,
 } from './ast.js';
@@ -244,12 +244,35 @@ export class Compiler {
     }
     cssBlock += '}\n';
 
-    if (style.hover) {
-      cssBlock += `.${className}:hover {\n`;
-      for (const prop of style.hover) {
-        cssBlock += `  ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+    // Pseudo-classes: hover, focus, active
+    for (const [pseudoName, pseudoProps] of [
+      ['hover', style.hover],
+      ['focus', style.focus],
+      ['active', style.active],
+    ] as [string, StyleProperty[] | undefined][]) {
+      if (pseudoProps) {
+        cssBlock += `.${className}:${pseudoName} {\n`;
+        for (const prop of pseudoProps) {
+          cssBlock += `  ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+        }
+        cssBlock += '}\n';
       }
-      cssBlock += '}\n';
+    }
+
+    // Pseudo-elements: ::before, ::after
+    if (style.pseudoElements) {
+      for (const pe of style.pseudoElements) {
+        cssBlock += `.${className}::${pe.selector} {\n`;
+        // Ensure content property exists (required for pseudo-elements)
+        const hasContent = pe.properties.some(p => p.name === 'content');
+        if (!hasContent) {
+          cssBlock += `  content: '';\n`;
+        }
+        for (const prop of pe.properties) {
+          cssBlock += `  ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+        }
+        cssBlock += '}\n';
+      }
     }
 
     if (style.responsive) {
@@ -457,12 +480,32 @@ export class Compiler {
     }
     cssBlock += '}\n';
 
-    if (style.hover) {
-      cssBlock += `.${scopeClass}:hover {\n`;
-      for (const prop of style.hover) {
-        cssBlock += `  ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+    // Pseudo-classes
+    for (const [pseudoName, pseudoProps] of [
+      ['hover', style.hover],
+      ['focus', style.focus],
+      ['active', style.active],
+    ] as [string, StyleProperty[] | undefined][]) {
+      if (pseudoProps) {
+        cssBlock += `.${scopeClass}:${pseudoName} {\n`;
+        for (const prop of pseudoProps) {
+          cssBlock += `  ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+        }
+        cssBlock += '}\n';
       }
-      cssBlock += '}\n';
+    }
+
+    // Pseudo-elements
+    if (style.pseudoElements) {
+      for (const pe of style.pseudoElements) {
+        cssBlock += `.${scopeClass}::${pe.selector} {\n`;
+        const hasContent = pe.properties.some(p => p.name === 'content');
+        if (!hasContent) cssBlock += `  content: '';\n`;
+        for (const prop of pe.properties) {
+          cssBlock += `  ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+        }
+        cssBlock += '}\n';
+      }
     }
 
     if (style.responsive) {
@@ -903,6 +946,7 @@ ${reactiveRuntime}
       'border': 'border',
       'flex': 'display: flex; gap',
       'grid': 'display: grid; grid-template-columns',
+      'content': 'content',
     };
     return mapping[name] || name;
   }

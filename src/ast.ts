@@ -148,6 +148,14 @@ export interface StyleBlock extends BaseNode {
   properties: StyleProperty[];
   responsive?: ResponsiveBlock[];
   hover?: StyleProperty[];
+  focus?: StyleProperty[];
+  active?: StyleProperty[];
+  pseudoElements?: PseudoElementBlock[];
+}
+
+export interface PseudoElementBlock {
+  selector: string; // 'before' | 'after'
+  properties: StyleProperty[];
 }
 
 export interface StyleProperty {
