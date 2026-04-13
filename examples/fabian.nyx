@@ -1,6 +1,6 @@
 # Fabian Budde — Personal Portfolio
 # Built with NyxCode 🦞
-# Dark/Light Mode with system detection + toggle
+# Dark Mode Only — Green Accent — Unique Design
 
 component ProjectCard {
   props icon title description url
@@ -8,11 +8,11 @@ component ProjectCard {
     style {
       radius 16px
       padding 2rem
-      transition all 0.3s ease
+      transition all 0.4s cubic-bezier(0.4, 0, 0.2, 1)
       position relative
       overflow hidden
       hover {
-        transform translateY(-6px)
+        transform translateY(-8px)
       }
       before {
         position absolute
@@ -20,13 +20,13 @@ component ProjectCard {
         left 0
         width 100%
         height 2px
-        bg linear-gradient(90deg, #667eea, #f093fb)
+        bg linear-gradient(90deg, #00d26a, #00e676)
       }
     }
     span .icon style="font-size: 2.5rem; display: block; margin-bottom: 1rem;"
     h3 .title style="font-size: 1.25rem; font-weight: 700; margin: 0 0 0.75rem 0;"
     p .description style="font-size: 0.9rem; line-height: 1.6; margin: 0 0 1.25rem 0; opacity: 0.7;"
-    link "View Project →" href=.url style="color: #667eea; text-decoration: none; font-weight: 600; font-size: 0.85rem;"
+    link "View Project →" href=.url style="color: #00d26a; text-decoration: none; font-weight: 600; font-size: 0.85rem; transition: color 0.3s;"
   }
 }
 
@@ -48,13 +48,11 @@ component SkillBadge {
 }
 
 page / {
-  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap' rel='stylesheet'>"
+  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap' rel='stylesheet'>"
   head "<meta name='viewport' content='width=device-width, initial-scale=1'>"
   head "<meta name='description' content='Fabian Budde — Software Developer & Entrepreneur. Building AI-native tools and e-commerce solutions.'>"
-  head "<style>*,*::before,*::after{box-sizing:border-box}html{scroll-behavior:smooth}body{font-family:Inter,sans-serif;margin:0;padding:0;min-height:100vh;transition:background .3s,color .3s}::selection{background:#667eea;color:#fff}:root{--bg:#0a0a12;--text:#e0e0f0;--heading:#f0f0ff;--muted:#8888aa;--subtle:#666688;--card-bg:rgba(255,255,255,.03);--card-border:rgba(255,255,255,.08);--card-hover:rgba(255,255,255,.06);--badge-bg:rgba(102,126,234,.12);--badge-text:#99aaee;--badge-border:rgba(102,126,234,.2);--contact-border:rgba(102,126,234,.25);--footer-border:rgba(255,255,255,.05);--footer-text:#505070;--footer-sub:#404060;--btn-outline-border:rgba(102,126,234,.3);--btn-outline-text:#99aaee;--hero-fade:linear-gradient(180deg,transparent,#0a0a12);--toggle-bg:rgba(255,255,255,.1);--toggle-hover:rgba(255,255,255,.2);--accent-shadow:rgba(102,126,234,.15)}[data-theme=light]{--bg:#fff;--text:#1a1a2e;--heading:#0a0a12;--muted:#555566;--subtle:#777788;--card-bg:rgba(0,0,0,.02);--card-border:rgba(0,0,0,.08);--card-hover:rgba(0,0,0,.04);--badge-bg:rgba(102,126,234,.08);--badge-text:#4455aa;--badge-border:rgba(102,126,234,.15);--contact-border:rgba(102,126,234,.2);--footer-border:rgba(0,0,0,.06);--footer-text:#999;--footer-sub:#bbb;--btn-outline-border:rgba(102,126,234,.3);--btn-outline-text:#5566bb;--hero-fade:linear-gradient(180deg,transparent,#fff);--toggle-bg:rgba(0,0,0,.06);--toggle-hover:rgba(0,0,0,.12);--accent-shadow:rgba(102,126,234,.1)}@media(prefers-color-scheme:light){:root:not([data-theme=dark]){--bg:#fff;--text:#1a1a2e;--heading:#0a0a12;--muted:#555566;--subtle:#777788;--card-bg:rgba(0,0,0,.02);--card-border:rgba(0,0,0,.08);--card-hover:rgba(0,0,0,.04);--badge-bg:rgba(102,126,234,.08);--badge-text:#4455aa;--badge-border:rgba(102,126,234,.15);--contact-border:rgba(102,126,234,.2);--footer-border:rgba(0,0,0,.06);--footer-text:#999;--footer-sub:#bbb;--btn-outline-border:rgba(102,126,234,.3);--btn-outline-text:#5566bb;--hero-fade:linear-gradient(180deg,transparent,#fff);--toggle-bg:rgba(0,0,0,.06);--toggle-hover:rgba(0,0,0,.12);--accent-shadow:rgba(102,126,234,.1)}}body{background:var(--bg);color:var(--text)}.project-card{background:var(--card-bg);border:1px solid var(--card-border)}.project-card:hover{box-shadow:0 12px 32px var(--accent-shadow);border-color:rgba(102,126,234,.4);background:var(--card-hover)}.project-card h3{color:var(--heading)}.project-card p{color:var(--muted)}.skill-badge{background:var(--badge-bg);color:var(--badge-text);border:1px solid var(--badge-border)}.skill-badge:hover{background:rgba(102,126,234,.25);color:var(--heading)}.section-label{color:#667eea}.section-heading{color:var(--heading)}.muted-text{color:var(--muted)}.subtle-text{color:var(--subtle)}.hero-section{background:radial-gradient(ellipse at 20% 50%,rgba(102,126,234,.08) 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,rgba(240,147,251,.06) 0%,transparent 50%),var(--bg)}.contact-link{color:var(--btn-outline-text);border:1px solid var(--contact-border)}.contact-link:hover{border-color:rgba(102,126,234,.5);background:rgba(102,126,234,.08)}.btn-outline{border:1px solid var(--btn-outline-border);color:var(--btn-outline-text)}.btn-outline:hover{border-color:rgba(102,126,234,.6);background:rgba(102,126,234,.1);transform:translateY(-2px)}.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(102,126,234,.3)}.theme-toggle{position:fixed;top:1.5rem;right:1.5rem;z-index:100;background:var(--toggle-bg);border:none;border-radius:50%;width:44px;height:44px;font-size:1.2rem;cursor:pointer;transition:all .3s;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px)}.theme-toggle:hover{background:var(--toggle-hover);transform:scale(1.1)}footer{border-top:1px solid var(--footer-border)}.footer-main{color:var(--footer-text)}.footer-sub{color:var(--footer-sub)}</style>"
-  head "<script>(function(){var s=localStorage.getItem('theme');if(s)document.documentElement.setAttribute('data-theme',s)})()</script>"
-  head "<button class='theme-toggle' onclick='toggleTheme()' aria-label='Toggle theme'><span id='theme-icon'>☀️</span></button>"
-  head "<script>function toggleTheme(){var h=document.documentElement,c=h.getAttribute('data-theme'),d=!c?(window.matchMedia('(prefers-color-scheme:light)').matches?false:true):c==='dark',n=d?'light':'dark';h.setAttribute('data-theme',n);localStorage.setItem('theme',n);document.getElementById('theme-icon').textContent=n==='light'?'🌙':'☀️'}window.addEventListener('DOMContentLoaded',function(){var s=localStorage.getItem('theme'),l=s==='light'||(!s&&window.matchMedia('(prefers-color-scheme:light)').matches);document.getElementById('theme-icon').textContent=l?'🌙':'☀️'})</script>"
+  head "<style>*,*::before,*::after{box-sizing:border-box}html{scroll-behavior:smooth}body{font-family:Inter,sans-serif;margin:0;padding:0;min-height:100vh;background:#0a0a12;color:#e0e0f0;overflow-x:hidden}::selection{background:#00d26a;color:#0a0a12}.project-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08)}.project-card:hover{box-shadow:0 0 30px rgba(0,210,106,.12),0 12px 32px rgba(0,0,0,.4);border-color:rgba(0,210,106,.35);background:rgba(0,210,106,.04)}.project-card h3{color:#f0f0ff}.project-card p{color:#8888aa}.skill-badge{background:rgba(0,210,106,.08);color:#66ffb2;border:1px solid rgba(0,210,106,.18)}.skill-badge:hover{background:rgba(0,210,106,.2);color:#f0f0ff;border-color:rgba(0,210,106,.4);box-shadow:0 0 12px rgba(0,210,106,.15)}.section-label{color:#00d26a}.section-heading{color:#f0f0ff}.muted-text{color:#8888aa}.subtle-text{color:#666688}.hero-section{background:radial-gradient(ellipse at 20% 50%,rgba(0,210,106,.06) 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,rgba(0,230,118,.04) 0%,transparent 50%),#0a0a12}.contact-link{color:#66ffb2;border:1px solid rgba(0,210,106,.25)}.contact-link:hover{border-color:rgba(0,210,106,.5);background:rgba(0,210,106,.08);box-shadow:0 0 20px rgba(0,210,106,.1)}.btn-outline{border:1px solid rgba(0,210,106,.3);color:#66ffb2}.btn-outline:hover{border-color:rgba(0,210,106,.6);background:rgba(0,210,106,.1);transform:translateY(-2px);box-shadow:0 0 20px rgba(0,210,106,.1)}.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,210,106,.3)}footer{border-top:1px solid rgba(255,255,255,.05)}.footer-main{color:#505070}.footer-sub{color:#404060}a{color:#00d26a!important}a:hover{color:#66ffb2!important;text-decoration:none!important}.bg-dots{position:fixed;top:0;left:0;width:100%;height:100%;background-image:radial-gradient(rgba(0,210,106,.07) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}.orb{position:fixed;border-radius:50%;filter:blur(80px);opacity:.35;pointer-events:none;z-index:0}.orb-1{width:400px;height:400px;background:radial-gradient(circle,rgba(0,210,106,.15),transparent 70%);top:-100px;right:-100px;animation:orbFloat1 20s ease-in-out infinite}.orb-2{width:300px;height:300px;background:radial-gradient(circle,rgba(0,230,118,.12),transparent 70%);bottom:20%;left:-80px;animation:orbFloat2 25s ease-in-out infinite}.orb-3{width:250px;height:250px;background:radial-gradient(circle,rgba(0,161,82,.1),transparent 70%);top:40%;right:10%;animation:orbFloat3 18s ease-in-out infinite}@keyframes orbFloat1{0%,100%{transform:translate(0,0)}25%{transform:translate(-30px,40px)}50%{transform:translate(20px,-20px)}75%{transform:translate(-15px,-30px)}}@keyframes orbFloat2{0%,100%{transform:translate(0,0)}33%{transform:translate(40px,-30px)}66%{transform:translate(-20px,20px)}}@keyframes orbFloat3{0%,100%{transform:translate(0,0)}50%{transform:translate(-25px,35px)}}.section-divider{width:100%;max-width:200px;height:1px;margin:0 auto;background:linear-gradient(90deg,transparent,rgba(0,210,106,.3),transparent);border:none}.typing-cursor{display:inline-block;width:2px;height:1.2em;background:#00d26a;margin-left:4px;vertical-align:text-bottom;animation:blink 1s step-end infinite}@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}.reveal{opacity:0;transform:translateY(30px);transition:opacity 0.8s ease,transform 0.8s ease}.reveal.visible{opacity:1;transform:translateY(0)}.category-label{color:#00d26a;font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:.5rem;display:block}.skills-group{margin-bottom:1.5rem}.hero-code{position:absolute;font-family:'JetBrains Mono',monospace;font-size:.7rem;color:rgba(0,210,106,.12);pointer-events:none;white-space:pre;line-height:1.4;z-index:0}.hero-code-left{top:15%;left:3%}.hero-code-right{bottom:15%;right:3%;text-align:right}@media(max-width:768px){.hero-code{display:none}.orb{opacity:.2}}</style>"
+  head "<script>document.addEventListener('DOMContentLoaded',function(){var obs=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target)}})},{threshold:0.12,rootMargin:'0px 0px -40px 0px'});document.querySelectorAll('.reveal').forEach(function(el){obs.observe(el)});var sub=document.getElementById('typed-sub');if(sub){var text='Software Developer & Entrepreneur';var i=0;sub.textContent='';function typeChar(){if(i<text.length){sub.textContent+=text.charAt(i);i++;setTimeout(typeChar,55)}else{var cur=document.getElementById('typing-cursor');if(cur)cur.style.animation='blink 1s step-end infinite'}}setTimeout(typeChar,800)}})</script>"
 
   animate fadeInUp {
     0% { opacity: 0; transform: translateY(30px); }
@@ -72,6 +70,18 @@ page / {
     50% { transform: translateY(-10px); }
     100% { transform: translateY(0px); }
   }
+
+  animate pulseGlow {
+    0% { opacity: 0.4; }
+    50% { opacity: 0.7; }
+    100% { opacity: 0.4; }
+  }
+
+  # ═══ BACKGROUND EFFECTS ═══
+  span "" class="bg-dots"
+  span "" class="orb orb-1"
+  span "" class="orb orb-2"
+  span "" class="orb orb-3"
 
   # ═══ HERO ═══
   section class="hero-section" {
@@ -91,10 +101,15 @@ page / {
       }
     }
 
-    span "" style="position: absolute; bottom: 0; left: 0; width: 100%; height: 40%; background: var(--hero-fade); pointer-events: none; z-index: 0;"
-    span "👋" style="font-size: 2rem; display: block; margin-bottom: 1rem; animation: float 3s ease-in-out infinite; position: relative; z-index: 1;"
-    h1 "Fabian Budde" style="font-size: 4rem; font-weight: 900; margin: 0 0 1rem 0; background: linear-gradient(135deg, #667eea 0%, #9b6dff 50%, #f093fb 100%); background-size: 200% 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: gradientShift 4s ease infinite; position: relative; z-index: 1; letter-spacing: -0.02em; line-height: 1.1;"
-    p "Software Developer & Entrepreneur" class="muted-text" style="font-size: 1.35rem; font-weight: 300; margin: 0 0 1.5rem 0; letter-spacing: 0.05em; position: relative; z-index: 1;"
+    span "" style="position: absolute; bottom: 0; left: 0; width: 100%; height: 40%; background: linear-gradient(180deg, transparent, #0a0a12); pointer-events: none; z-index: 0;"
+
+    span "page / {\n  head \"...\"\n  section {\n    style {\n      bg #0a0a12\n      color green\n    }\n    h1 \"Fabian\"\n  }\n}" class="hero-code hero-code-left" style="animation: pulseGlow 4s ease-in-out infinite;"
+    span "component Card {\n  props icon title\n  section {\n    span .icon\n    h3 .title\n    link \"→\" href=.url\n  }\n}" class="hero-code hero-code-right" style="animation: pulseGlow 4s ease-in-out infinite 2s;"
+
+    span ">" style="font-size: 2rem; display: block; margin-bottom: 1rem; animation: float 3s ease-in-out infinite; position: relative; z-index: 1; color: #00d26a; font-family: 'JetBrains Mono', monospace; font-weight: 700;"
+    h1 "Fabian Budde" style="font-size: 4rem; font-weight: 900; margin: 0 0 1rem 0; background: linear-gradient(135deg, #00d26a 0%, #00c853 50%, #00e676 100%); background-size: 200% 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: gradientShift 4s ease infinite; position: relative; z-index: 1; letter-spacing: -0.02em; line-height: 1.1;"
+    p "" id="typed-sub" class="muted-text" style="font-size: 1.35rem; font-weight: 300; margin: 0 0 1.5rem 0; letter-spacing: 0.05em; position: relative; z-index: 1; font-family: 'JetBrains Mono', monospace; min-height: 2rem;"
+    span "" id="typing-cursor" class="typing-cursor" style="position: relative; z-index: 1; margin-top: -1.5rem; margin-bottom: 1rem;"
     p "Self-taught since 2018. Building AI-native tools and the future of e-commerce." class="subtle-text" style="font-size: 1rem; max-width: 500px; line-height: 1.7; position: relative; z-index: 1; animation: fadeInUp 1s ease 0.3s both;"
 
     section {
@@ -106,31 +121,41 @@ page / {
         z-index 1
         @mobile { flex-direction column, align-items center }
       }
-      link "View Projects ↓" href="#projects" class="btn-primary" style="display: inline-block; padding: 0.85rem 2rem; background: linear-gradient(135deg, #667eea, #764ba2); color: white; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 0.9rem; transition: all 0.3s ease;"
+      link "View Projects ↓" href="#projects" class="btn-primary" style="display: inline-block; padding: 0.85rem 2rem; background: linear-gradient(135deg, #00d26a, #00a152); color: #0a0a12; text-decoration: none; border-radius: 12px; font-weight: 700; font-size: 0.9rem; transition: all 0.3s ease;"
       link "GitHub →" href="https://github.com/fabudde" class="btn-outline" style="display: inline-block; padding: 0.85rem 2rem; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 0.9rem; transition: all 0.3s ease; background: transparent;"
     }
   }
 
+  # ═══ DIVIDER ═══
+  span "" class="section-divider" style="display: block; margin-top: 0;"
+
   # ═══ ABOUT ═══
-  section {
+  section class="reveal" {
     style {
       padding 6rem 2rem
       max-width 800px
       margin 0 auto
+      position relative
+      z-index 1
       @mobile { padding 4rem 1.5rem }
     }
     span "About" class="section-label" style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; display: block; margin-bottom: 1rem;"
     h2 "Building things that matter." class="section-heading" style="font-size: 2.25rem; font-weight: 800; margin: 0 0 1.5rem 0;"
     p "I started coding in 2018 — no degree, no bootcamp, just curiosity and stubbornness. Seven years later, I build AI-native programming languages, e-commerce platforms, and tools that help businesses scale." class="muted-text" style="font-size: 1.05rem; line-height: 1.8; margin: 0 0 1.25rem 0;"
-    p "Based in the Sauerland, Germany. Co-Founder of Ayuni (Artificial Emotional Intelligence). Creator of NyxCode. Building the future with TypeScript, Rust, and a cosmic lobster by my side." class="muted-text" style="font-size: 1.05rem; line-height: 1.8; margin: 0;"
+    p "Based in the Sauerland, Germany. Creator of NyxCode and ShellGames.ai. Building tools that make development faster and AI-native." class="muted-text" style="font-size: 1.05rem; line-height: 1.8; margin: 0;"
   }
 
+  # ═══ DIVIDER ═══
+  span "" class="section-divider reveal" style="display: block;"
+
   # ═══ PROJECTS ═══
-  section id="projects" {
+  section id="projects" class="reveal" {
     style {
       padding 6rem 2rem
-      max-width 1100px
+      max-width 900px
       margin 0 auto
+      position relative
+      z-index 1
       @mobile { padding 4rem 1.5rem }
     }
     span "Projects" class="section-label" style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; display: block; margin-bottom: 1rem; text-align: center;"
@@ -139,63 +164,97 @@ page / {
     section {
       style {
         display grid
-        grid-template-columns repeat(3, 1fr)
+        grid-template-columns repeat(2, 1fr)
         gap 1.5rem
         @mobile { grid-template-columns 1fr }
       }
       ProjectCard icon="🦞" title="NyxCode" description="AI-native programming language for the web. 68% fewer tokens than React. Zero config." url="https://github.com/fabudde/nyxcode"
-      ProjectCard icon="🧠" title="Ayuni" description="Artificial Emotional Intelligence. Building AI that understands and responds to human emotions." url="https://ayuni.ai"
       ProjectCard icon="🎲" title="ShellGames.ai" description="AI-vs-AI gaming platform. Chess, Poker, Ludo — where artificial minds compete." url="https://shellgames.ai"
-      ProjectCard icon="🔀" title="CrossCart" description="Cross-platform e-commerce migration. Seamlessly move shops between Shopware, WooCommerce, and more." url="https://github.com/fabudde"
-      ProjectCard icon="🛒" title="ForkCart" description="Open source e-commerce framework. TypeScript, modular, extensible, developer-first." url="https://github.com/fabudde"
-      ProjectCard icon="🏥" title="PraxisFix" description="Automated web agency for medical practices. AI-generated websites deployed in minutes." url="https://praxisfix.de"
+      ProjectCard icon="🔀" title="CrossCart" description="Cross-platform e-commerce plugin. Häufig-zusammen-gekauft for Shopware, WooCommerce, Shopify." url="https://crosscart.store"
+      ProjectCard icon="🛒" title="ForkCart" description="Open source TypeScript e-commerce framework. Modular, extensible, AI-native." url="https://github.com/forkcart/forkcart"
     }
   }
 
+  # ═══ DIVIDER ═══
+  span "" class="section-divider reveal" style="display: block;"
+
   # ═══ SKILLS ═══
-  section {
+  section class="reveal" {
     style {
       padding 6rem 2rem
       max-width 800px
       margin 0 auto
       text-align center
+      position relative
+      z-index 1
       @mobile { padding 4rem 1.5rem }
     }
     span "Skills" class="section-label" style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; display: block; margin-bottom: 1rem;"
     h2 "Technologies I work with." class="section-heading" style="font-size: 2.25rem; font-weight: 800; margin: 0 0 2.5rem 0;"
-    section {
-      style {
-        display flex
-        flex-wrap wrap
-        justify-content center
-        gap 0.75rem
+
+    section class="skills-group" {
+      style { margin-bottom 1.5rem }
+      span "Languages" class="category-label"
+      section {
+        style { display flex, flex-wrap wrap, justify-content center, gap 0.6rem }
+        SkillBadge label="TypeScript"
+        SkillBadge label="PHP"
+        SkillBadge label="Rust"
+        SkillBadge label="SQL"
       }
-      SkillBadge label="TypeScript"
-      SkillBadge label="PHP"
-      SkillBadge label="Rust"
-      SkillBadge label="Next.js"
-      SkillBadge label="React"
-      SkillBadge label="Node.js"
-      SkillBadge label="Shopware 6"
-      SkillBadge label="AI / LLM"
-      SkillBadge label="PostgreSQL"
-      SkillBadge label="Docker"
-      SkillBadge label="Linux"
-      SkillBadge label="Solana"
-      SkillBadge label="MedusaJS"
-      SkillBadge label="Caddy"
-      SkillBadge label="WebSockets"
-      SkillBadge label="Git"
+    }
+
+    section class="skills-group" {
+      style { margin-bottom 1.5rem }
+      span "Frameworks" class="category-label"
+      section {
+        style { display flex, flex-wrap wrap, justify-content center, gap 0.6rem }
+        SkillBadge label="Next.js"
+        SkillBadge label="React"
+        SkillBadge label="Node.js"
+        SkillBadge label="MedusaJS"
+        SkillBadge label="Shopware 6"
+      }
+    }
+
+    section class="skills-group" {
+      style { margin-bottom 1.5rem }
+      span "Infrastructure" class="category-label"
+      section {
+        style { display flex, flex-wrap wrap, justify-content center, gap 0.6rem }
+        SkillBadge label="Docker"
+        SkillBadge label="Linux"
+        SkillBadge label="Caddy"
+        SkillBadge label="PostgreSQL"
+        SkillBadge label="Git"
+      }
+    }
+
+    section class="skills-group" {
+      style { margin-bottom 0 }
+      span "Specialties" class="category-label"
+      section {
+        style { display flex, flex-wrap wrap, justify-content center, gap 0.6rem }
+        SkillBadge label="AI / LLM"
+        SkillBadge label="WebSockets"
+        SkillBadge label="Solana"
+        SkillBadge label="E-Commerce"
+      }
     }
   }
 
+  # ═══ DIVIDER ═══
+  span "" class="section-divider reveal" style="display: block;"
+
   # ═══ CONTACT ═══
-  section {
+  section class="reveal" {
     style {
       padding 6rem 2rem
       text-align center
       max-width 600px
       margin 0 auto
+      position relative
+      z-index 1
       @mobile { padding 4rem 1.5rem }
     }
     span "Contact" class="section-label" style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; display: block; margin-bottom: 1rem;"
@@ -219,6 +278,8 @@ page / {
       padding 3rem 2rem
       text-align center
       margin-top 2rem
+      position relative
+      z-index 1
     }
     p "Built with NyxCode 🦞" class="footer-main" style="font-size: 0.85rem; margin: 0 0 0.5rem 0;"
     p "© 2026 Fabian Budde. All rights reserved." class="footer-sub" style="font-size: 0.75rem; margin: 0;"
