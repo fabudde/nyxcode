@@ -1,0 +1,25 @@
+component Alert {
+  props message type="info" dismissable="true"
+  section {
+    style { padding 1rem, radius 8px, bg #1a1a2e }
+    p .message
+  }
+}
+
+page / {
+  state count = 0
+  h1 "Default Props + Element Defaults Test"
+  
+  Alert message="Hello World"
+  Alert message="Error!" type="error"
+  Alert message="Warning" type="warn" dismissable="false"
+  
+  button "Click me" -> count = count + 1
+  button "Reset" -> count = 0
+  input placeholder="Type here..."
+  select {
+    option "Option A"
+    option "Option B"
+  }
+  p count
+}

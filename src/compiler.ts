@@ -55,6 +55,7 @@ export class Compiler {
   private styleCache: Map<string, string> = new Map(); // hash -> className for dedup
   private staticMode: boolean = false; // When true, don't emit data-navigate on links
   private layout: LayoutNode | null = null; // Layout wrapping all pages
+  private usedInteractiveElements: Set<string> = new Set(); // Track button/input/select/textarea/a usage
 
   constructor(options: Partial<CompilerOptions> = {}) {
     this.options = {
@@ -126,11 +127,13 @@ export class Compiler {
     let layoutCssBlocks: string[] = [];
     let layoutHeadInjections: string[] = [];
     let layoutHtmlTemplate: string | null = null;
+    let layoutInteractiveElements: Set<string> = new Set();
     if (this.layout) {
       // Do a single compile to collect layout CSS, head injections + HTML template
       this.css = [];
       this.js = [];
       this.headInjections = [];
+      this.usedInteractiveElements = new Set();
       this.componentId = 0;
       this.indent = 0;
       this.staticMode = true;
@@ -138,6 +141,7 @@ export class Compiler {
       this.staticMode = false;
       layoutCssBlocks = [...this.css];
       layoutHeadInjections = [...this.headInjections];
+      layoutInteractiveElements = new Set(this.usedInteractiveElements);
     }
 
     const results: Array<{path: string, html: string}> = [];
@@ -155,6 +159,7 @@ export class Compiler {
       this.hasReactivity = false;
       this.headInjections = [...layoutHeadInjections]; // Start with layout head injections
       this.animations = [];
+      this.usedInteractiveElements = new Set(layoutInteractiveElements); // Start with layout elements
       // Keep components and styleCache across pages for dedup
 
       let bodyHtml: string;
@@ -365,6 +370,7 @@ export class Compiler {
 
     const headExtra = this.headInjections.length > 0 ? '\n  ' + this.headInjections.join('\n  ') : '';
     const animCSS = this.animations.length > 0 ? '\n    ' + this.animations.join('\n    ') : '';
+    const elementDefaults = this.buildElementDefaults();
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -376,7 +382,7 @@ export class Compiler {
   <link rel="canonical" href="https://nyxcode.io${pagePath}">` + headExtra + `
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, sans-serif; }` + animCSS + `
+    body { font-family: system-ui, -apple-system, sans-serif; }` + animCSS + elementDefaults + `
 ` + (css ? '    ' + css.split('\n').join('\n    ') : '') + `
   </style>
 </head>
@@ -486,6 +492,12 @@ export class Compiler {
 
     const tag = this.mapTag(el.tag);
     const content = this.compileContent(el.content);
+
+    // Track interactive elements for CSS defaults injection
+    const INTERACTIVE_ELEMENTS = new Set(['button', 'input', 'select', 'textarea', 'a']);
+    if (INTERACTIVE_ELEMENTS.has(tag)) {
+      this.usedInteractiveElements.add(tag);
+    }
     
     // Check for style block in children — generates scoped class
     let scopeClass = '';
@@ -896,6 +908,13 @@ export class Compiler {
       props[attr.name] = typeof attr.value === 'string' ? attr.value : '';
     }
 
+    // Fill in defaults for missing props
+    for (const propDef of comp.props) {
+      if (propDef.defaultValue !== undefined && !(propDef.name in props)) {
+        props[propDef.name] = propDef.defaultValue;
+      }
+    }
+
     // Style dedup: reuse class if identical style already emitted
     let scopeClass = "";
     const styleStmt = comp.body.find(s => s.type === "Style") as StyleBlock | undefined;
@@ -957,6 +976,13 @@ export class Compiler {
       return slotHtml;
     }
     const tag = this.mapTag(el.tag);
+
+    // Track interactive elements for CSS defaults injection
+    const INTERACTIVE_ELEMENTS = new Set(['button', 'input', 'select', 'textarea', 'a']);
+    if (INTERACTIVE_ELEMENTS.has(tag)) {
+      this.usedInteractiveElements.add(tag);
+    }
+
     let content = '';
 
     if (el.content) {
@@ -1264,6 +1290,7 @@ export class Compiler {
 
     const headExtra = this.headInjections.length > 0 ? '\n  ' + this.headInjections.join('\n  ') : '';
     const animCSS = this.animations.length > 0 ? '\n    ' + this.animations.join('\n    ') : '';
+    const elementDefaults = this.buildElementDefaults();
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -1273,7 +1300,7 @@ export class Compiler {
   <title>NyxCode App</title>${headExtra}
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, sans-serif; }${animCSS}
+    body { font-family: system-ui, -apple-system, sans-serif; }${animCSS}${elementDefaults}
 ${css ? '    ' + css.split('\n').join('\n    ') : ''}
   </style>
 </head>
@@ -1338,6 +1365,35 @@ ${reactiveRuntime}
     return mapping[name] || name;
   }
 
+
+  /**
+   * Generate CSS defaults for interactive elements (button, input, select, textarea, a).
+   * Only includes rules for elements actually used on the page (tree-shaken).
+   * Lower specificity than scoped styles, so user styles override automatically.
+   */
+  private buildElementDefaults(): string {
+    if (this.usedInteractiveElements.size === 0) return '';
+
+    let css = '\n    /* NyxCode Element Defaults */\n';
+
+    if (this.usedInteractiveElements.has('button')) {
+      css += '    button { font-family: inherit; font-size: inherit; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #1a1a2e; color: inherit; cursor: pointer; transition: opacity 0.15s; }\n';
+      css += '    button:hover { opacity: 0.85; }\n';
+    }
+    if (this.usedInteractiveElements.has('input') || this.usedInteractiveElements.has('select') || this.usedInteractiveElements.has('textarea')) {
+      const selectors: string[] = [];
+      if (this.usedInteractiveElements.has('input')) selectors.push('input');
+      if (this.usedInteractiveElements.has('select')) selectors.push('select');
+      if (this.usedInteractiveElements.has('textarea')) selectors.push('textarea');
+      css += `    ${selectors.join(', ')} { font-family: inherit; font-size: inherit; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #0d0d1a; color: inherit; }\n`;
+    }
+    if (this.usedInteractiveElements.has('a')) {
+      css += '    a { color: #667eea; text-decoration: none; }\n';
+      css += '    a:hover { text-decoration: underline; }\n';
+    }
+
+    return css;
+  }
 
   /** Generate a hash string from style block properties for dedup */
   private hashStyle(style: StyleBlock): string {

@@ -1040,9 +1040,15 @@ export class Parser {
       // Stop if the identifier is uppercase (component invocation)
       if (this.peek().value[0] >= 'A' && this.peek().value[0] <= 'Z') break;
       const name = this.consumeIdentifier();
-      const optional = this.check(TokenType.Question);
+      let optional = this.check(TokenType.Question);
       if (optional) this.advance();
-      props.push({ name, optional });
+      let defaultValue: string | undefined;
+      // Check for default value: prop="value"
+      if (this.check(TokenType.Equals)) {
+        this.advance(); // consume =
+        defaultValue = this.consume(TokenType.String).value;
+      }
+      props.push({ name, optional, defaultValue });
     }
     return props;
   }

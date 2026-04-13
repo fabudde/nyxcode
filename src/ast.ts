@@ -312,6 +312,7 @@ export interface ComputedStatement extends BaseNode {
 export interface PropDef {
   name: string;
   optional: boolean;
+  defaultValue?: string;
 }
 
 export interface ColumnDef {
