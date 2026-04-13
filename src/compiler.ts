@@ -756,8 +756,9 @@ export class Compiler {
         const stateName = typeof attr.value === 'string' ? attr.value : '';
         parts.push(`data-nyx-model="${stateName}"`);
       } else if (attr.name === 'style') {
-        // Inline style passthrough
-        parts.push(`style="${attr.value}"`);
+        // Inline style with shorthand expansion
+        const expandedStyle = this.expandInlineShorthands(attr.value as string);
+        parts.push(`style="${expandedStyle}"`);
       } else if (attr.name === 'href') {
         parts.push(`href="${attr.value}"`);
       } else {
@@ -1670,6 +1671,21 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
       'margin': 'margin',
     };
     return mapping[name] || name;
+  }
+
+  /**
+   * Expand CSS shorthands in inline style="..." attributes.
+   * Splits by `;`, expands each property name via mapCSSProperty.
+   */
+  private expandInlineShorthands(style: string): string {
+    return style.split(';').map(part => {
+      const colonIdx = part.indexOf(':');
+      if (colonIdx === -1) return part;
+      const prop = part.substring(0, colonIdx).trim();
+      const value = part.substring(colonIdx + 1);
+      if (!prop) return part;
+      return ` ${this.mapCSSProperty(prop)}:${value}`;
+    }).join(';').trim();
   }
 
 
