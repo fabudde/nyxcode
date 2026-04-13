@@ -1336,7 +1336,6 @@ ${reactiveRuntime}
       'metric': 'div',
       'text': 'span',
       'link': 'a',
-      'icon': 'i',
       'slot': 'div',
     };
     return mapping[tag] || tag;

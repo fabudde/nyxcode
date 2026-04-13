@@ -249,6 +249,48 @@ head "<title>My Page</title>"
 head "<meta name='description' content='My NyxCode app'>"
 ```
 
+## Icons
+
+**Emoji icons (zero deps, recommended):**
+```nyx
+span "🦞" style="font-size: 2rem;"
+span "⚡" style="font-size: 1.5rem;"
+```
+
+**Lucide Icons (lightweight SVG icons):**
+```nyx
+head "<link href='https://unpkg.com/lucide-static@latest/font/lucide.css' rel='stylesheet'>"
+
+span "" class="icon-home" style="font-size: 1.5rem;"
+span "" class="icon-settings"
+span "" class="icon-user"
+```
+
+**Font Awesome:**
+```nyx
+head "<link href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css' rel='stylesheet'>"
+
+span "" class="fa-solid fa-house" style="font-size: 1.5rem;"
+span "" class="fa-brands fa-github"
+span "" class="fa-solid fa-rocket"
+```
+
+**Material Icons:**
+```nyx
+head "<link href='https://fonts.googleapis.com/icon?family=Material+Icons' rel='stylesheet'>"
+
+span "home" class="material-icons"
+span "settings" class="material-icons"
+```
+
+**SVG inline (via head injection):**
+```nyx
+head "<svg style='display:none'><symbol id='logo' viewBox='0 0 24 24'><path d='...'/></symbol></svg>"
+
+# Then use:
+head "<svg width='24' height='24'><use href='#logo'/></svg>"
+```
+
 ## Common Mistakes (DO NOT)
 
 ```
@@ -306,4 +348,4 @@ border-radius: 12px;                  radius 12px
 | NyxCode   | 1     | 545   | 0 files |
 
 ## Version
-v0.3.0 — Docs: https://nyxcode.io/docs/
+v0.3.1 — Docs: https://nyxcode.io/docs/
