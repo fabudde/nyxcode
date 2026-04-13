@@ -25,6 +25,9 @@ import { Compiler } from './compiler.js';
 import { Validator, ValidationError } from './validator.js';
 import { Program, ComponentNode, UseStatement } from './ast.js';
 import { DevServer } from './dev-server.js';
+import { compileBackend } from './backend-compiler.js';
+import { compileAuth } from './auth-compiler.js';
+import { TableNode, SecurityNode, ApiNode } from './ast.js';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -200,6 +203,32 @@ try {
         const rel = pagePath === '/' ? 'index.html' : pagePath.replace(/^\//, '') + '/index.html';
         console.log(`   📄 ${rel}`);
       }
+    }
+    // === Backend Generation ===
+    const tables = ast.body.filter((n: any) => n.type === 'Table') as TableNode[];
+    const apis = ast.body.filter((n: any) => n.type === 'Api') as ApiNode[];
+    const security = ast.body.find((n: any) => n.type === 'Security') as SecurityNode | undefined;
+
+    if (tables.length > 0 || apis.length > 0) {
+      // Extract protected paths from security block
+      const protectedPaths = security 
+        ? security.rules.filter(r => r.name === 'protect').map(r => r.value)
+        : [];
+      let serverCode = compileBackend(tables, apis);
+      if (security) {
+        // Inject auth AFTER express.json() but BEFORE create tables
+        const authCode = compileAuth(security, tables);
+        // Inject protect middleware AFTER auth definition but BEFORE CRUD  
+        const protectLines = protectedPaths.map(p => 
+          `\n// Protect ${p}\napp.use('${p}', authMiddleware);`
+        ).join('\n');
+        serverCode = serverCode.replace(
+          '// ── Create tables',
+          authCode + protectLines + '\n\n// ── Create tables'
+        );
+      }
+      writeFileSync(resolve(outDir, 'server.js'), serverCode);
+      console.log(`   🖥️  server.js generated (${tables.length} table${tables.length !== 1 ? 's' : ''}${security ? ' + auth' : ''})`);
     }
   } else if (command === 'watch') {
     // === Watch Mode ===

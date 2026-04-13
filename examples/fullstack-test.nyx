@@ -1,6 +1,10 @@
+# Full-Stack NyxCode Demo
+# 30 lines → complete app with DB, Auth, CRUD API
+
 table users {
   name text required
   email email unique
+  password text required
   role text default="user"
   created auto
 }
@@ -13,21 +17,15 @@ table posts {
   created auto
 }
 
-auth {
+security {
   table users
   login email password
   token jwt
   protect /api/posts
 }
 
-api /stats {
-  respond "ok"
-}
-
 page / {
-  data users = get /api/users
   h1 "Full-Stack NyxCode"
-  each users -> user {
-    h2 .name
-  }
+  p "This app was generated from 30 lines of NyxCode."
+  p "It includes: SQLite database, REST API, JWT auth, and this page."
 }

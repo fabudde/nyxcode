@@ -124,29 +124,38 @@ export class Parser {
     this.consume(TokenType.LeftBrace);
 
     const columns: ColumnDef[] = [];
+    const typeKeywords = new Set(['text', 'email', 'number', 'int', 'float', 'decimal', 'bool', 'auto']);
+    const constraintKeywords = new Set(['required', 'unique', 'default', 'ref', 'auto']);
+
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       const colName = this.consumeIdentifier();
+      let colType = 'text'; // default type
       const constraints: string[] = [];
 
-      // Read type and constraints until next identifier or }
-      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      // Next token should be the TYPE (text, email, number, etc.) or a table ref
+      if (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
         const next = this.peek();
-        if (next.type === TokenType.Identifier && !this.isConstraintKeyword(next.value)) {
-          break; // Next column name
-        }
-        if (next.type === TokenType.Identifier || next.type === TokenType.Equals || next.type === TokenType.Number) {
-          constraints.push(this.advance().value);
-          // Handle default=value
-          if (constraints[constraints.length - 1] === 'default' && this.check(TokenType.Equals)) {
-            this.advance(); // =
-            constraints.push('=' + this.advance().value);
-          }
-        } else {
-          break;
+        if (next.type === TokenType.Identifier) {
+          colType = this.advance().value;
         }
       }
 
-      const colType = constraints.shift() || 'string';
+      // Rest are constraints until we hit the next column name
+      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+        const next = this.peek();
+        if (next.type === TokenType.Identifier && constraintKeywords.has(next.value)) {
+          constraints.push(this.advance().value);
+          // Handle default="value" or default=value
+          if (constraints[constraints.length - 1] === 'default' && this.check(TokenType.Equals)) {
+            this.advance(); // =
+            const val = this.advance().value;
+            constraints.push('=' + val);
+          }
+        } else {
+          break; // Next column name or unknown token
+        }
+      }
+
       columns.push({ name: colName, type: colType, constraints });
     }
 
@@ -221,17 +230,30 @@ export class Parser {
 
     const rules: SecurityRule[] = [];
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-      const name = this.consumeIdentifier();
-      let value = '';
+      // Rule name: identifier or path like /api/posts
+      let name = '';
+      if (this.peek().value.startsWith('/')) {
+        name = this.advance().value;
+      } else {
+        name = this.consumeIdentifier();
+      }
+      // Collect ALL values on this line (space-separated identifiers/paths)
+      const values: string[] = [];
       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
         const next = this.peek();
-        if (next.type === TokenType.Identifier && !value) {
-          value = this.advance().value;
+        // Stop if next token looks like a new rule name (known keywords)
+        const ruleKeywords = ['table', 'login', 'token', 'protect', 'hash', 'session', 'role'];
+        if (values.length > 0 && (next.type === TokenType.Identifier && ruleKeywords.includes(next.value))) break;
+        if (values.length > 0 && next.value.startsWith('/')) break;
+        if (next.type === TokenType.Identifier || next.type === TokenType.String) {
+          values.push(this.advance().value);
+        } else if (next.value.startsWith('/')) {
+          values.push(this.advance().value);
         } else {
           break;
         }
       }
-      rules.push({ name, value });
+      rules.push({ name, value: values.join(' ') });
     }
 
     this.consume(TokenType.RightBrace);
@@ -1230,7 +1252,9 @@ export class Parser {
   }
 
   private isConstraintKeyword(value: string): boolean {
-    return ['required', 'unique', 'auto', 'default', 'ref'].includes(value);
+    // Type keywords AND constraint keywords — anything that's NOT a new column name
+    return ['text', 'email', 'number', 'int', 'float', 'decimal', 'bool', 'auto',
+            'required', 'unique', 'default', 'ref'].includes(value);
   }
 
   private error(message: string): Error {

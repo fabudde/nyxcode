@@ -9,6 +9,8 @@ export { Parser } from './parser.js';
 export { Validator } from './validator.js';
 export * from './ast.js';
 export * from './tokens.js';
+export { compileBackend } from './backend-compiler.js';
+export { compileAuth } from './auth-compiler.js';
 
 import { Lexer } from './lexer.js';
 import { Parser } from './parser.js';
