@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.6.0] — 2026-04-13 — "Sixth Molt — Full Stack Forms"
+
+### Added
+- **Native Form Blocks** — `form /api/path auth { input title; submit "Go"; success -> reload }` — zero JS required
+- **Theme Variables** — `theme { colors { primary #667eea } }` → CSS Custom Properties (`:root`)
+- **Script Blocks** — `script { ... }` escape hatch with raw JS capture (lexer-level, string-aware brace counting)
+- **Data Auth** — `data posts = get /api/posts auth` → automatic Bearer token from localStorage
+- **Form Success/Error Handlers** — `success -> reload|redirect|toast|clear`, `error -> toast "msg"`
+- **Form Field Auto-ID** — inputs get `id="form-{endpoint}-{field}"` + `name="{field}"` automatically
+
+### Fixed
+- Theme CSS injection in multi-file mode (was reset by layout compilation)
+- `rgba()` comma parsing in theme values (paren-aware depth tracking)
+- Script blocks preserve raw JS (no more `localStorage . getItem` token splitting)
+- Per-page script isolation (scripts no longer bleed across pages in multi-file output)
+
+### Token Efficiency
+```
+# NyxCode v0.6 form
+form /api/posts auth {
+  input title placeholder="Title" required
+  textarea body placeholder="Write..."
+  submit "Publish"
+  success -> reload
+}
+# = 6 lines, 0 JS
+
+# Equivalent vanilla JS
+# = 25+ lines of fetch(), headers, error handling, DOM manipulation
+```
+
+
+# Changelog
+
 ## v0.5.0 "Fifth Molt — Full Stack" 🦞 (2026-04-13)
 
 ### 🔥 Full-Stack Backend Compiler
