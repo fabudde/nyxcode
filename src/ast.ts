@@ -18,7 +18,8 @@ export interface Program extends BaseNode {
   body: TopLevelNode[];
 }
 
-export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode;
+export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode
+  | PresetNode;
 
 /** `page /path { ... }` */
 export interface PageNode extends BaseNode {
@@ -102,6 +103,7 @@ export type Statement =
   | RawExpression
   | HeadStatement
   | AnimateStatement
+  | PresetNode
   | ScriptStatement;
 
 /** `head { ... }` — inject into <head>: fonts, meta, raw CSS */
@@ -193,6 +195,14 @@ export interface FormAction {
 }
 
 /** `script { ... }` — raw JS block, no escaping */
+export interface PresetNode {
+  type: 'Preset';
+  name: string;
+  styles: Array<{name: string; value: string}>;
+  line: number;
+  col: number;
+}
+
 export interface ScriptStatement extends BaseNode {
   type: 'Script';
   content: string;

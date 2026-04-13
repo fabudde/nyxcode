@@ -52,6 +52,7 @@ export class Compiler {
   private importResolver?: (path: string) => Program | null;
   private headInjections: string[] = [];
   private themeVars: Map<string, string> = new Map();
+  private presets: Map<string, string> = new Map(); // preset name → CSS class name
   private scripts: string[] = [];
   private animations: string[] = [];
   private styleCache: Map<string, string> = new Map(); // hash -> className for dedup
@@ -136,6 +137,11 @@ export class Compiler {
         themeCSS += '--' + key + ':' + value + ';';
       }
       themeCSS += '}';
+    }
+
+    // Process preset blocks
+    for (const node of program.body) {
+      if (node.type === 'Preset') this.compilePreset(node as any);
     }
 
     // If we have a layout, compile its CSS once (shared across all pages)
@@ -250,6 +256,11 @@ export class Compiler {
     // Process theme blocks
     for (const node of program.body) {
       if (node.type === 'Theme') this.compileTheme(node);
+    }
+
+    // Process preset blocks
+    for (const node of program.body) {
+      if (node.type === 'Preset') this.compilePreset(node as any);
     }
 
     // Multi-page: compile ALL pages
@@ -491,6 +502,7 @@ export class Compiler {
       case 'Style': return this.compileStyle(stmt);
       case 'Form': return this.compileForm(stmt);
       case 'Script': this.scripts.push((stmt as ScriptStatement).content); return '';
+      case 'Preset': this.compilePreset(stmt as any); return '';
       case 'Auth': return ''; // Auth is handled at build level
       case 'On': return ''; // Events compiled with their parent element
       case 'State': return this.compileState(stmt as StateStatement);
@@ -565,9 +577,21 @@ export class Compiler {
       }
     }
 
-    let attrs = this.compileAttributes(filteredAttrs);
-    if (scopeClass) {
-      attrs = ` class="${scopeClass}"${attrs}`;
+    // Handle preset= attribute → add preset CSS class
+    let presetClass = '';
+    const presetAttr = filteredAttrs.find(a => a.name === 'preset');
+    if (presetAttr) {
+      const presetName = typeof presetAttr.value === 'string' ? presetAttr.value : '';
+      if (this.presets.has(presetName)) {
+        presetClass = this.presets.get(presetName)!;
+      }
+    }
+    const nonPresetAttrs = filteredAttrs.filter(a => a.name !== 'preset');
+
+    let attrs = this.compileAttributes(nonPresetAttrs);
+    const classes = [scopeClass, presetClass].filter(Boolean).join(' ');
+    if (classes) {
+      attrs = ` class="${classes}"${attrs}`;
     }
 
     // Filter out style blocks from children rendering
@@ -907,20 +931,43 @@ export class Compiler {
   }
 
 
+  private compilePreset(preset: any): void {
+    const className = 'nyx-p_' + preset.name;
+    const props = preset.styles.map((s: any) => {
+      const prop = this.mapCSSProperty(s.name);
+      return prop + ': ' + s.value;
+    }).join('; ');
+    this.css.push('.' + className + ' { ' + props + '; }');
+    this.presets.set(preset.name, className);
+  }
+
   private compileTheme(theme: any): void {
+    let fontCSS = '';
     for (const section of theme.sections) {
-      for (const [key, value] of Object.entries(section.entries)) {
-        this.themeVars.set(`${section.name}-${key}`, value as string);
+      if (section.name === 'fonts') {
+        // Auto-apply fonts: heading → h1-h6, body → p,span,li,td,label,input,textarea,select
+        const heading = section.entries['heading'];
+        const body = section.entries['body'];
+        if (heading) fontCSS += 'h1,h2,h3,h4,h5,h6{font-family:' + heading + ';}';
+        if (body) fontCSS += 'body,p,span,li,td,label,input,textarea,select{font-family:' + body + ';}';
+      } else {
+        for (const [key, value] of Object.entries(section.entries)) {
+          this.themeVars.set(section.name + '-' + key, value as string);
+        }
       }
     }
     // Generate CSS custom properties
+    let css = '';
     if (this.themeVars.size > 0) {
-      let css = ':root{';
+      css = ':root{';
       for (const [key, value] of this.themeVars) {
-        css += `--${key}:${value};`;
+        css += '--' + key + ':' + value + ';';
       }
       css += '}';
-      this.headInjections.push(`<style>${css}</style>`);
+    }
+    if (fontCSS) css += fontCSS;
+    if (css) {
+      this.headInjections.push('<style>' + css + '</style>');
     }
   }
 

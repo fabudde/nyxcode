@@ -75,9 +75,10 @@ export class Parser {
       case TokenType.Security: return this.parseSecurity();
       case TokenType.Use: return this.parseUse();
       case TokenType.Layout: return this.parseLayout();
+      case TokenType.Preset: return this.parsePreset() as any;
       case TokenType.EOF: return null;
       default:
-        throw this.error(`Unexpected token '${token.value}' at top level. Expected: page, component, api, table, store, theme, security, or layout.`);
+        throw this.error(`Unexpected token '${token.value}' at top level. Expected: page, component, api, table, store, theme, security, layout, or preset.`);
     }
   }
 
@@ -212,6 +213,12 @@ export class Parser {
       const entries: Record<string, string> = {};
       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
         const key = this.consumeIdentifier();
+        // If next is a string literal, use directly (handles "Space Grotesk, sans-serif")
+        if (this.peek().type === TokenType.String) {
+          entries[key] = this.advance().value;
+          if (this.check(TokenType.Comma)) this.advance();
+          continue;
+        }
         // Collect value: everything until next key or closing brace
         // Handles rgba(255,255,255,0.06), multi-word values, etc.
         let valueParts: string[] = [];
@@ -379,6 +386,7 @@ export class Parser {
         return this.parseStyle();
       case TokenType.Form: return this.parseForm();
       case TokenType.Script: return this.parseScript();
+      case TokenType.Preset: return this.parsePreset();
       case TokenType.Auth: return this.parseAuth();
       case TokenType.On: return this.parseOn();
       case TokenType.Validate: return this.parseValidate();
@@ -828,6 +836,35 @@ export class Parser {
    * Parse `script { ... }` — raw JavaScript block.
    * Content between braces is raw JS, no escaping.
    */
+  private parsePreset(): any {
+    const start = this.consume(TokenType.Preset);
+    const name = this.consumeIdentifier();
+    this.consume(TokenType.LeftBrace);
+    const styles: Array<{name: string; value: string}> = [];
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      if (this.peek().type !== TokenType.Identifier) break;
+      const prop = this.advance().value;
+      let valueParts: string[] = [];
+      let parenDepth = 0;
+      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+        const next = this.peek();
+        if (next.type === TokenType.LeftParen) { parenDepth++; this.advance(); valueParts.push('('); continue; }
+        if (next.type === TokenType.RightParen) { parenDepth = Math.max(0, parenDepth - 1); this.advance(); valueParts.push(')'); continue; }
+        if (parenDepth > 0) { valueParts.push(this.advance().value); continue; }
+        if (next.type === TokenType.Comma) { this.advance(); break; }
+        if (next.type === TokenType.Identifier && valueParts.length > 0) {
+          const after = this.tokens[this.pos + 1];
+          if (after && after.type === TokenType.LeftParen) { valueParts.push(this.advance().value); continue; }
+          break;
+        }
+        valueParts.push(this.advance().value);
+      }
+      if (valueParts.length > 0) styles.push({ name: prop, value: valueParts.join('') });
+    }
+    this.consume(TokenType.RightBrace);
+    return { type: 'Preset', name, styles, line: start.line, col: start.col };
+  }
+
   private parseScript(): ScriptStatement {
     const start = this.consume(TokenType.Script);
     // Lexer already captured raw content between { }, no brace consumption needed
@@ -1077,7 +1114,7 @@ export class Parser {
       }
       // Attribute: key=value or key="complex value" (including keyword tokens like style=)
       // Attribute: key=value — handle keywords that can also be attribute names
-      else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form || next.type === TokenType.Data || next.type === TokenType.State) && this.peekAt(1)?.type === TokenType.Equals) {
+      else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form || next.type === TokenType.Data || next.type === TokenType.State || next.type === TokenType.Preset) && this.peekAt(1)?.type === TokenType.Equals) {
         const name = this.advance().value;
         this.advance(); // =
         const valToken = this.peek();
