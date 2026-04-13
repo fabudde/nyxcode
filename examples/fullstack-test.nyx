@@ -1,0 +1,33 @@
+table users {
+  name text required
+  email email unique
+  role text default="user"
+  created auto
+}
+
+table posts {
+  title text required
+  body text
+  author users
+  published bool default=false
+  created auto
+}
+
+auth {
+  table users
+  login email password
+  token jwt
+  protect /api/posts
+}
+
+api /stats {
+  respond "ok"
+}
+
+page / {
+  data users = get /api/users
+  h1 "Full-Stack NyxCode"
+  each users -> user {
+    h2 .name
+  }
+}

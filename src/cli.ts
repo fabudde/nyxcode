@@ -15,10 +15,12 @@
  *   nyx dev examples/docs.nyx --port=8080
  */
 
+import * as fs from 'fs';
 import { readFileSync, writeFileSync, mkdirSync, watch as fsWatch, statSync } from 'fs';
 import { resolve, dirname, relative } from 'path';
 import { parse } from './index.js';
 import { Lexer } from './lexer.js';
+import { Parser } from './parser.js';
 import { Compiler } from './compiler.js';
 import { Validator, ValidationError } from './validator.js';
 import { Program, ComponentNode, UseStatement } from './ast.js';
@@ -87,7 +89,20 @@ try {
     for (const t of tokens) {
       console.log(`${t.line}:${t.col.toString().padEnd(4)} ${t.type.padEnd(15)} ${t.value}`);
     }
-  } else if (command === 'build') {
+  } else if (command === 'parse') {
+  const inputFile = args[1];
+  if (!inputFile) {
+    console.error('Usage: nyxcode parse <file.nyx>');
+    process.exit(1);
+  }
+  const source = fs.readFileSync(inputFile, 'utf-8');
+  const lexer = new Lexer(source);
+  const tokens = lexer.tokenize();
+  const parser = new Parser(tokens);
+  const ast = parser.parse();
+  console.log(JSON.stringify(ast, null, 2));
+  console.log(`\n✅ Parsed ${ast.body.length} top-level nodes successfully.`);
+} else if (command === 'build') {
     const ast = parse(source);
 
     // Set up import resolver for `use` statements
