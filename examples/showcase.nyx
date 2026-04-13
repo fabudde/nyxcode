@@ -3,11 +3,14 @@ theme {
     primary #667eea
     accent #764ba2
     bg #0a0a12
-    card #12121f
-    glass rgba(255,255,255,0.03)
+    card rgba(255,255,255,0.015)
+    border rgba(255,255,255,0.04)
+    glow rgba(102,126,234,0.1)
+    glow-border rgba(102,126,234,0.15)
     text #e2e8f0
+    sub #94a3b8
     muted #64748b
-    glow rgba(102,126,234,0.15)
+    dim #475569
   }
   fonts {
     heading "Space Grotesk, sans-serif"
@@ -19,179 +22,484 @@ preset label {
   fs 0.65rem, fw 700, tt uppercase, ls 0.3em, c var(--colors-primary)
 }
 
-preset card {
-  bg var(--colors-card), r 16px, p 2rem
-}
-
-preset divider {
-  h 1px, bg linear-gradient(90deg,transparent,var(--colors-glow),transparent)
-}
-
 layout {
   head "<link rel='preconnect' href='https://fonts.googleapis.com'>"
-  head "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap'>"
+  head "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap'>"
   head "<title>NyxCode — The AI-Native Programming Language</title>"
   head "<meta name='description' content='Write 82% fewer tokens. One .nyx file = full-stack app with DB, Auth and API.'>"
-  head "<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a12;color:#e2e8f0}a{color:inherit;text-decoration:none}.gradient-text{background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent}.gradient-text-pink{background:linear-gradient(135deg,#667eea,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent}.gradient-text-purple{background:linear-gradient(135deg,#764ba2,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent}.btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;padding:0.75rem 2rem;border-radius:8px;font-weight:600;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s}.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(102,126,234,0.3)}.btn-secondary{color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);padding:0.75rem 2rem;border-radius:8px;font-weight:600;transition:border-color 0.2s}.btn-secondary:hover{border-color:rgba(102,126,234,0.4)}.site-link{display:block;padding:1.5rem;border-radius:12px;border:1px solid rgba(255,255,255,0.06);text-align:center;font-weight:600;background:rgba(255,255,255,0.02);transition:border-color 0.2s,transform 0.2s}.site-link:hover{border-color:rgba(102,126,234,0.3);transform:translateY(-2px)}.code-block{background:#0d0d1a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:1.5rem;font-family:'Courier New',monospace;font-size:0.85rem;line-height:1.7;overflow-x:auto;color:#c8d6e5;white-space:pre;text-align:left}</style>"
+  head "<link rel='icon' href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦞</text></svg>'>"
+  head "<style>*{margin:0;padding:0;box-sizing:border-box}html{scroll-behavior:smooth}body{background:#0a0a12;color:#e2e8f0;overflow-x:hidden}::selection{background:rgba(102,126,234,0.3);color:#fff}@keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes gradient{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}.grad-text{background:linear-gradient(135deg,#667eea,#764ba2,#f093fb,#667eea);background-size:400% 400%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:gradient 8s ease infinite}.grad-text-static{background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent}.grad-pink{background:linear-gradient(135deg,#667eea,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent}.grad-purple{background:linear-gradient(135deg,#764ba2,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent}</style>"
   slot
 }
 
 page / {
-  section style="max-width: 1200px; margin: 0 auto; p: 6rem 2rem 4rem; ta: center;" {
+  # ── Hero ──
+  section {
+    style {
+      max-width 900px
+      margin 0 auto
+      padding 8rem 2rem 4rem
+      text-align center
+      animation fadeUp 0.8s ease
+    }
     div { p "THE AI-NATIVE LANGUAGE" preset=label }
-    div { h1 "Write apps with" style="fs: 3.5rem; fw: 800; lh: 1.15; ls: -0.03em; mt: 1rem;" }
-    div { h1 "82% fewer tokens" class="gradient-text" style="fs: 3.5rem; fw: 800; lh: 1.15; ls: -0.03em;" }
-    div { p "One .nyx file compiles to a complete full-stack app with database, auth and API. Built for AIs, loved by developers." style="c: #94a3b8; fs: 1.15rem; max-width: 580px; m: 1.5rem auto 0; lh: 1.7;" }
-    div flex=row center gap=1rem style="mt: 2.5rem;" {
-      div { a "Get Started" href="/docs" class="btn-primary" }
-      div { a "Live Demo" href="https://demo.nyxcode.io" class="btn-secondary" }
+    div { h1 "Write apps with" style="font-size: 3.5rem; font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; margin-top: 1rem; color: var(--colors-text);" }
+    div { h1 "82% fewer tokens" class="grad-text" style="font-size: 3.5rem; font-weight: 800; line-height: 1.1; letter-spacing: -0.03em;" }
+    div { p "One .nyx file compiles to a full-stack app with database, auth and API. Built for AIs, loved by developers." style="color: var(--colors-sub); font-size: 1.15rem; max-width: 560px; margin: 1.5rem auto 0; line-height: 1.8; font-weight: 300;" }
+    div {
+      style {
+        display flex
+        justify-content center
+        gap 1rem
+        margin-top 2.5rem
+        animation fadeUp 1s ease
+      }
+      div {
+        a "Get Started →" href="/docs"
+        style {
+          background linear-gradient(135deg,#667eea,#764ba2)
+          color white
+          padding 0.85rem 2.25rem
+          border-radius 10px
+          font-weight 600
+          display inline-block
+          transition all 0.3s ease
+          hover { transform translateY(-3px), box-shadow 0 12px 30px rgba(102,126,234,0.35) }
+        }
+      }
+      div {
+        a "Live Demo" href="https://demo.nyxcode.io"
+        style {
+          color var(--colors-text)
+          border 1px solid var(--colors-border)
+          padding 0.85rem 2.25rem
+          border-radius 10px
+          font-weight 600
+          display inline-block
+          transition all 0.3s ease
+          hover { border-color var(--colors-glow-border), background var(--colors-card) }
+        }
+      }
     }
   }
 
-  div preset=divider style="m: 2rem auto; max-width: 1200px;"
+  # ── Divider ──
+  div style="height: 1px; background: linear-gradient(90deg,transparent,rgba(102,126,234,0.15),transparent); margin: 0 auto; max-width: 1200px;"
 
-  section style="max-width: 900px; m: 0 auto; p: 2rem;" {
-    div { p "SEE THE DIFFERENCE" preset=label style="ta: center; mb: 0.75rem;" }
-    div { h2 "30 lines. Full-stack blog." style="ta: center; fs: 2rem; fw: 700; mb: 2rem;" }
-    div class="code-block" {
-      span style="d: block; c: #c792ea;" {
-        span "table" style="c: #82aaff;"
+  # ── Code Example ──
+  section {
+    style {
+      max-width 900px
+      margin 0 auto
+      padding 4rem 2rem
+      animation fadeIn 1s ease
+    }
+    div { p "SEE THE DIFFERENCE" preset=label style="text-align: center; margin-bottom: 0.75rem;" }
+    div { h2 "30 lines. Full-stack blog." style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 2rem; color: var(--colors-text);" }
+    div {
+      style {
+        background #0d0d1a
+        border 1px solid rgba(255,255,255,0.06)
+        border-radius 16px
+        padding 2rem
+        font-family monospace
+        font-size 0.85rem
+        line-height 1.8
+        overflow-x auto
+        color #c8d6e5
+        white-space pre
+      }
+      span style="display: block; color: #82aaff;" {
+        span "table" style="color: #c792ea; font-weight: 600;"
         span " posts { title text required, body text }"
       }
-      span style="d: block; c: #c792ea;" {
-        span "security" style="c: #82aaff;"
+      span style="display: block; color: #82aaff;" {
+        span "security" style="color: #c792ea; font-weight: 600;"
         span " { login email password, protect /api/posts }"
       }
-      span " " style="d: block;"
-      span style="d: block; c: #ffcb6b;" {
-        span "preset" style="c: #82aaff;"
-        span " card { bg #1a1a2e, r 12px, p 2rem }"
+      span " " style="display: block;"
+      span style="display: block;" {
+        span "preset" style="color: #c792ea; font-weight: 600;"
+        span " card { " style="color: #82aaff;"
+        span "bg #1a1a2e, r 12px, p 2rem" style="color: #ffcb6b;"
+        span " }"
       }
-      span " " style="d: block;"
-      span style="d: block;" {
-        span "page" style="c: #82aaff;"
+      span " " style="display: block;"
+      span style="display: block;" {
+        span "page" style="color: #c792ea; font-weight: 600;"
         span " / {"
       }
-      span style="d: block;" {
-        span "  h1 " style="c: #82aaff;"
-        span "\"My Blog\"" style="c: #c3e88d;"
+      span style="display: block;" {
+        span "  h1 " style="color: #82aaff;"
+        span "\"My Blog\"" style="color: #c3e88d;"
       }
-      span style="d: block;" {
-        span "  form" style="c: #82aaff;"
-        span " /api/posts "
-        span "auth" style="c: #c792ea;"
+      span style="display: block;" {
+        span "  form" style="color: #c792ea;"
+        span " /api/posts " style="color: #82aaff;"
+        span "auth" style="color: #ffcb6b;"
         span " {"
       }
-      span "    input title, submit \"Post\"" style="d: block; c: #89ddff;"
-      span "    success -> reload" style="d: block; c: #ffcb6b;"
-      span "  }" style="d: block;"
-      span style="d: block;" {
-        span "  data" style="c: #82aaff;"
-        span " posts = get /api/posts "
-        span "auth" style="c: #c792ea;"
+      span "    input title, submit \"Post\"" style="display: block; color: #89ddff;"
+      span style="display: block;" {
+        span "    success" style="color: #c792ea;"
+        span " -> " style="color: #89ddff;"
+        span "reload" style="color: #ffcb6b;"
       }
-      span style="d: block;" {
-        span "  each" style="c: #82aaff;"
-        span " posts -> div "
-        span "preset=card" style="c: #ffcb6b;"
+      span "  }" style="display: block; color: #546e7a;"
+      span style="display: block;" {
+        span "  data" style="color: #c792ea;"
+        span " posts = get /api/posts " style="color: #82aaff;"
+        span "auth" style="color: #ffcb6b;"
+      }
+      span style="display: block;" {
+        span "  each" style="color: #c792ea;"
+        span " posts -> div " style="color: #82aaff;"
+        span "preset=card" style="color: #ffcb6b;"
         span " {"
       }
-      span "    h3 .title" style="d: block; c: #89ddff;"
-      span "    p .body" style="d: block; c: #89ddff;"
-      span "  }" style="d: block;"
-      span "}" style="d: block;"
+      span "    h3 .title" style="display: block; color: #89ddff;"
+      span "    p .body" style="display: block; color: #89ddff;"
+      span "  }" style="display: block; color: #546e7a;"
+      span "}" style="display: block; color: #546e7a;"
     }
-    div { p "Database, JWT auth, CRUD API, reactive frontend. Zero config." style="ta: center; c: #64748b; fs: 0.9rem; mt: 1.25rem;" }
+    div { p "Database, JWT auth, CRUD API, reactive frontend. Zero config." style="text-align: center; color: var(--colors-muted); font-size: 0.9rem; margin-top: 1.5rem; font-style: italic;" }
   }
 
-  div preset=divider style="m: 2rem auto; max-width: 1200px;"
+  div style="height: 1px; background: linear-gradient(90deg,transparent,rgba(102,126,234,0.15),transparent); margin: 0 auto; max-width: 1200px;"
 
-  section style="max-width: 1200px; m: 0 auto; p: 2rem;" {
-    div { p "TOKEN EFFICIENCY" preset=label style="ta: center; mb: 0.75rem;" }
-    div { h2 "Less tokens = less cost = faster" style="ta: center; fs: 2rem; fw: 700; mb: 3rem;" }
-    div grid=3 gap=1.5rem {
-      div preset=card style="ta: center; border: 1px solid var(--colors-glow);" {
-        div { p "-25%" class="gradient-text" style="fs: 2.5rem; fw: 800;" }
-        div { p "vs Tailwind" style="c: #94a3b8; fs: 0.85rem; mt: 0.5rem;" }
-        div { p "Static Sites" preset=label style="mt: 1rem;" }
-      }
-      div preset=card style="ta: center; border: 1px solid rgba(118,75,162,0.15);" {
-        div { p "-82%" class="gradient-text-pink" style="fs: 2.5rem; fw: 800;" }
-        div { p "vs Next.js" style="c: #94a3b8; fs: 0.85rem; mt: 0.5rem;" }
-        div { p "Full-Stack Apps" preset=label style="mt: 1rem;" }
-      }
-      div preset=card style="ta: center; border: 1px solid rgba(240,147,251,0.15);" {
-        div { p "1" class="gradient-text-purple" style="fs: 2.5rem; fw: 800;" }
-        div { p "file, zero config" style="c: #94a3b8; fs: 0.85rem; mt: 0.5rem;" }
-        div { p "vs 12+ files" preset=label style="mt: 1rem;" }
-      }
+  # ── Token Stats ──
+  section {
+    style {
+      max-width 1100px
+      margin 0 auto
+      padding 4rem 2rem
     }
-  }
-
-  div preset=divider style="m: 2rem auto; max-width: 1200px;"
-
-  section style="max-width: 1200px; m: 0 auto; p: 2rem;" {
-    div { p "FEATURES" preset=label style="ta: center; mb: 0.75rem;" }
-    div { h2 "Everything you need, nothing you don't" style="ta: center; fs: 2rem; fw: 700; mb: 3rem;" }
-    div grid=2 gap=1.25rem {
-      div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
-        div { h3 "⚡ Instant Compile" style="fs: 1.1rem; fw: 600;" }
-        div { p "Milliseconds, not minutes. No webpack, no bundler, no waiting." style="c: #64748b; fs: 0.85rem; mt: 0.5rem; lh: 1.6;" }
+    div { p "TOKEN EFFICIENCY" preset=label style="text-align: center; margin-bottom: 0.75rem;" }
+    div { h2 "Less tokens = less cost = faster" style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 3rem; color: var(--colors-text);" }
+    div {
+      style {
+        display grid
+        grid-template-columns repeat(3, 1fr)
+        gap 1.5rem
+        @mobile { grid-template-columns 1fr }
       }
-      div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
-        div { h3 "🗃 Built-in Database" style="fs: 1.1rem; fw: 600;" }
-        div { p "Define tables in your .nyx file. SQLite with WAL mode, auto-migrations." style="c: #64748b; fs: 0.85rem; mt: 0.5rem; lh: 1.6;" }
+      div {
+        style {
+          background var(--colors-card)
+          border 1px solid var(--colors-glow-border)
+          border-radius 20px
+          padding 2.5rem 2rem
+          text-align center
+          transition all 0.4s ease
+          hover { transform translateY(-6px), box-shadow 0 16px 40px var(--colors-glow), border-color rgba(102,126,234,0.3) }
+        }
+        div { p "-25%" class="grad-text-static" style="font-size: 2.75rem; font-weight: 800;" }
+        div { p "vs Tailwind" style="color: var(--colors-sub); font-size: 0.9rem; margin-top: 0.5rem;" }
+        div { p "Static Sites" preset=label style="margin-top: 1.25rem;" }
       }
-      div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
-        div { h3 "🔐 Auth in One Line" style="fs: 1.1rem; fw: 600;" }
-        div { p "security { login email password }. JWT, bcrypt, middleware — all generated." style="c: #64748b; fs: 0.85rem; mt: 0.5rem; lh: 1.6;" }
+      div {
+        style {
+          background var(--colors-card)
+          border 1px solid rgba(118,75,162,0.15)
+          border-radius 20px
+          padding 2.5rem 2rem
+          text-align center
+          transition all 0.4s ease
+          hover { transform translateY(-6px), box-shadow 0 16px 40px rgba(118,75,162,0.15), border-color rgba(118,75,162,0.3) }
+        }
+        div { p "-82%" class="grad-pink" style="font-size: 2.75rem; font-weight: 800;" }
+        div { p "vs Next.js + Prisma + JWT" style="color: var(--colors-sub); font-size: 0.9rem; margin-top: 0.5rem;" }
+        div { p "Full-Stack Apps" preset=label style="margin-top: 1.25rem;" }
       }
-      div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
-        div { h3 "🎨 60+ CSS Shorthands" style="fs: 1.1rem; fw: 600;" }
-        div { p "bg, r, p, fs, fw, c — Tailwind-level brevity. Plus layout attrs: flex=col center gap=2rem." style="c: #64748b; fs: 0.85rem; mt: 0.5rem; lh: 1.6;" }
+      div {
+        style {
+          background var(--colors-card)
+          border 1px solid rgba(240,147,251,0.15)
+          border-radius 20px
+          padding 2.5rem 2rem
+          text-align center
+          transition all 0.4s ease
+          hover { transform translateY(-6px), box-shadow 0 16px 40px rgba(240,147,251,0.1), border-color rgba(240,147,251,0.3) }
+        }
+        div { p "1" class="grad-purple" style="font-size: 2.75rem; font-weight: 800;" }
+        div { p "file, zero config" style="color: var(--colors-sub); font-size: 0.9rem; margin-top: 0.5rem;" }
+        div { p "vs 12+ files" preset=label style="margin-top: 1.25rem;" }
       }
-      div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
-        div { h3 "📄 Forms That Work" style="fs: 1.1rem; fw: 600;" }
-        div { p "form /api/posts auth { input title }. Fetch, JWT headers, error handling — done." style="c: #64748b; fs: 0.85rem; mt: 0.5rem; lh: 1.6;" }
-      }
-      div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
-        div { h3 "🧩 Components & Presets" style="fs: 1.1rem; fw: 600;" }
-        div { p "Reusable components with slots. Style presets: define once, preset=name everywhere." style="c: #64748b; fs: 0.85rem; mt: 0.5rem; lh: 1.6;" }
-      }
-    }
-  }
-
-  div preset=divider style="m: 2rem auto; max-width: 1200px;"
-
-  section style="max-width: 1200px; m: 0 auto; p: 2rem;" {
-    div { p "BUILT WITH NYXCODE" preset=label style="ta: center; mb: 0.75rem;" }
-    div { h2 "7 production sites and counting" style="ta: center; fs: 2rem; fw: 700; mb: 3rem;" }
-    div grid=3 gap=1.25rem {
-      div { a "nyxcode.io" href="https://nyxcode.io" class="site-link" }
-      div { a "demo.nyxcode.io" href="https://demo.nyxcode.io" class="site-link" }
-      div { a "fabianbudde.com" href="https://fabianbudde.com" class="site-link" }
-      div { a "rudel.fun" href="https://rudel.fun" class="site-link" }
-      div { a "heytyto.dev" href="https://heytyto.dev" class="site-link" }
-      div { a "heykiro.dev" href="https://heykiro.dev" class="site-link" }
     }
   }
 
-  div preset=divider style="m: 2rem auto; max-width: 1200px;"
+  div style="height: 1px; background: linear-gradient(90deg,transparent,rgba(102,126,234,0.15),transparent); margin: 0 auto; max-width: 1200px;"
 
-  section style="max-width: 700px; m: 0 auto; p: 2rem 2rem 6rem; ta: center;" {
-    div { h2 "Start building in seconds" style="fs: 2rem; fw: 700;" }
-    div { p "Install NyxCode and ship your first app." style="c: #64748b; mt: 0.75rem; mb: 2rem;" }
-    div class="code-block" style="ta: left;" {
-      span "npm install -g @fabudde/nyxcode" style="d: block; c: #c3e88d;"
-      span "nyxcode build app.nyx" style="d: block; c: #82aaff;"
+  # ── Features ──
+  section {
+    style {
+      max-width 1100px
+      margin 0 auto
+      padding 4rem 2rem
     }
-    div flex=row center gap=1rem style="mt: 2rem;" {
-      div { a "Documentation" href="/docs" class="btn-primary" }
-      div { a "GitHub" href="https://github.com/fabudde/nyxcode" class="btn-secondary" }
+    div { p "FEATURES" preset=label style="text-align: center; margin-bottom: 0.75rem;" }
+    div { h2 "Everything you need, nothing you don't" style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 3rem; color: var(--colors-text);" }
+    div {
+      style {
+        display grid
+        grid-template-columns repeat(2, 1fr)
+        gap 1.25rem
+        @mobile { grid-template-columns 1fr }
+      }
+      div {
+        style {
+          background var(--colors-card)
+          border 1px solid var(--colors-border)
+          border-radius 20px
+          padding 2rem
+          transition all 0.4s ease
+          hover { transform translateY(-4px), border-color var(--colors-glow-border), box-shadow 0 12px 30px var(--colors-glow) }
+        }
+        div { span "⚡" style="font-size: 1.75rem;" }
+        div { h3 "Instant Compile" style="font-size: 1.1rem; font-weight: 600; margin-top: 0.75rem; color: var(--colors-text);" }
+        div { p "Milliseconds, not minutes. No webpack, no bundler, no waiting." style="color: var(--colors-muted); font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.7;" }
+      }
+      div {
+        style {
+          background var(--colors-card)
+          border 1px solid var(--colors-border)
+          border-radius 20px
+          padding 2rem
+          transition all 0.4s ease
+          hover { transform translateY(-4px), border-color var(--colors-glow-border), box-shadow 0 12px 30px var(--colors-glow) }
+        }
+        div { span "🗃" style="font-size: 1.75rem;" }
+        div { h3 "Built-in Database" style="font-size: 1.1rem; font-weight: 600; margin-top: 0.75rem; color: var(--colors-text);" }
+        div { p "Define tables in your .nyx file. SQLite with WAL mode, auto-migrations." style="color: var(--colors-muted); font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.7;" }
+      }
+      div {
+        style {
+          background var(--colors-card)
+          border 1px solid var(--colors-border)
+          border-radius 20px
+          padding 2rem
+          transition all 0.4s ease
+          hover { transform translateY(-4px), border-color var(--colors-glow-border), box-shadow 0 12px 30px var(--colors-glow) }
+        }
+        div { span "🔐" style="font-size: 1.75rem;" }
+        div { h3 "Auth in One Line" style="font-size: 1.1rem; font-weight: 600; margin-top: 0.75rem; color: var(--colors-text);" }
+        div { p "security { login email password }. JWT, bcrypt, middleware — all generated." style="color: var(--colors-muted); font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.7;" }
+      }
+      div {
+        style {
+          background var(--colors-card)
+          border 1px solid var(--colors-border)
+          border-radius 20px
+          padding 2rem
+          transition all 0.4s ease
+          hover { transform translateY(-4px), border-color var(--colors-glow-border), box-shadow 0 12px 30px var(--colors-glow) }
+        }
+        div { span "🎨" style="font-size: 1.75rem;" }
+        div { h3 "60+ CSS Shorthands" style="font-size: 1.1rem; font-weight: 600; margin-top: 0.75rem; color: var(--colors-text);" }
+        div { p "bg, r, p, fs, fw, c — plus layout attrs: flex=col center gap=2rem." style="color: var(--colors-muted); font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.7;" }
+      }
+      div {
+        style {
+          background var(--colors-card)
+          border 1px solid var(--colors-border)
+          border-radius 20px
+          padding 2rem
+          transition all 0.4s ease
+          hover { transform translateY(-4px), border-color var(--colors-glow-border), box-shadow 0 12px 30px var(--colors-glow) }
+        }
+        div { span "📄" style="font-size: 1.75rem;" }
+        div { h3 "Forms That Work" style="font-size: 1.1rem; font-weight: 600; margin-top: 0.75rem; color: var(--colors-text);" }
+        div { p "form /api/posts auth { input title }. Fetch, JWT, error handling — done." style="color: var(--colors-muted); font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.7;" }
+      }
+      div {
+        style {
+          background var(--colors-card)
+          border 1px solid var(--colors-border)
+          border-radius 20px
+          padding 2rem
+          transition all 0.4s ease
+          hover { transform translateY(-4px), border-color var(--colors-glow-border), box-shadow 0 12px 30px var(--colors-glow) }
+        }
+        div { span "🧩" style="font-size: 1.75rem;" }
+        div { h3 "Components & Presets" style="font-size: 1.1rem; font-weight: 600; margin-top: 0.75rem; color: var(--colors-text);" }
+        div { p "Reusable components with slots. Presets: define once, use everywhere." style="color: var(--colors-muted); font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.7;" }
+      }
     }
   }
 
-  footer style="border-top: 1px solid rgba(255,255,255,0.04); p: 2rem; ta: center;" {
-    div { p "Built with 🦞 by Nyx & Fabian — NyxCode v0.8.1 — MIT License" style="c: #475569; fs: 0.8rem;" }
+  div style="height: 1px; background: linear-gradient(90deg,transparent,rgba(102,126,234,0.15),transparent); margin: 0 auto; max-width: 1200px;"
+
+  # ── Sites ──
+  section {
+    style {
+      max-width 1100px
+      margin 0 auto
+      padding 4rem 2rem
+    }
+    div { p "BUILT WITH NYXCODE" preset=label style="text-align: center; margin-bottom: 0.75rem;" }
+    div { h2 "7 production sites and counting" style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 3rem; color: var(--colors-text);" }
+    div {
+      style {
+        display grid
+        grid-template-columns repeat(3, 1fr)
+        gap 1.25rem
+        @mobile { grid-template-columns 1fr }
+      }
+      div {
+        a "nyxcode.io" href="https://nyxcode.io"
+        style {
+          display block
+          padding 1.75rem
+          border-radius 16px
+          border 1px solid var(--colors-border)
+          text-align center
+          font-weight 600
+          background var(--colors-card)
+          transition all 0.3s ease
+          hover { border-color var(--colors-glow-border), transform translateY(-3px), box-shadow 0 8px 25px var(--colors-glow) }
+        }
+      }
+      div {
+        a "demo.nyxcode.io" href="https://demo.nyxcode.io"
+        style {
+          display block
+          padding 1.75rem
+          border-radius 16px
+          border 1px solid var(--colors-border)
+          text-align center
+          font-weight 600
+          background var(--colors-card)
+          transition all 0.3s ease
+          hover { border-color var(--colors-glow-border), transform translateY(-3px), box-shadow 0 8px 25px var(--colors-glow) }
+        }
+      }
+      div {
+        a "fabianbudde.com" href="https://fabianbudde.com"
+        style {
+          display block
+          padding 1.75rem
+          border-radius 16px
+          border 1px solid var(--colors-border)
+          text-align center
+          font-weight 600
+          background var(--colors-card)
+          transition all 0.3s ease
+          hover { border-color var(--colors-glow-border), transform translateY(-3px), box-shadow 0 8px 25px var(--colors-glow) }
+        }
+      }
+      div {
+        a "rudel.fun" href="https://rudel.fun"
+        style {
+          display block
+          padding 1.75rem
+          border-radius 16px
+          border 1px solid var(--colors-border)
+          text-align center
+          font-weight 600
+          background var(--colors-card)
+          transition all 0.3s ease
+          hover { border-color var(--colors-glow-border), transform translateY(-3px), box-shadow 0 8px 25px var(--colors-glow) }
+        }
+      }
+      div {
+        a "heytyto.dev" href="https://heytyto.dev"
+        style {
+          display block
+          padding 1.75rem
+          border-radius 16px
+          border 1px solid var(--colors-border)
+          text-align center
+          font-weight 600
+          background var(--colors-card)
+          transition all 0.3s ease
+          hover { border-color var(--colors-glow-border), transform translateY(-3px), box-shadow 0 8px 25px var(--colors-glow) }
+        }
+      }
+      div {
+        a "heykiro.dev" href="https://heykiro.dev"
+        style {
+          display block
+          padding 1.75rem
+          border-radius 16px
+          border 1px solid var(--colors-border)
+          text-align center
+          font-weight 600
+          background var(--colors-card)
+          transition all 0.3s ease
+          hover { border-color var(--colors-glow-border), transform translateY(-3px), box-shadow 0 8px 25px var(--colors-glow) }
+        }
+      }
+    }
+  }
+
+  div style="height: 1px; background: linear-gradient(90deg,transparent,rgba(102,126,234,0.15),transparent); margin: 0 auto; max-width: 1200px;"
+
+  # ── CTA ──
+  section {
+    style {
+      max-width 700px
+      margin 0 auto
+      padding 4rem 2rem 6rem
+      text-align center
+    }
+    div { h2 "Start building in seconds" style="font-size: 2rem; font-weight: 700; color: var(--colors-text);" }
+    div { p "Install NyxCode and ship your first app." style="color: var(--colors-muted); margin-top: 0.75rem; margin-bottom: 2rem;" }
+    div {
+      style {
+        background #0d0d1a
+        border 1px solid rgba(255,255,255,0.06)
+        border-radius 12px
+        padding 1.5rem
+        font-family monospace
+        font-size 0.85rem
+        line-height 1.8
+        text-align left
+      }
+      span "npm install -g @fabudde/nyxcode" style="display: block; color: #c3e88d;"
+      span "nyxcode build app.nyx" style="display: block; color: #82aaff;"
+    }
+    div {
+      style {
+        display flex
+        justify-content center
+        gap 1rem
+        margin-top 2rem
+      }
+      div {
+        a "Documentation" href="/docs"
+        style {
+          background linear-gradient(135deg,#667eea,#764ba2)
+          color white
+          padding 0.85rem 2.25rem
+          border-radius 10px
+          font-weight 600
+          display inline-block
+          transition all 0.3s ease
+          hover { transform translateY(-3px), box-shadow 0 12px 30px rgba(102,126,234,0.35) }
+        }
+      }
+      div {
+        a "GitHub" href="https://github.com/fabudde/nyxcode"
+        style {
+          color var(--colors-text)
+          border 1px solid var(--colors-border)
+          padding 0.85rem 2.25rem
+          border-radius 10px
+          font-weight 600
+          display inline-block
+          transition all 0.3s ease
+          hover { border-color var(--colors-glow-border), background var(--colors-card) }
+        }
+      }
+    }
+  }
+
+  footer {
+    style {
+      border-top 1px solid var(--colors-border)
+      padding 2rem
+      text-align center
+    }
+    div { p "Built with 🦞 by Nyx & Fabian — NyxCode v0.8.1 — MIT License" style="color: var(--colors-dim); font-size: 0.8rem;" }
   }
 }
