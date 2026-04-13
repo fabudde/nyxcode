@@ -68,6 +68,8 @@ div grid=3 gap=1.5rem { }                # 3-column grid
 | `between` | `justify-content:space-between` |
 | `wrap` | `flex-wrap:wrap` |
 
+**⚠️ `center` overrides `between`!** `center` sets `justify-content:center` which beats `between`. Use `style { ai center }` separately if you need vertical centering + space-between.
+
 ## Style Presets
 ```nyx
 preset label { fs 0.7rem, fw 700, tt uppercase, c var(--colors-primary) }
@@ -99,7 +101,15 @@ Each `page /path { }` = one route. Multi-page = separate HTML files (SSG).
 h1 "Title"
 p "Text"
 span "Inline"
-link "Click" href="/about"
+a "Click" href="/about"
+link "Click" href="/about"          # alias for a
+
+# Structure
+section { }, div { }, nav { }, header { }, footer { }
+
+# Attributes work on any element
+div id="team"                         # anchor target
+div class="custom-class"              # CSS class from head styles
 button "Click" -> count = count + 1
 input placeholder="Type..." bind=name
 select { option "A", option "B", option "C" }
@@ -154,6 +164,8 @@ animate pulse {
 ```nyx
 head "<style>@keyframes fade { from { opacity:0 } to { opacity:1 } }</style>"
 head "<link href='https://fonts.googleapis.com/css2?family=Inter&display=swap' rel='stylesheet'>"
+
+**Note:** `animate` blocks use CSS syntax (semicolons), not NyxCode commas — they output raw `@keyframes`.
 ```
 
 ## State
@@ -307,6 +319,9 @@ display: flex;                        d flex (or flex=row)
 | Elements merging | Wrap siblings in `div { }` |
 | Import not working | Relative paths: `use "./file.nyx"` |
 | Font commas break | Quote: `"Inter, sans-serif"` |
+| center + between | `center` overrides `between` — use `style { ai center }` separately |
+| class not applied | `class="name"` for CSS classes defined in `head "<style>..."` |
+| anchor links | `div id="section"` for scroll targets |
 
 ## AI Rules
 1. **USE SHORTHANDS** — `bg c p m r fs fw w h d op z`, never full names
@@ -321,4 +336,4 @@ display: flex;                        d flex (or flex=row)
 10. **COMMENTS = `#`**
 
 ## Version
-v0.8.0 — https://nyxcode.io/
+v0.8.1 — https://nyxcode.io/
