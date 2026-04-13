@@ -556,17 +556,53 @@ export class Parser {
     'place-items', 'place-content', 'align-content',
   ]);
 
+  /**
+   * CSS properties whose values commonly contain commas as part of the value
+   * (not as property separators). When parsing these properties, commas are
+   * consumed as part of the value instead of ending the property.
+   */
+  private static COMMA_VALUE_PROPERTIES = new Set([
+    'font-family', 'font', 'transition', 'animation', 'background',
+    'background-image', 'shadow', 'box-shadow', 'text-shadow',
+    'grid-template-columns', 'grid-template-rows', 'grid-template-areas',
+    'transform', 'filter', 'backdrop-filter',
+  ]);
+
   private parseStyleProperty(): StyleProperty {
     const name = this.consumeIdentifier();
     let value = '';
     let parenDepth = 0; // Track parentheses for rgba(), linear-gradient(), etc.
 
+    // Resolve the full property name (might be hyphenated, e.g., "font" + "-" + "family")
+    let fullPropName = name;
+    // Peek ahead: if next tokens form a hyphenated CSS property name suffix, DON'T consume here
+    // (the hyphen handling below will build it). But for comma-value detection, we need to
+    // check the resolved name. We do a lookahead to construct it.
+    {
+      let lookIdx = this.pos;
+      let candidate = name;
+      while (lookIdx + 1 < this.tokens.length) {
+        const dashTok = this.tokens[lookIdx];
+        const nextTok = this.tokens[lookIdx + 1];
+        if (dashTok?.value === '-' && nextTok?.type === TokenType.Identifier) {
+          candidate = candidate + '-' + nextTok.value;
+          lookIdx += 2;
+        } else {
+          break;
+        }
+      }
+      fullPropName = candidate;
+    }
+
+    // Determine if this property's value allows commas (e.g., font-family, transition)
+    const allowCommasInValue = Parser.COMMA_VALUE_PROPERTIES.has(fullPropName);
+
     // Consume value tokens until we hit:
-    // - comma OUTSIDE parens (property separator in single-line blocks)
+    // - comma OUTSIDE parens (property separator) — UNLESS property allows commas in value
     // - } (end of style block) — only at depth 0
     // - @ (responsive block)
     // - another CSS property name (multi-line separator) — only at depth 0
-    // - 'hover' keyword
+    // - pseudo-class/element keyword
     while (!this.isAtEnd()) {
       const next = this.peek();
 
@@ -594,7 +630,38 @@ export class Parser {
 
       // Outside parentheses: normal rules
       if (next.type === TokenType.RightBrace || next.type === TokenType.At) break;
-      if (next.type === TokenType.Comma) { this.advance(); break; }
+
+      // Comma handling: depends on whether the property allows commas in its value
+      if (next.type === TokenType.Comma) {
+        if (allowCommasInValue) {
+          // Check if what follows the comma is a known CSS property name (= new property)
+          // or just a continuation of the value (e.g., "Inter, sans-serif")
+          const afterComma = this.peekAt(1);
+          const afterAfterComma = this.peekAt(2);
+          if (afterComma && afterComma.type === TokenType.Identifier) {
+            // Check if it's a hyphenated property: ident-ident
+            let candidateProp = afterComma.value;
+            if (afterAfterComma?.value === '-') {
+              const thirdToken = this.peekAt(3);
+              if (thirdToken?.type === TokenType.Identifier) {
+                candidateProp = afterComma.value + '-' + thirdToken.value;
+              }
+            }
+            if (Parser.CSS_PROPERTIES.has(candidateProp)) {
+              // Next thing after comma IS a CSS property — comma is a separator
+              this.advance(); // consume comma
+              break;
+            }
+          }
+          // Not a CSS property after comma — comma is part of the value
+          value += this.advance().value + ' ';
+          continue;
+        } else {
+          // Normal property: comma is always a separator
+          this.advance(); break;
+        }
+      }
+
       if (['hover', 'focus', 'active', 'before', 'after'].includes(next.value)) break;
       // If we see an identifier that's a known CSS property, it's the NEXT property
       if (next.type === TokenType.Identifier && value.length > 0) {
