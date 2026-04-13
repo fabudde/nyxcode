@@ -1113,10 +1113,15 @@ export class Parser {
           attributes.push({ name, value: this.advance().value });
         }
       }
-      // Identifier after element: could be content reference (state/computed var) or shorthand attribute
+      // Identifier after element: could be content reference, boolean attribute, or layout shorthand
       else if (next.type === TokenType.Identifier && !ELEMENT_TAGS.has(next.value) && !this.isKeyword(next)) {
+        // Layout shorthand booleans: center, between, around, evenly, wrap, nowrap
+        const LAYOUT_BOOLEANS = new Set(['center', 'between', 'around', 'evenly', 'wrap', 'nowrap']);
+        if (LAYOUT_BOOLEANS.has(next.value)) {
+          attributes.push({ name: this.advance().value, value: 'true' });
+        }
         // If no content yet, treat first lone identifier as content reference
-        if (!content && !this.peekAt(1)?.type?.toString().includes('Equals')) {
+        else if (!content && !this.peekAt(1)?.type?.toString().includes('Equals')) {
           content = { type: 'Identifier', name: this.advance().value, line: next.line, col: next.col } as any;
         } else {
           attributes.push({ name: this.advance().value, value: 'true' });

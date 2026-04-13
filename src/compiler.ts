@@ -544,22 +544,61 @@ export class Compiler {
       this.compileStyleWithClass(styleChild, scopeClass);
     }
 
-    // Handle layout elements (grid, row) — convert attrs to style
-    let extraStyle = '';
+    // Layout shorthand attributes → inline style generation
+    // flex=col|row|wrap, grid=N, gap=X, center, between, wrap, etc.
+    let extraStyles: string[] = [];
+    const LAYOUT_ATTRS = new Set(['flex', 'grid', 'gap', 'center', 'between', 'around', 'evenly', 'wrap', 'nowrap', 'cols', 'rows', 'place']);
+    
+    // Legacy tag support (grid/row elements)
     if (el.tag === 'grid') {
       const cols = el.attributes.find(a => a.name === 'cols');
       const gap = el.attributes.find(a => a.name === 'gap');
-      extraStyle = `display:grid;grid-template-columns:repeat(${cols?.value || 3},1fr)`;
-      if (gap) extraStyle += `;gap:${gap.value}`;
+      extraStyles.push(`display:grid`, `grid-template-columns:repeat(${cols?.value || 3},1fr)`);
+      if (gap) extraStyles.push(`gap:${gap.value}`);
     } else if (el.tag === 'row') {
-      extraStyle = 'display:flex';
+      extraStyles.push('display:flex');
       const gap = el.attributes.find(a => a.name === 'gap');
-      if (gap) extraStyle += `;gap:${gap.value}`;
+      if (gap) extraStyles.push(`gap:${gap.value}`);
+    }
+    
+    // Shorthand layout attributes on ANY element
+    for (const attr of el.attributes) {
+      if (attr.name === 'flex') {
+        extraStyles.push('display:flex');
+        const v = typeof attr.value === 'string' ? attr.value : '';
+        if (v === 'col' || v === 'column') extraStyles.push('flex-direction:column');
+        else if (v === 'row') extraStyles.push('flex-direction:row');
+        else if (v === 'wrap') { extraStyles.push('flex-wrap:wrap'); }
+      } else if (attr.name === 'grid' && el.tag !== 'grid') {
+        extraStyles.push('display:grid');
+        const v = typeof attr.value === 'string' ? attr.value : '';
+        if (/^\d+$/.test(v)) extraStyles.push(`grid-template-columns:repeat(${v},1fr)`);
+        else if (v) extraStyles.push(`grid-template-columns:${v}`);
+      } else if (attr.name === 'gap' && el.tag !== 'grid' && el.tag !== 'row') {
+        extraStyles.push(`gap:${attr.value}`);
+      } else if (attr.name === 'center') {
+        extraStyles.push('align-items:center', 'justify-content:center');
+      } else if (attr.name === 'between') {
+        extraStyles.push('justify-content:space-between');
+      } else if (attr.name === 'around') {
+        extraStyles.push('justify-content:space-around');
+      } else if (attr.name === 'evenly') {
+        extraStyles.push('justify-content:space-evenly');
+      } else if (attr.name === 'wrap') {
+        extraStyles.push('flex-wrap:wrap');
+      } else if (attr.name === 'place') {
+        const v = typeof attr.value === 'string' ? attr.value : '';
+        if (v === 'center') extraStyles.push('place-items:center');
+        else if (v) extraStyles.push(`place-items:${v}`);
+      }
     }
 
-    // Merge extra style with existing style attribute
-    const filteredAttrs = el.attributes.filter(a => !['cols', 'gap'].includes(a.name));
-    if (extraStyle) {
+    // Filter layout attrs from HTML output
+    const filteredAttrs = el.attributes.filter(a => !LAYOUT_ATTRS.has(a.name));
+    
+    // Merge extra styles
+    if (extraStyles.length > 0) {
+      const extraStyle = extraStyles.join(';');
       const existingStyle = filteredAttrs.find(a => a.name === 'style');
       if (existingStyle) {
         existingStyle.value = extraStyle + ';' + existingStyle.value;
@@ -1537,16 +1576,98 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
 
   private mapCSSProperty(name: string): string {
     const mapping: Record<string, string> = {
+      // Layout
       'bg': 'background',
+      'bgc': 'background-color',
+      'bgi': 'background-image',
+      'r': 'border-radius',
       'radius': 'border-radius',
       'shadow': 'box-shadow',
+      'op': 'opacity',
+      'z': 'z-index',
+      'pos': 'position',
+      
+      // Spacing
+      'p': 'padding',
+      'pt': 'padding-top',
+      'pr': 'padding-right',
+      'pb': 'padding-bottom',
+      'pl': 'padding-left',
+      'px': 'padding-inline',
+      'py': 'padding-block',
+      'm': 'margin',
+      'mt': 'margin-top',
+      'mr': 'margin-right',
+      'mb': 'margin-bottom',
+      'ml': 'margin-left',
+      'mx': 'margin-inline',
+      'my': 'margin-block',
+      'gap': 'gap',
+      
+      // Sizing
+      'w': 'width',
+      'h': 'height',
+      'minw': 'min-width',
+      'maxw': 'max-width',
+      'minh': 'min-height',
+      'maxh': 'max-height',
+      
+      // Typography
+      'fs': 'font-size',
+      'fw': 'font-weight',
+      'ff': 'font-family',
+      'lh': 'line-height',
+      'ls': 'letter-spacing',
+      'ta': 'text-align',
+      'td': 'text-decoration',
+      'tt': 'text-transform',
+      'ws': 'white-space',
+      'c': 'color',
+      
+      // Borders
+      'border': 'border',
+      'bt': 'border-top',
+      'br': 'border-right',
+      'bb': 'border-bottom',
+      'bl': 'border-left',
+      'bc': 'border-color',
+      'bw': 'border-width',
+      
+      // Flexbox
+      'ai': 'align-items',
+      'jc': 'justify-content',
+      'ac': 'align-content',
+      'as': 'align-self',
+      'fd': 'flex-direction',
+      'fw2': 'flex-wrap',
+      'fg': 'flex-grow',
+      'fs2': 'flex-shrink',
+      'fb': 'flex-basis',
+      
+      // Grid
+      'gc': 'grid-column',
+      'gr': 'grid-row',
+      'gtc': 'grid-template-columns',
+      'gtr': 'grid-template-rows',
+      
+      // Display
+      'd': 'display',
+      'of': 'overflow',
+      'ofx': 'overflow-x',
+      'ofy': 'overflow-y',
+      'v': 'visibility',
+      'cur': 'cursor',
+      
+      // Transforms & Transitions  
+      'tf': 'transform',
+      'tr': 'transition',
+      'anim': 'animation',
+      
+      // Legacy (keep working)
       'text': 'color',
+      'content': 'content',
       'padding': 'padding',
       'margin': 'margin',
-      'border': 'border',
-      'flex': 'display: flex; gap',
-      'grid': 'display: grid; grid-template-columns',
-      'content': 'content',
     };
     return mapping[name] || name;
   }
