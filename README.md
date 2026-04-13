@@ -33,7 +33,7 @@ page /home {
 }
 ```
 
-## Features (v0.4.0)
+## Features (v0.5.0)
 
 ### 📐 Layout System (NEW in v0.3)
 

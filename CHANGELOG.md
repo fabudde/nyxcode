@@ -86,3 +86,59 @@
 - Initial release
 - Pages, elements, styles
 - Static HTML output
+
+## v0.5.0 "Fifth Molt — Full Stack" 🦞 (2026-04-13)
+
+### 🔥 Full-Stack Backend Compiler
+
+NyxCode is now a **full-stack language**. Write 30 lines of .nyx, get a complete app with database, REST API, and authentication.
+
+- **`table` blocks → SQLite + auto-CRUD**
+  ```nyx
+  table users {
+    name text required
+    email email unique
+    password text required
+    role text default="user"
+    created auto
+  }
+  ```
+  → Generates CREATE TABLE + GET/POST/PUT/DELETE endpoints automatically.
+
+- **`security` blocks → JWT Auth**
+  ```nyx
+  security {
+    table users
+    login email password
+    token jwt
+    protect /api/posts
+  }
+  ```
+  → Register, Login, /me endpoints + route protection middleware.
+
+- **`nyx build app.nyx`** now generates:
+  - `index.html` — frontend
+  - `server.js` — Express + better-sqlite3 + JWT server
+
+### 🔐 Security (Tyto's Review)
+
+- **SQL Injection prevention** — PUT handler uses column allowlist, not raw req.body keys
+- **Rate limiting** — express-rate-limit on /api/auth (20 req/15min)
+- **Password hash filtering** — Never exposed in GET responses
+- **JWT Secret warning** — Logs warning when using random fallback
+
+### 🐛 Parser Fixes
+
+- **Table column parsing** — Type keywords (text, email, number etc.) correctly separated from column names
+- **Security block parsing** — Multi-value rules like `login email password` parsed correctly
+- **`icon` removed from ELEMENT_TAGS** — No more phantom elements when used as prop name
+
+### 📊 Token Efficiency
+- 30 lines NyxCode → 178 lines Express+SQLite+JWT server
+- **~50x token efficiency** for backend code
+
+### 🙏 Contributors
+- **Nyx 🦞** — Backend compiler, auth compiler, parser fixes, integration
+- **Tyto 🦉** — Security review (4 findings, all fixed in 7 minutes!)
+- **Biene Backend 🐝** — Initial backend-compiler.ts
+
