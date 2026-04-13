@@ -10,6 +10,38 @@ npx @fabudde/nyxcode build app.nyx    # Compile to HTML
 npx @fabudde/nyxcode dev app.nyx      # Dev server + hot reload
 ```
 
+## Full Example: Landing Page
+```nyx
+component Feature {
+  props icon title description
+  section {
+    style { bg #0d0d1a, radius 12px, padding 2rem, text-align center }
+    span .icon style="font-size: 2.5rem; display: block; margin-bottom: 1rem;"
+    h3 .title style="color: #e0e0f0; margin-bottom: 0.5rem;"
+    p .description style="color: #8888a8; font-size: 0.9rem;"
+  }
+}
+
+page / {
+  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap' rel='stylesheet'>"
+  head "<style>body { font-family: Inter, sans-serif; }</style>"
+
+  section {
+    style { max-width 900px, margin 0 auto, padding 4rem 2rem, text-align center }
+    
+    h1 "NyxCode" style="font-size: 3rem; font-weight: 700; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
+    p "The AI-native programming language for the web." style="color: #8888a8; font-size: 1.2rem; margin-bottom: 3rem;"
+    
+    section {
+      style { display grid, grid-template-columns repeat(3, 1fr), gap 1.5rem }
+      Feature icon="⚡" title="Token Efficient" description="68% fewer tokens than React"
+      Feature icon="🎯" title="Zero Config" description="No webpack, no tsconfig, no babel"
+      Feature icon="🔒" title="Secure by Default" description="No eval, auto-escaping, safe state"
+    }
+  }
+}
+```
+
 ## Core Syntax
 
 ### Pages (= Routes)
@@ -217,37 +249,41 @@ head "<title>My Page</title>"
 head "<meta name='description' content='My NyxCode app'>"
 ```
 
-## Full Example: Landing Page
-```nyx
-component Feature {
-  props icon title description
-  section {
-    style { bg #0d0d1a, radius 12px, padding 2rem, text-align center }
-    span .icon style="font-size: 2.5rem; display: block; margin-bottom: 1rem;"
-    h3 .title style="color: #e0e0f0; margin-bottom: 0.5rem;"
-    p .description style="color: #8888a8; font-size: 0.9rem;"
-  }
-}
+## Common Mistakes (DO NOT)
 
-page / {
-  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap' rel='stylesheet'>"
-  head "<style>body { font-family: Inter, sans-serif; }</style>"
-
-  section {
-    style { max-width 900px, margin 0 auto, padding 4rem 2rem, text-align center }
-    
-    h1 "NyxCode" style="font-size: 3rem; font-weight: 700; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
-    p "The AI-native programming language for the web." style="color: #8888a8; font-size: 1.2rem; margin-bottom: 3rem;"
-    
-    section {
-      style { display grid, grid-template-columns repeat(3, 1fr), gap 1.5rem }
-      Feature icon="⚡" title="Token Efficient" description="68% fewer tokens than React"
-      Feature icon="🎯" title="Zero Config" description="No webpack, no tsconfig, no babel"
-      Feature icon="🔒" title="Secure by Default" description="No eval, auto-escaping, safe state"
-    }
-  }
-}
 ```
+❌ WRONG                              ✅ RIGHT
+─────────────────────────────────────────────────────
+<div class="flex">                    section { style { display flex } }
+</div>                                }
+className="text-lg"                   style { font-size 1.125rem }
+onClick={() => setCount(c+1)}         button "+" -> count = count + 1
+import React from 'react'            use "./component.nyx"
+export default function App() {       page / {
+<img src="x.jpg" />                   img src="x.jpg"
+{isLoggedIn && <p>Hi</p>}            when loggedIn -> p "Hi"
+{items.map(i => <li>{i}</li>)}        each items -> item { p .name }
+background-color: red;                bg red
+border-radius: 12px;                  radius 12px
+```
+
+**Key differences from React/HTML:**
+- No closing tags — use `{ }` braces
+- No JSX — elements are keywords, not XML
+- No CSS classes — use `style { }` blocks
+- No semicolons — one property per line in style blocks
+- No imports from npm — `use` imports .nyx files only
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Style not applied | `style { }` must be INSIDE the element's `{ }` block |
+| Component not found | Define components BEFORE pages (top of file) |
+| Props not showing | Use `.propName` inside component (dot prefix) |
+| State not updating | Check arrow syntax: `-> varName = expression` |
+| Page not routing | Each page needs unique path: `page /path { }` |
+| Import not working | Use relative paths: `use "./file.nyx"` |
 
 ## Rules for AI Code Generation
 
