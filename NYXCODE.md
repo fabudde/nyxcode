@@ -1,684 +1,198 @@
-# NYXCODE.md — AI Context File
-# Give this file to any AI to generate NyxCode.
+# NYXCODE.md — AI Context File (v0.8)
+# Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
-A token-efficient web language that replaces TypeScript/Next.js. One file = full-stack app. Built for AI code generation.
+A token-efficient language replacing TypeScript/Next.js. One `.nyx` file = full-stack app with DB, Auth, API, frontend. **25% fewer tokens than Tailwind, 82% fewer than Next.js.**
 
 ## Quick Start
 ```bash
-npx @fabudde/nyxcode build app.nyx    # Compile to HTML
+npx @fabudde/nyxcode build app.nyx    # Compile
 npx @fabudde/nyxcode dev app.nyx      # Dev server + hot reload
 ```
 
-## Full Example: Landing Page
+## Hero Example: Full-Stack Blog
 ```nyx
-component Feature {
-  props icon title description
-  section {
-    style { bg #0d0d1a, radius 12px, padding 2rem, text-align center }
-    span .icon style="font-size: 2.5rem; display: block; margin-bottom: 1rem;"
-    h3 .title style="color: #e0e0f0; margin-bottom: 0.5rem;"
-    p .description style="color: #8888a8; font-size: 0.9rem;"
-  }
-}
+table posts { title text required, body text, created auto }
+security { table users, login email password, token jwt, protect /api/posts }
+theme { colors { primary #667eea, bg #0a0a12, card #1a1a2e } }
+preset card { bg var(--colors-card), r 12px, p 2rem }
 
 page / {
-  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap' rel='stylesheet'>"
-  head "<style>body { font-family: Inter, sans-serif; }</style>"
-
-  section {
-    style { max-width 900px, margin 0 auto, padding 4rem 2rem, text-align center }
-    
-    h1 "NyxCode" style="font-size: 3rem; font-weight: 700; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
-    p "The AI-native programming language for the web." style="color: #8888a8; font-size: 1.2rem; margin-bottom: 3rem;"
-    
-    section {
-      style { display grid, grid-template-columns repeat(3, 1fr), gap 1.5rem }
-      Feature icon="⚡" title="Token Efficient" description="68% fewer tokens than React"
-      Feature icon="🎯" title="Zero Config" description="No webpack, no tsconfig, no babel"
-      Feature icon="🔒" title="Secure by Default" description="No eval, auto-escaping, safe state"
-    }
+  section style="max-width: 800px; margin: 0 auto; padding: 2rem;" {
+    div { h1 "My Blog" }
+    form /api/posts auth { input title, submit "Post", success -> reload }
+    data posts = get /api/posts auth
+    each posts -> div preset=card { h3 .title, p .body }
   }
 }
 ```
+**Generates:** SQLite DB, JWT auth, CRUD API, reactive frontend. Zero config.
 
-## Core Syntax
+## CSS Shorthands — ALWAYS USE THESE
 
-### Pages (= Routes)
+| Short | CSS | Short | CSS |
+|-------|-----|-------|-----|
+| `bg` | background | `c` | color |
+| `p` | padding | `m` | margin |
+| `pt pb pl pr` | padding-* | `mt mb ml mr` | margin-* |
+| `px py` | padding-inline/block | `mx my` | margin-inline/block |
+| `w` | width | `h` | height |
+| `minw maxw` | min/max-width | `minh maxh` | min/max-height |
+| `r` | border-radius | `fs` | font-size |
+| `fw` | font-weight | `ff` | font-family |
+| `lh` | line-height | `ls` | letter-spacing |
+| `ta` | text-align | `tt` | text-transform |
+| `td` | text-decoration | `d` | display |
+| `pos` | position | `z` | z-index |
+| `op` | opacity | `cur` | cursor |
+| `ai` | align-items | `jc` | justify-content |
+| `fd` | flex-direction | `gap` | gap |
+| `of` | overflow | `shadow` | box-shadow |
+| `tf` | transform | `tr` | transition |
+| `anim` | animation | `gtc` | grid-template-columns |
+
+## Layout Attributes — On Any Element
 ```nyx
-page / {
-  h1 "Hello World"
-}
+section flex=col center gap=2rem { }     # Flexbox column, centered
+nav flex=row between { }                  # Flex row, space-between
+div grid=3 gap=1.5rem { }                # 3-column grid
+```
 
-page /about {
-  h1 "About"
-  p "This is my app."
+| Attr | CSS |
+|------|-----|
+| `flex=col` | `display:flex; flex-direction:column` |
+| `flex=row` | `display:flex; flex-direction:row` |
+| `grid=3` | `display:grid; grid-template-columns:repeat(3,1fr)` |
+| `gap=X` | `gap:X` |
+| `center` | `align-items:center; justify-content:center` |
+| `between` | `justify-content:space-between` |
+| `wrap` | `flex-wrap:wrap` |
+
+## Style Presets
+```nyx
+preset label { fs 0.7rem, fw 700, tt uppercase, c var(--colors-primary) }
+preset card { bg var(--colors-card), r 12px, p 2rem }
+
+p "TITLE" preset=label
+section preset=card { h3 "Content" }
+```
+
+## Theme
+```nyx
+theme {
+  colors { primary #667eea, bg #0a0a12, card #1a1a2e }
+  fonts { heading "Space Grotesk, sans-serif", body "Inter, sans-serif" }
 }
 ```
-Each `page /path { }` = one route. File-based routing without files.
+Colors → `var(--colors-primary)`. Fonts auto-apply to headings/body.
 
-### Elements
+## Pages & Elements
 ```nyx
-# Text
+page / { h1 "Home" }
+page /about { h1 "About" }
+
 h1 "Title"
-h2 "Subtitle"
-p "Paragraph"
-span "Inline text"
-link "Click me" href="/about"
-
-# Interactive
+p "Text" style="c: #888;"
+img src="/photo.jpg" alt="Photo"
 button "Click" -> count = count + 1
-input placeholder="Type here..." bind=name
-select { option "A", option "B" }
-textarea placeholder="Write..."
-
-# Media
-img src="/photo.jpg" alt="A photo"
-
-# Layout
-section { ... }
-nav { ... }
-footer { ... }
-header { ... }
-div { ... }
+input placeholder="Name" bind=name
 ```
 
-### Styling (3 Tiers)
+**⚠️ SIBLING RULE:** Two elements at same level merge. Wrap in `div { }`:
+```nyx
+div { a "Home" href="/" }
+div { a "About" href="/about" }
+```
 
-**Tier 1: Style blocks (90% of cases)**
+## Styling
 ```nyx
 section {
-  style {
-    bg #1a1a2e
-    color white
-    padding 2rem
-    radius 12px
-    display flex
-    gap 1rem
-    shadow 0 4px 12px rgba(0, 0, 0, 0.2)
-    transition all 0.2s
-  }
-  h1 "Styled section"
+  style { bg #1a1a2e, c white, p 2rem, r 12px }
+  h1 "Styled"
 }
+
+# Hover
+style { bg #667eea, hover { bg #5a6fd6, tf translateY(-2px) } }
+
+# Responsive
+style { p 4rem, @mobile { p 1rem } }
 ```
 
-Common shorthands: `bg` = background, `radius` = border-radius, `shadow` = box-shadow. Most CSS properties pass through directly.
-
-**Responsive:**
-```nyx
-style {
-  padding 4rem
-  grid-template-columns repeat(3, 1fr)
-  @mobile { padding 2rem, grid-template-columns 1fr }
-  @tablet { padding 3rem }
-}
-```
-
-**Hover/Focus/Active:**
-```nyx
-style {
-  bg #667eea
-  hover { bg #5a6fd6, transform translateY(-2px) }
-  focus { outline 2px solid #667eea }
-}
-```
-
-**Tier 2: Animations**
-```nyx
-animate pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-```
-
-**Tier 3: Raw CSS (escape hatch)**
-```nyx
-head "<style>body { font-family: Inter, sans-serif; }</style>"
-head "<link href='https://fonts.googleapis.com/css2?family=Inter&display=swap' rel='stylesheet'>"
-```
-
-### Reactive State
+## State
 ```nyx
 state count = 0
-state name = "World"
 computed double = count * 2
-
-h1 count                           # Auto-updates when count changes
-p name
+h1 count
 button "+" -> count = count + 1
-button "Reset" -> count = 0
-input bind=name                    # Two-way binding
 ```
 
-### Components
+## Components
 ```nyx
 component Card {
-  props title description icon
-  section {
-    style { bg #1a1a2e, radius 12px, padding 1.5rem }
-    span .icon style="font-size: 2rem;"
-    h3 .title
-    p .description
+  props title desc icon
+  section preset=card {
+    span .icon style="fs: 2rem;"
+    div { h3 .title }
+    p .desc style="c: #888;"
   }
 }
-
-# Usage:
-Card title="Fast" description="Really fast" icon="⚡"
-Card title="Simple" description="Zero config" icon="🎯"
+Card title="Fast" desc="Milliseconds" icon="⚡"
 ```
+Default props: `props title color="#667eea"`. Slots: `slot` keyword.
 
-**Default props:**
-```nyx
-component Button {
-  props label color="#667eea" size="1rem"
-}
-Button label="Click"                    # Uses defaults
-Button label="Go" color="red"          # Overrides color
-```
-
-**Slots (nested content):**
-```nyx
-component Modal {
-  props title
-  section {
-    h2 .title
-    slot                                # Children go here
-  }
-}
-
-Modal title="Confirm" {
-  p "Are you sure?"
-  button "Yes"
-}
-```
-
-### Layout (wraps all pages)
+## Layout
 ```nyx
 layout {
-  nav {
-    link "Home" href="/"
-    link "About" href="/about"
-  }
-  section {
-    style { margin-left 260px, padding 3rem }
-    slot                                # Page content goes here
-  }
+  head "<link href='...' rel='stylesheet'>"
+  nav flex=row between { div { a "Home" href="/" } }
+  slot
   footer { p "Made with NyxCode" }
 }
 ```
 
-### Imports
+## Forms
 ```nyx
-use "./components/navbar.nyx"
-use "./layout.nyx"
-```
-
-### Iteration
-```nyx
-each items -> item {
-  p .name
-  span .description
-}
-```
-
-### Conditionals
-```nyx
-when loggedIn -> p "Welcome back!"
-else -> link "Login" href="/login"
-```
-
-### Forms
-```nyx
-form action="/api/contact" method="POST" {
-  input name placeholder="Name" required
-  input email type="email" placeholder="Email" required
-  textarea message placeholder="Message"
-  submit "Send"
-}
-```
-
-### Comments
-```nyx
-# This is a comment
-```
-
-### Head Injection
-```nyx
-head "<title>My Page</title>"
-head "<meta name='description' content='My NyxCode app'>"
-```
-
-## Icons
-
-**Emoji icons (zero deps, recommended):**
-```nyx
-span "🦞" style="font-size: 2rem;"
-span "⚡" style="font-size: 1.5rem;"
-```
-
-**Lucide Icons (lightweight SVG icons):**
-```nyx
-head "<link href='https://unpkg.com/lucide-static@latest/font/lucide.css' rel='stylesheet'>"
-
-span "" class="icon-home" style="font-size: 1.5rem;"
-span "" class="icon-settings"
-span "" class="icon-user"
-```
-
-**Font Awesome:**
-```nyx
-head "<link href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css' rel='stylesheet'>"
-
-span "" class="fa-solid fa-house" style="font-size: 1.5rem;"
-span "" class="fa-brands fa-github"
-span "" class="fa-solid fa-rocket"
-```
-
-**Material Icons:**
-```nyx
-head "<link href='https://fonts.googleapis.com/icon?family=Material+Icons' rel='stylesheet'>"
-
-span "home" class="material-icons"
-span "settings" class="material-icons"
-```
-
-**SVG inline (via head injection):**
-```nyx
-head "<svg style='display:none'><symbol id='logo' viewBox='0 0 24 24'><path d='...'/></symbol></svg>"
-
-# Then use:
-head "<svg width='24' height='24'><use href='#logo'/></svg>"
-```
-
-## Common Mistakes (DO NOT)
-
-```
-❌ WRONG                              ✅ RIGHT
-─────────────────────────────────────────────────────
-<div class="flex">                    section { style { display flex } }
-</div>                                }
-className="text-lg"                   style { font-size 1.125rem }
-onClick={() => setCount(c+1)}         button "+" -> count = count + 1
-import React from 'react'            use "./component.nyx"
-export default function App() {       page / {
-<img src="x.jpg" />                   img src="x.jpg"
-{isLoggedIn && <p>Hi</p>}            when loggedIn -> p "Hi"
-{items.map(i => <li>{i}</li>)}        each items -> item { p .name }
-background-color: red;                bg red
-border-radius: 12px;                  radius 12px
-```
-
-**Key differences from React/HTML:**
-- No closing tags — use `{ }` braces
-- No JSX — elements are keywords, not XML
-- No CSS classes — use `style { }` blocks
-- No semicolons — one property per line in style blocks
-- No imports from npm — `use` imports .nyx files only
-
-## Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| Style not applied | `style { }` must be INSIDE the element's `{ }` block |
-| Component not found | Define components BEFORE pages (top of file) |
-| Props not showing | Use `.propName` inside component (dot prefix) |
-| State not updating | Check arrow syntax: `-> varName = expression` |
-| Page not routing | Each page needs unique path: `page /path { }` |
-| Import not working | Use relative paths: `use "./file.nyx"` |
-
-## Rules for AI Code Generation
-
-1. **Minimize tokens** — use shorthands (`bg` not `background-color`)
-2. **One file when possible** — pages + components + state in one .nyx file
-3. **No closing tags** — NyxCode uses `{ }` blocks, not `</div>`
-4. **Props with `.`** — inside components, `.title` references the prop
-5. **State is reactive** — just declare `state x = 0`, use `x` in elements
-6. **Style blocks, not classes** — no `class="flex items-center"`, use `style { display flex }`
-7. **`->` for events** — `button "Go" -> count = count + 1`
-8. **`bind=` for two-way** — `input bind=name`
-9. **Strings use `""`** — always double quotes
-10. **Comments use `#`**
-
-## Token Comparison
-
-| Framework | Files | Lines | Config |
-|-----------|-------|-------|--------|
-| Next.js   | 22    | 1200  | 5 files |
-| NyxCode   | 1     | 545   | 0 files |
-
-## Full-Stack (Backend)
-
-`nyx build` generates **both** `index.html` (frontend) and `server.js` (backend) from a single `.nyx` file.
-
-**Required npm packages:** `express`, `better-sqlite3`, `bcryptjs`, `jsonwebtoken`, `express-rate-limit`
-
-### Tables (= Database)
-```nyx
-table users {
-  name text required
-  email email unique
-  password text required
-  role text default="user"
-  created auto
-}
-
-table posts {
-  title text required
-  body text
-  author users          # Foreign key → users(id)
-  published bool default=false
-  created auto
-}
-```
-
-Every table gets an `id` (auto-increment primary key) automatically. Each table generates a full CRUD REST API:
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/users` | GET | List all |
-| `/api/users/:id` | GET | Get one |
-| `/api/users` | POST | Create |
-| `/api/users/:id` | PUT | Update |
-| `/api/users/:id` | DELETE | Delete |
-
-**Column types:**
-
-| NyxCode | SQLite | Notes |
-|---------|--------|-------|
-| `text` | TEXT | General string |
-| `email` | TEXT | Treated as text in DB |
-| `number` / `int` | INTEGER | Whole numbers |
-| `float` / `decimal` | REAL | Decimal numbers |
-| `bool` | INTEGER | 0/1 |
-| `auto` | DATETIME | Auto-set to `CURRENT_TIMESTAMP` |
-| `users` (table name) | INTEGER | Foreign key → `users(id)` |
-
-**Constraints:** `required` (NOT NULL), `unique` (UNIQUE), `default="value"` (DEFAULT)
-
-### Security (= Auth)
-```nyx
-security {
-  table users             # Which table stores users
-  login email password    # Fields for authentication
-  token jwt               # JWT-based tokens
-  protect /api/posts      # Require auth for this path
-}
-```
-
-This generates:
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/auth/register` | POST | Create account (hashes password with bcrypt) |
-| `/api/auth/login` | POST | Returns JWT token (7-day expiry) |
-| `/api/auth/me` | GET | Get current user (requires token) |
-
-Protected routes require `Authorization: Bearer <token>` header. Rate-limited to 20 requests per 15 minutes.
-
-Passwords are **never returned** in any API response.
-
-### Data Binding (Frontend → Backend)
-```nyx
-data users = get /api/users
-data posts = get /api/posts
-```
-
-- Fetches the URL on page load
-- Stores the result in a JS variable
-- Use with `each` to render lists:
-
-```nyx
-data posts = get /api/posts
-
-each posts -> post {
-  h3 .title
-  p .body
-}
-```
-
-### Complete Full-Stack Example
-
-**30 lines → full-stack app with database, auth, CRUD API, and frontend:**
-
-```nyx
-# Full-Stack NyxCode Demo
-# 30 lines → complete app with DB, Auth, CRUD API
-
-table users {
-  name text required
-  email email unique
-  password text required
-  role text default="user"
-  created auto
-}
-
-table posts {
-  title text required
-  body text
-  author users
-  published bool default=false
-  created auto
-}
-
-security {
-  table users
-  login email password
-  token jwt
-  protect /api/posts
-}
-
-page / {
-  h1 "My Blog"
-
-  data posts = get /api/posts
-
-  each posts -> post {
-    section {
-      style { bg #1a1a2e, radius 12px, padding 1.5rem, margin-bottom 1rem }
-      h3 .title
-      p .body
-    }
-  }
-}
-```
-
-**What `nyx build` generates from this:**
-- `index.html` — SPA with routing, components, reactive state
-- `server.js` — Express server with SQLite, CRUD for `users` + `posts`, JWT auth, bcrypt password hashing, rate limiting
-
-**Token efficiency:**
-
-| Stack | Lines | Files |
-|-------|-------|-------|
-| TypeScript + Express + Prisma + React | ~500 | 10+ |
-| NyxCode | 30 | 1 |
-
-## Version
-v0.3.1 — Docs: https://nyxcode.io/docs/
-
----
-
-## v0.6 Features
-
-### Forms — Zero JS Required
-```nyx
-form /api/posts auth {
-  input title placeholder="Post title" required
-  textarea body placeholder="Write something..."
-  submit "Publish"
-  success -> reload
-  error -> toast "Failed to publish"
-}
-```
-
-**What this generates:** `<form>` with styled inputs, `fetch()` POST with JSON body, JWT auth header from localStorage, success/error handling. Zero JavaScript written.
-
-**Form syntax:**
-- `form /api/endpoint` — POST to this URL
-- `form /api/endpoint auth` — include Bearer token from localStorage
-- `input fieldname placeholder="..." required` — text input (fieldname = JSON key)
-- `textarea fieldname placeholder="..."` — multiline input
-- `select fieldname` — dropdown
-- `submit "Button Text"` — submit button
-- `success -> reload` — reload page on success
-- `success -> redirect "/path"` — navigate on success
-- `success -> clear` — reset form + show "Done!"
-- `success -> toast "Message"` — show success message
-- `error -> toast "Message"` — show error message
-
-**Token comparison:**
-```
-# NyxCode v0.6 — 6 lines
 form /api/posts auth {
   input title placeholder="Title" required
-  textarea body placeholder="Write..."
   submit "Publish"
   success -> reload
+  error -> toast "Failed"
 }
-
-# Equivalent JS — 25+ lines of fetch(), headers, error handling
 ```
 
-### Theme Variables
+## Full-Stack Backend
+
+### Tables
 ```nyx
-theme {
-  colors {
-    primary #667eea
-    bg #0a0a12
-    card #1a1a2e
-    muted #888
-  }
-  spacing {
-    page 3rem 2rem
-  }
-}
+table posts { title text required, body text, author users, created auto }
 ```
+Auto: `id` PK, CRUD API (`/api/posts`), SQLite WAL.
+Types: `text`, `email`, `int`, `float`, `bool`, `auto`, `tablename` (FK).
+Constraints: `required`, `unique`, `default="val"`.
 
-**Generates CSS Custom Properties:**
-```css
-:root {
-  --colors-primary: #667eea;
-  --colors-bg: #0a0a12;
-  --colors-card: #1a1a2e;
-  --colors-muted: #888;
-  --spacing-page: 3rem 2rem;
-}
-```
-
-**Use anywhere:**
+### Security
 ```nyx
-style { bg var(--colors-bg), color var(--colors-primary) }
-h1 "Title" style="color: var(--colors-primary);"
+security { table users, login email password, token jwt, protect /api/posts }
 ```
+Generates: register, login, JWT middleware, bcrypt, rate limiting.
 
-### Script Block (Escape Hatch)
-```nyx
-script {
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log('Custom JS here');
-  });
-}
-```
-**Rule:** Use `script {}` for edge cases only. 95% of apps should need zero script blocks. If you need script, consider if NyxCode should have a native feature for it instead.
-
-### Data with Auth
+### Data Binding
 ```nyx
 data posts = get /api/posts auth
-```
-The `auth` keyword tells the compiler to include a Bearer token from localStorage in the fetch request. No manual header code needed.
-
-**Without auth:** `data posts = get /api/posts` — plain fetch
-**With auth:** `data posts = get /api/posts auth` — adds Authorization header
-
-### Complete Full-Stack Example with v0.6
-```nyx
-table posts {
-  title text required
-  body text
-  author text
-  created auto
-}
-
-security {
-  table users
-  login email password
-  token jwt
-  protect /api/posts
-}
-
-theme {
-  colors {
-    primary #667eea
-    bg #0a0a12
-    card #1a1a2e
-  }
-}
-
-page / {
-  style { bg var(--colors-bg) }
-  h1 "My Blog" style="color: var(--colors-primary);"
-
-  form /api/posts auth {
-    input title placeholder="Post title" required
-    textarea body placeholder="Write..."
-    submit "Publish"
-    success -> reload
-  }
-
-  data posts = get /api/posts auth
-  each posts -> post {
-    section {
-      style { bg var(--colors-card), radius 12px, padding 1.5rem, margin-bottom 1rem }
-      h3 .title style="color: #e0e0f0;"
-      p .body style="color: #888;"
-    }
-  }
-}
+each posts -> div preset=card { h3 .title }
 ```
 
-**30 lines. Database + Auth + Form + Theme + Data binding. One file.**
+## AI Rules
+1. **USE SHORTHANDS** — `bg c p m r fs fw w h d op z`, never full names
+2. **USE LAYOUT ATTRS** — `flex=col center` not `style { d flex, fd column }`
+3. **USE PRESETS** — define once, `preset=name` everywhere
+4. **USE THEME** — `var(--colors-primary)` not hardcoded colors
+5. **WRAP SIBLINGS** — `div { element }` to prevent merging
+6. **ONE FILE** — everything in one .nyx
+7. **NO CLOSING TAGS** — `{ }` blocks
+8. **PROPS = `.`** — `.title` inside components
+9. **STRINGS = `""`** — double quotes
+10. **COMMENTS = `#`**
 
 ## Version
-v0.7.0 — Style Presets, Theme Fonts, Forms, Themes, Scripts, Data Auth
-Docs: https://nyxcode.io/docs/
-
-### Style Presets (v0.7) — Reusable Named Styles
-```nyx
-preset label {
-  font-size 0.7rem
-  color var(--colors-primary)
-  font-weight 700
-  text-transform uppercase
-  letter-spacing 0.25em
-}
-
-preset card {
-  background var(--colors-card)
-  border-radius 12px
-  padding 2rem
-}
-
-page / {
-  p "SECTION" preset=label
-  section preset=card {
-    h3 "Reusable card style"
-    p "No inline styles needed"
-  }
-}
-```
-Presets generate CSS classes (`.nyx-p_label`, `.nyx-p_card`). Use `preset=name` on any element. Combine with `style {}` for overrides.
-
-### Theme Fonts (v0.7) — Auto Font Assignment
-```nyx
-theme {
-  fonts {
-    heading "Space Grotesk, sans-serif"
-    body "Inter, sans-serif"
-  }
-  colors {
-    primary #667eea
-  }
-}
-```
-`heading` auto-applies to h1-h6. `body` auto-applies to body, p, span, li, input, textarea. **Quote font values that contain commas.**
+v0.8.0 — https://nyxcode.io/
