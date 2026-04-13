@@ -1,139 +1,169 @@
-# NyxCode Showcase — BUILT IN NYXCODE
-use "./components/hero.nyx"
-use "./components/feature.nyx"
-use "./components/stat.nyx"
-use "./components/testimonial.nyx"
-
-page /showcase {
-  head "<link rel='preconnect' href='https://fonts.googleapis.com'>"
-  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400&display=swap' rel='stylesheet'>"
-  head "<style>body button{background:rgba(102,126,234,0.15);border:1px solid rgba(102,126,234,0.3);color:white;padding:0.8rem 2rem;border-radius:12px;font-size:1.2rem;cursor:pointer;transition:all 0.2s;margin:0.3rem}body button:hover{background:rgba(102,126,234,0.3);transform:scale(1.05)}body h1,body h2,body h3{margin-bottom:0.5rem}body .nyx-page p{margin-bottom:0.5rem;opacity:0.85}.counter-num{font-size:5rem;font-weight:800;background:linear-gradient(135deg,#667eea,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin:1rem 0}.stat-num{font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,#667eea,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}.feature-card h3{color:#e0e0f0}.feature-card .icon{font-size:2rem;margin-bottom:0.8rem}.testimonial-quote{font-style:italic;line-height:1.6;margin-bottom:0.8rem}.testimonial-author{color:#667eea;font-weight:600}.testimonial-role{color:#8080a0;font-size:0.8rem}</style>"
-
-  animate drift {
-    to { transform: translate(30px, 30px); }
+theme {
+  colors {
+    primary #667eea
+    accent #764ba2
+    bg #0a0a12
+    card #12121f
+    text #e2e8f0
+    muted #64748b
   }
-
-  animate pulse {
-    0% { transform: scale(1); opacity: 0.8; }
-    50% { transform: scale(1.05); opacity: 1; }
-    100% { transform: scale(1); opacity: 0.8; }
+  fonts {
+    heading "Space Grotesk, sans-serif"
+    body "Inter, sans-serif"
   }
+}
 
-  style {
-    bg #0a0a1a
-    color #e0e0f0
-    font-family Inter
-    margin 0
-    padding 0
-  }
+preset label {
+  fs 0.65rem, fw 700, tt uppercase, ls 0.3em, c var(--colors-primary)
+}
 
-  section {
-    style {
-      bg linear-gradient(135deg, #667eea, #764ba2, #f093fb)
-      padding 6rem 2rem
-      text-align center
-      color white
-      overflow hidden
+preset card {
+  bg var(--colors-card), r 16px, p 2rem
+}
+
+layout {
+  head "<link rel='preconnect' href='https://fonts.googleapis.com'><link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap'><title>NyxCode — The AI-Native Programming Language</title><meta name='description' content='Write 82%% fewer tokens. One .nyx file = full-stack app with DB, Auth and API.'><meta name='viewport' content='width=device-width, initial-scale=1'><style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{background:var(--colors-bg);color:var(--colors-text);overflow-x:hidden}::selection{background:rgba(102,126,234,0.3)}@media(max-width:768px){[style*='grid-template-columns:repeat(3']{grid-template-columns:1fr!important}[style*='grid-template-columns:repeat(2']{grid-template-columns:1fr!important}[style*='display:flex;flex-direction:row']{flex-direction:column!important;align-items:stretch!important}}</style>"
+  slot
+}
+
+page / {
+  section style="max-width: 1200px; margin: 0 auto; padding: 6rem 2rem 4rem; text-align: center;" {
+    p "THE AI-NATIVE LANGUAGE" preset=label
+    h1 "Write apps with 82% fewer tokens" style="font-size: 3.5rem; font-weight: 800; line-height: 1.15; letter-spacing: -0.03em; margin-top: 1rem;"
+    p "One .nyx file compiles to a complete full-stack app with database, auth and API. Built for AIs, loved by developers." style="color: #94a3b8; font-size: 1.15rem; max-width: 580px; margin: 1.5rem auto 0; line-height: 1.7;"
+    div flex=row center gap=1rem style="margin-top: 2.5rem;" {
+      div { a "Get Started →" href="/docs" style="background: linear-gradient(135deg,#667eea,#764ba2); color: white; border: none; padding: 0.75rem 2rem; border-radius: 8px; font-weight: 600; text-decoration: none; display: inline-block;" }
+      div { a "Live Demo" href="https://demo.nyxcode.io" style="color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1); padding: 0.75rem 2rem; border-radius: 8px; font-weight: 600; text-decoration: none; display: inline-block;" }
     }
-    h1 "NyxCode"
-    p "The AI-native programming language for the web. Write less. Ship more."
   }
 
-  section {
-    style {
-      display flex
-      justify-content center
-      gap 4rem
-      padding 3rem 2rem
-      bg #12122a
-      border-bottom 1px solid rgba(255, 255, 255, 0.05)
+  div style="height: 1px; background: linear-gradient(90deg,transparent,rgba(102,126,234,0.2),transparent); margin: 2rem auto; max-width: 1200px;"
 
-      @mobile {
-        flex-direction column
-        gap 1.5rem
+  section style="max-width: 900px; margin: 0 auto; padding: 2rem;" {
+    p "SEE THE DIFFERENCE" preset=label style="text-align: center; margin-bottom: 0.75rem;"
+    h2 "30 lines. Full-stack blog." style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 2rem;"
+    div style="background: #0d0d1a; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 1.5rem; font-family: 'Courier New', monospace; font-size: 0.85rem; line-height: 1.7; overflow-x: auto; color: #c8d6e5; white-space: pre; text-align: left;" {
+      span "table posts { title text required, body text }" style="display: block; color: #82aaff;"
+      span "security { login email password, protect /api/posts }" style="display: block; color: #c792ea;"
+      span " " style="display: block;"
+      span "preset card { bg #1a1a2e, r 12px, p 2rem }" style="display: block; color: #ffcb6b;"
+      span " " style="display: block;"
+      span "page / {" style="display: block; color: #82aaff;"
+      span "  h1 'My Blog'" style="display: block; padding-left: 1rem;"
+      span "  form /api/posts auth {" style="display: block; padding-left: 1rem; color: #c792ea;"
+      span "    input title, submit 'Post'" style="display: block; padding-left: 2rem; color: #c3e88d;"
+      span "    success -> reload" style="display: block; padding-left: 2rem; color: #f78c6c;"
+      span "  }" style="display: block; padding-left: 1rem;"
+      span "  data posts = get /api/posts auth" style="display: block; padding-left: 1rem; color: #c792ea;"
+      span "  each posts -> div preset=card {" style="display: block; padding-left: 1rem; color: #82aaff;"
+      span "    h3 .title" style="display: block; padding-left: 2rem;"
+      span "    p .body" style="display: block; padding-left: 2rem;"
+      span "  }" style="display: block; padding-left: 1rem;"
+      span "}" style="display: block; color: #82aaff;"
+    }
+    p "Database, JWT auth, CRUD API, reactive frontend. Zero config." style="text-align: center; color: #64748b; font-size: 0.9rem; margin-top: 1.25rem;"
+  }
+
+  div style="height: 1px; background: linear-gradient(90deg,transparent,rgba(102,126,234,0.2),transparent); margin: 2rem auto; max-width: 1200px;"
+
+  section style="max-width: 1200px; margin: 0 auto; padding: 2rem;" {
+    p "TOKEN EFFICIENCY" preset=label style="text-align: center; margin-bottom: 0.75rem;"
+    h2 "Less tokens = less cost = faster" style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 3rem;"
+    div grid=3 gap=1.5rem {
+      div preset=card style="text-align: center; border: 1px solid rgba(102,126,234,0.15);" {
+        p "-25%" style="font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg,#667eea,#764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
+        p "vs Tailwind" style="color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem;"
+        p "Static Sites" preset=label style="margin-top: 1rem;"
+      }
+      div preset=card style="text-align: center; border: 1px solid rgba(118,75,162,0.15);" {
+        p "-82%" style="font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg,#667eea,#f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
+        p "vs Next.js" style="color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem;"
+        p "Full-Stack Apps" preset=label style="margin-top: 1rem;"
+      }
+      div preset=card style="text-align: center; border: 1px solid rgba(240,147,251,0.15);" {
+        p "1" style="font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg,#764ba2,#f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
+        p "file, zero config" style="color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem;"
+        p "vs 12+ files" preset=label style="margin-top: 1rem;"
       }
     }
-    Stat number="68%" label="fewer lines than React"
-    Stat number="v0.2" label="with reactivity"
-    Stat number="0" label="config files needed"
-    Stat number="MIT" label="open source forever"
   }
 
-  section {
-    style {
-      display grid
-      grid-template-columns repeat(3, 1fr)
-      gap 1.5rem
-      padding 5rem 2rem
-      max-width 1000px
-      margin 0 auto
+  div style="height: 1px; background: linear-gradient(90deg,transparent,rgba(102,126,234,0.2),transparent); margin: 2rem auto; max-width: 1200px;"
 
-      @mobile {
-        grid-template-columns 1fr
+  section style="max-width: 1200px; margin: 0 auto; padding: 2rem;" {
+    p "FEATURES" preset=label style="text-align: center; margin-bottom: 0.75rem;"
+    h2 "Everything you need, nothing you don't" style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 3rem;"
+    div grid=2 gap=1.25rem {
+      div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
+        h3 "⚡ Instant Compile" style="font-size: 1.1rem; font-weight: 600;"
+        p "Milliseconds, not minutes. No webpack, no bundler, no waiting." style="color: #64748b; font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.6;"
+      }
+      div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
+        h3 "🗃 Built-in Database" style="font-size: 1.1rem; font-weight: 600;"
+        p "Define tables in your .nyx file. SQLite with WAL mode, auto-migrations." style="color: #64748b; font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.6;"
+      }
+      div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
+        h3 "🔐 Auth in One Line" style="font-size: 1.1rem; font-weight: 600;"
+        p "security { login email password }. JWT, bcrypt, middleware — all generated." style="color: #64748b; font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.6;"
+      }
+      div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
+        h3 "🎨 Style Presets" style="font-size: 1.1rem; font-weight: 600;"
+        p "Define once, use everywhere. CSS shorthands like bg, r, p, fs, fw — Tailwind-level brevity." style="color: #64748b; font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.6;"
+      }
+      div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
+        h3 "📄 Forms That Work" style="font-size: 1.1rem; font-weight: 600;"
+        p "form /api/posts auth { input title }. Fetch, JWT headers, error handling — done." style="color: #64748b; font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.6;"
+      }
+      div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
+        h3 "🧩 Components" style="font-size: 1.1rem; font-weight: 600;"
+        p "Shared layouts, reusable components, slot-based composition. Multi-file imports." style="color: #64748b; font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.6;"
       }
     }
-    Feature icon="⚡" title="State in 1 Line" description="state count = 0. Reactive, bindable, auto-updating."
-    Feature icon="🧩" title="Real Components" description="Import, reuse, compose. Props and scoped styles."
-    Feature icon="🎨" title="3-Tier Styling" description="Shorthand, style blocks, or raw CSS escape hatch."
-    Feature icon="🔒" title="Secure by Default" description="No eval. Auto-escape. CSRF. Tyto-approved."
-    Feature icon="🤖" title="Built for AI" description="60% less cost for AI coding platforms."
-    Feature icon="📦" title="Zero Config" description="File = route. No webpack. No tsconfig. Just .nyx."
   }
 
-  section {
-    style {
-      padding 5rem 2rem
-      max-width 500px
-      margin 0 auto
-      text-align center
-    }
-    h2 "Live Reactivity"
-    p "This counter is compiled from 6 lines of NyxCode."
+  div style="height: 1px; background: linear-gradient(90deg,transparent,rgba(102,126,234,0.2),transparent); margin: 2rem auto; max-width: 1200px;"
 
-    state clicks = 0
-    h1 clicks
-    button "+" -> clicks = clicks + 1
-    button "-" -> clicks = clicks - 1
-    button "Reset" -> clicks = 0
-  }
-
-  section {
-    style {
-      padding 5rem 2rem
-      max-width 800px
-      margin 0 auto
-      display grid
-      grid-template-columns repeat(2, 1fr)
-      gap 1.5rem
-
-      @mobile {
-        grid-template-columns 1fr
+  section style="max-width: 1200px; margin: 0 auto; padding: 2rem;" {
+    p "BUILT WITH NYXCODE" preset=label style="text-align: center; margin-bottom: 0.75rem;"
+    h2 "7 production sites and counting" style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 3rem;"
+    div grid=3 gap=1.25rem {
+      div style="padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); text-align: center; background: rgba(255,255,255,0.02);" {
+        a "nyxcode.io →" href="https://nyxcode.io" style="color: inherit; text-decoration: none; font-weight: 600;"
+      }
+      div style="padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); text-align: center; background: rgba(255,255,255,0.02);" {
+        a "demo.nyxcode.io →" href="https://demo.nyxcode.io" style="color: inherit; text-decoration: none; font-weight: 600;"
+      }
+      div style="padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); text-align: center; background: rgba(255,255,255,0.02);" {
+        a "fabianbudde.com →" href="https://fabianbudde.com" style="color: inherit; text-decoration: none; font-weight: 600;"
+      }
+      div style="padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); text-align: center; background: rgba(255,255,255,0.02);" {
+        a "rudel.fun →" href="https://rudel.fun" style="color: inherit; text-decoration: none; font-weight: 600;"
+      }
+      div style="padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); text-align: center; background: rgba(255,255,255,0.02);" {
+        a "heytyto.dev →" href="https://heytyto.dev" style="color: inherit; text-decoration: none; font-weight: 600;"
+      }
+      div style="padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); text-align: center; background: rgba(255,255,255,0.02);" {
+        a "heykiro.dev →" href="https://heykiro.dev" style="color: inherit; text-decoration: none; font-weight: 600;"
       }
     }
-    Testimonial quote="Security-as-Language-Constraint. You cant even WRITE insecure code." author="Tyto" role="Security Advisor"
-    Testimonial quote="Wir ham einfach eine eigene Sprache erfunden. In 2 Stunden." author="Fabian" role="Co-Creator"
-    Testimonial quote="First Molt = Lobster wirft Schale ab. Das ist perfekt." author="Kiro" role="Wolf of the Rudel"
-    Testimonial quote="Das Rudel baut Dinge die es noch nicht gibt." author="Nyx" role="Creator and Compiler"
   }
 
-  section {
-    style {
-      bg linear-gradient(135deg, #667eea, #764ba2)
-      padding 5rem 2rem
-      text-align center
-      color white
+  div style="height: 1px; background: linear-gradient(90deg,transparent,rgba(102,126,234,0.2),transparent); margin: 2rem auto; max-width: 1200px;"
+
+  section style="max-width: 700px; margin: 0 auto; padding: 2rem 2rem 6rem; text-align: center;" {
+    h2 "Start building in seconds" style="font-size: 2rem; font-weight: 700;"
+    p "Install NyxCode and build your first app." style="color: #64748b; margin-top: 0.75rem; margin-bottom: 2rem;"
+    pre style="background: #0d0d1a; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 1.5rem; font-family: monospace; font-size: 0.85rem; line-height: 1.7; text-align: left; color: #c8d6e5;" {
+      code "npm install -g @fabudde/nyxcode" 
+      code "nyxcode build app.nyx" 
     }
-    h2 "Start Building"
-    p "npx nyxcode build your-page.nyx"
+    div flex=row center gap=1rem style="margin-top: 2rem;" {
+      div { a "Documentation →" href="/docs" style="background: linear-gradient(135deg,#667eea,#764ba2); color: white; padding: 0.75rem 2rem; border-radius: 8px; font-weight: 600; text-decoration: none; display: inline-block;" }
+      div { a "GitHub" href="https://github.com/fabudde/nyxcode" style="color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1); padding: 0.75rem 2rem; border-radius: 8px; font-weight: 600; text-decoration: none; display: inline-block;" }
+    }
   }
 
-  footer {
-    style {
-      padding 2rem
-      text-align center
-      color #505070
-      font-size 0.8rem
-    }
-    p "Built with NyxCode by Nyx, Fabian and Tyto. MIT License."
+  footer style="border-top: 1px solid rgba(255,255,255,0.04); padding: 2rem; text-align: center;" {
+    p "Built with 🦞 by Nyx & Fabian — NyxCode v0.7.0 — MIT License" style="color: #475569; font-size: 0.8rem;"
   }
 }
