@@ -496,3 +496,149 @@ page / {
 
 ## Version
 v0.3.1 — Docs: https://nyxcode.io/docs/
+
+---
+
+## v0.6 Features
+
+### Forms — Zero JS Required
+```nyx
+form /api/posts auth {
+  input title placeholder="Post title" required
+  textarea body placeholder="Write something..."
+  submit "Publish"
+  success -> reload
+  error -> toast "Failed to publish"
+}
+```
+
+**What this generates:** `<form>` with styled inputs, `fetch()` POST with JSON body, JWT auth header from localStorage, success/error handling. Zero JavaScript written.
+
+**Form syntax:**
+- `form /api/endpoint` — POST to this URL
+- `form /api/endpoint auth` — include Bearer token from localStorage
+- `input fieldname placeholder="..." required` — text input (fieldname = JSON key)
+- `textarea fieldname placeholder="..."` — multiline input
+- `select fieldname` — dropdown
+- `submit "Button Text"` — submit button
+- `success -> reload` — reload page on success
+- `success -> redirect "/path"` — navigate on success
+- `success -> clear` — reset form + show "Done!"
+- `success -> toast "Message"` — show success message
+- `error -> toast "Message"` — show error message
+
+**Token comparison:**
+```
+# NyxCode v0.6 — 6 lines
+form /api/posts auth {
+  input title placeholder="Title" required
+  textarea body placeholder="Write..."
+  submit "Publish"
+  success -> reload
+}
+
+# Equivalent JS — 25+ lines of fetch(), headers, error handling
+```
+
+### Theme Variables
+```nyx
+theme {
+  colors {
+    primary #667eea
+    bg #0a0a12
+    card #1a1a2e
+    muted #888
+  }
+  spacing {
+    page 3rem 2rem
+  }
+}
+```
+
+**Generates CSS Custom Properties:**
+```css
+:root {
+  --colors-primary: #667eea;
+  --colors-bg: #0a0a12;
+  --colors-card: #1a1a2e;
+  --colors-muted: #888;
+  --spacing-page: 3rem 2rem;
+}
+```
+
+**Use anywhere:**
+```nyx
+style { bg var(--colors-bg), color var(--colors-primary) }
+h1 "Title" style="color: var(--colors-primary);"
+```
+
+### Script Block (Escape Hatch)
+```nyx
+script {
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('Custom JS here');
+  });
+}
+```
+**Rule:** Use `script {}` for edge cases only. 95% of apps should need zero script blocks. If you need script, consider if NyxCode should have a native feature for it instead.
+
+### Data with Auth
+```nyx
+data posts = get /api/posts auth
+```
+The `auth` keyword tells the compiler to include a Bearer token from localStorage in the fetch request. No manual header code needed.
+
+**Without auth:** `data posts = get /api/posts` — plain fetch
+**With auth:** `data posts = get /api/posts auth` — adds Authorization header
+
+### Complete Full-Stack Example with v0.6
+```nyx
+table posts {
+  title text required
+  body text
+  author text
+  created auto
+}
+
+security {
+  table users
+  login email password
+  token jwt
+  protect /api/posts
+}
+
+theme {
+  colors {
+    primary #667eea
+    bg #0a0a12
+    card #1a1a2e
+  }
+}
+
+page / {
+  style { bg var(--colors-bg) }
+  h1 "My Blog" style="color: var(--colors-primary);"
+
+  form /api/posts auth {
+    input title placeholder="Post title" required
+    textarea body placeholder="Write..."
+    submit "Publish"
+    success -> reload
+  }
+
+  data posts = get /api/posts auth
+  each posts -> post {
+    section {
+      style { bg var(--colors-card), radius 12px, padding 1.5rem, margin-bottom 1rem }
+      h3 .title style="color: #e0e0f0;"
+      p .body style="color: #888;"
+    }
+  }
+}
+```
+
+**30 lines. Database + Auth + Form + Theme + Data binding. One file.**
+
+## Version
+v0.6.0 — Forms, Theme Variables, Script Blocks, Data Auth
+Docs: https://nyxcode.io/docs/
