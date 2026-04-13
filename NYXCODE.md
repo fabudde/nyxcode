@@ -86,16 +86,25 @@ theme {
 ```
 Colors → `var(--colors-primary)`. Fonts auto-apply to headings/body.
 
-## Pages & Elements
+## Pages & Routing
 ```nyx
 page / { h1 "Home" }
 page /about { h1 "About" }
+page /blog { h1 "Blog" }
+```
+Each `page /path { }` = one route. Multi-page = separate HTML files (SSG).
 
+## Elements
+```nyx
 h1 "Title"
-p "Text" style="c: #888;"
-img src="/photo.jpg" alt="Photo"
+p "Text"
+span "Inline"
+link "Click" href="/about"
 button "Click" -> count = count + 1
-input placeholder="Name" bind=name
+input placeholder="Type..." bind=name
+select { option "A", option "B", option "C" }
+textarea placeholder="Write..."
+img src="/photo.jpg" alt="Photo"
 ```
 
 **⚠️ SIBLING RULE:** Two elements at same level merge. Wrap in `div { }`:
@@ -104,18 +113,47 @@ div { a "Home" href="/" }
 div { a "About" href="/about" }
 ```
 
-## Styling
+## Styling (3 Tiers)
+
+**Tier 1: Style blocks (90% of cases)**
 ```nyx
 section {
-  style { bg #1a1a2e, c white, p 2rem, r 12px }
+  style { bg #1a1a2e, c white, p 2rem, r 12px, d flex, gap 1rem }
   h1 "Styled"
 }
+```
 
-# Hover
-style { bg #667eea, hover { bg #5a6fd6, tf translateY(-2px) } }
+**Hover / Focus / Active:**
+```nyx
+style {
+  bg #667eea, c white
+  hover { bg #5a6fd6, tf translateY(-2px) }
+  focus { outline 2px solid #667eea }
+}
+```
 
-# Responsive
-style { p 4rem, @mobile { p 1rem } }
+**Responsive (@mobile = max 768px, @tablet = max 1024px):**
+```nyx
+style {
+  p 4rem, gtc repeat(3, 1fr)
+  @mobile { p 1rem, gtc 1fr }
+  @tablet { p 2rem, gtc repeat(2, 1fr) }
+}
+```
+
+**Tier 2: Animations**
+```nyx
+animate pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+```
+
+**Tier 3: Head CSS injection (global styles, fonts)**
+```nyx
+head "<style>@keyframes fade { from { opacity:0 } to { opacity:1 } }</style>"
+head "<link href='https://fonts.googleapis.com/css2?family=Inter&display=swap' rel='stylesheet'>"
 ```
 
 ## State
@@ -138,7 +176,26 @@ component Card {
 }
 Card title="Fast" desc="Milliseconds" icon="⚡"
 ```
-Default props: `props title color="#667eea"`. Slots: `slot` keyword.
+**Default props:**
+```nyx
+component Button {
+  props label color="#667eea" size="1rem"
+}
+Button label="Click"                    # Uses defaults
+Button label="Go" color="red"          # Override
+```
+
+**Slots (nested content):**
+```nyx
+component Modal {
+  props title
+  section {
+    div { h2 .title }
+    slot                                # Children inserted here
+  }
+}
+Modal title="Confirm" { p "Are you sure?", button "Yes" }
+```
 
 ## Layout
 ```nyx
@@ -150,6 +207,20 @@ layout {
 }
 ```
 
+## Imports (multi-file)
+```nyx
+use "./components.nyx"                  # Import components
+use "./layout.nyx"                      # Import layout
+```
+
+## Iteration & Conditionals
+```nyx
+each items -> item { div { h3 .name }, p .description }
+
+when loggedIn -> p "Welcome back!"
+else -> div { a "Login" href="/login" }
+```
+
 ## Forms
 ```nyx
 form /api/posts auth {
@@ -158,6 +229,32 @@ form /api/posts auth {
   success -> reload
   error -> toast "Failed"
 }
+```
+
+## Script Block (escape hatch)
+```nyx
+script {
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('Custom JS');
+  });
+}
+```
+Use only for edge cases. 95% of apps need zero script blocks.
+
+## Icons
+
+**Emoji (recommended):** `span "🦞" style="fs: 2rem;"`
+
+**Lucide:** `head "<link href='https://unpkg.com/lucide-static@latest/font/lucide.css' rel='stylesheet'>"` → `span "" class="icon-home"`
+
+**Font Awesome:** `head "<link href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css' rel='stylesheet'>"` → `span "" class="fa-solid fa-house"`
+
+**Material Icons:** `head "<link href='https://fonts.googleapis.com/icon?family=Material+Icons' rel='stylesheet'>"` → `span "home" class="material-icons"`
+
+## Head Injection
+```nyx
+head "<title>My Page</title>"
+head "<meta name='description' content='My app'>"
 ```
 
 ## Full-Stack Backend
@@ -181,6 +278,35 @@ Generates: register, login, JWT middleware, bcrypt, rate limiting.
 data posts = get /api/posts auth
 each posts -> div preset=card { h3 .title }
 ```
+
+## Common Mistakes
+
+```
+WRONG                                 RIGHT
+<div class="flex">                    section flex=row { }
+className="text-lg"                   style { fs 1.125rem }
+onClick={() => set(c+1)}              button "+" -> count = count + 1
+import React from 'react'            use "./component.nyx"
+export default function App()         page / {
+background-color: red;                bg red
+border-radius: 12px;                  r 12px
+font-size: 0.9rem;                    fs 0.9rem
+display: flex;                        d flex (or flex=row)
+{items.map(i => <li>{i}</li>)}        each items -> i { p .name }
+{show && <p>Hi</p>}                   when show -> p "Hi"
+```
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Style not applied | `style { }` must be INSIDE the element's `{ }` |
+| Component not found | Define components BEFORE pages |
+| Props not showing | Use `.propName` (dot prefix) inside component |
+| State not updating | Arrow syntax: `-> varName = expression` |
+| Elements merging | Wrap siblings in `div { }` |
+| Import not working | Relative paths: `use "./file.nyx"` |
+| Font commas break | Quote: `"Inter, sans-serif"` |
 
 ## AI Rules
 1. **USE SHORTHANDS** — `bg c p m r fs fw w h d op z`, never full names
