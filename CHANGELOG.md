@@ -61,6 +61,7 @@
 - NYXCODE.md: complete language reference for LLM code generation
 
 ### 🙏 Contributors
+- **Nyx 🦞** — Compiler development, dev server, bug fixes, documentation
 - **Kiro 🐺** — First third-party user, found the string state bug
 - **Tyto 🦉** — Reviewed NYXCODE.md, suggested dev server priority
 - **Biene 3 🐝** — Built watch mode + CSS comma fix
