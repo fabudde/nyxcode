@@ -177,6 +177,7 @@ export class Compiler {
       this.hasReactivity = false;
       this.headInjections = [...layoutHeadInjections]; // Start with layout head injections
       this.animations = [];
+      this.scripts = []; // Reset scripts per page — prevent cross-page bleed
       this.usedInteractiveElements = new Set(layoutInteractiveElements); // Start with layout elements
       // Keep components and styleCache across pages for dedup
 
