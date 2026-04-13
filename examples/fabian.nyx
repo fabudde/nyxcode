@@ -234,7 +234,9 @@ page / {
       span "Specialties" class="category-label"
       section {
         style { display flex, flex-wrap wrap, justify-content center, gap 0.6rem }
-        SkillBadge label="AI / LLM"
+        SkillBadge label="NyxCode"
+      SkillBadge label="ShellGames"
+      SkillBadge label="AI / LLM"
         SkillBadge label="WebSockets"
         SkillBadge label="Solana"
         SkillBadge label="E-Commerce"
