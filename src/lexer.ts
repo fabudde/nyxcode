@@ -237,6 +237,67 @@ export class Lexer {
 
     // Check if it's a keyword
     const type = KEYWORDS[value] ?? TokenType.Identifier;
+    
+    // Special: script keyword — capture raw content between { and matching }
+    if (type === TokenType.Script) {
+      // Skip whitespace
+      while (this.pos < this.source.length && /\s/.test(this.source[this.pos])) {
+        if (this.source[this.pos] === '\n') this.line++;
+        this.pos++;
+      }
+      if (this.pos < this.source.length && this.source[this.pos] === '{') {
+        this.pos++; // skip opening {
+        let depth = 1;
+        let raw = '';
+        while (this.pos < this.source.length && depth > 0) {
+          const ch = this.source[this.pos];
+          // Skip string literals (don't count braces inside strings)
+          if (ch === "'" || ch === '"' || ch === '`') {
+            const quote = ch;
+            raw += ch;
+            this.pos++;
+            while (this.pos < this.source.length && this.source[this.pos] !== quote) {
+              if (this.source[this.pos] === '\\') {
+                raw += this.source[this.pos];
+                this.pos++;
+                if (this.pos < this.source.length) {
+                  raw += this.source[this.pos];
+                  this.pos++;
+                }
+                continue;
+              }
+              if (this.source[this.pos] === '\n') this.line++;
+              raw += this.source[this.pos];
+              this.pos++;
+            }
+            if (this.pos < this.source.length) {
+              raw += this.source[this.pos]; // closing quote
+              this.pos++;
+            }
+            continue;
+          }
+          // Skip single-line comments
+          if (ch === '/' && this.pos + 1 < this.source.length && this.source[this.pos + 1] === '/') {
+            while (this.pos < this.source.length && this.source[this.pos] !== '\n') {
+              raw += this.source[this.pos];
+              this.pos++;
+            }
+            continue;
+          }
+          if (ch === '{') depth++;
+          else if (ch === '}') {
+            depth--;
+            if (depth === 0) { this.pos++; break; }
+          }
+          if (ch === '\n') this.line++;
+          raw += ch;
+          this.pos++;
+        }
+        this.tokens.push({ type: TokenType.Script, value: raw.trim(), line: this.line, col: startCol });
+        return;
+      }
+    }
+    
     this.tokens.push({ type, value, line: this.line, col: startCol });
   }
 

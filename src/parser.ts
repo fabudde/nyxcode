@@ -830,28 +830,8 @@ export class Parser {
    */
   private parseScript(): ScriptStatement {
     const start = this.consume(TokenType.Script);
-    this.consume(TokenType.LeftBrace);
-    
-    // Collect raw content until matching closing brace
-    let content = '';
-    let depth = 1;
-    while (depth > 0 && !this.isAtEnd()) {
-      const tok = this.advance();
-      if (tok.type === TokenType.LeftBrace as any) depth++;
-      else if (tok.type === TokenType.RightBrace as any) {
-        depth--;
-        if (depth === 0) break;
-      }
-      // Reconstruct the source text
-      if (tok.type === TokenType.String as any) {
-        content += '"' + tok.value.replace(/"/g, '\\"') + '"';
-      } else {
-        content += tok.value;
-      }
-      content += ' ';
-    }
-    
-    return { type: 'Script', content: content.trim(), line: start.line, col: start.col };
+    // Lexer already captured raw content between { }, no brace consumption needed
+    return { type: 'Script', content: start.value, line: start.line, col: start.col };
   }
 
     private parseAuth(): AuthStatement {
