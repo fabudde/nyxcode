@@ -200,6 +200,7 @@ page / {
         SkillBadge label="PHP"
         SkillBadge label="Rust"
         SkillBadge label="SQL"
+        SkillBadge label="NyxCode"
       }
     }
 
@@ -213,6 +214,7 @@ page / {
         SkillBadge label="Node.js"
         SkillBadge label="MedusaJS"
         SkillBadge label="Shopware 6"
+        SkillBadge label="ForkCart"
       }
     }
 
@@ -234,8 +236,6 @@ page / {
       span "Specialties" class="category-label"
       section {
         style { display flex, flex-wrap wrap, justify-content center, gap 0.6rem }
-        SkillBadge label="NyxCode"
-      SkillBadge label="ForkCart"
       SkillBadge label="AI / LLM"
         SkillBadge label="WebSockets"
         SkillBadge label="Solana"
