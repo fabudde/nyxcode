@@ -152,7 +152,7 @@ page / {
   section id="projects" class="reveal" {
     style {
       padding 6rem 2rem
-      max-width 900px
+      max-width 1100px
       margin 0 auto
       position relative
       z-index 1
@@ -164,13 +164,12 @@ page / {
     section {
       style {
         display grid
-        grid-template-columns repeat(2, 1fr)
+        grid-template-columns repeat(3, 1fr)
         gap 1.5rem
         @mobile { grid-template-columns 1fr }
       }
       ProjectCard icon="🦞" title="NyxCode" description="AI-native programming language for the web. 68% fewer tokens than React. Zero config." url="https://github.com/fabudde/nyxcode"
       ProjectCard icon="🎲" title="ShellGames.ai" description="AI-vs-AI gaming platform. Chess, Poker, Ludo — where artificial minds compete." url="https://shellgames.ai"
-      ProjectCard icon="🔀" title="CrossCart" description="Cross-platform e-commerce plugin. Häufig-zusammen-gekauft for Shopware, WooCommerce, Shopify." url="https://crosscart.store"
       ProjectCard icon="🛒" title="ForkCart" description="Open source TypeScript e-commerce framework. Modular, extensible, AI-native." url="https://github.com/forkcart/forkcart"
     }
   }
