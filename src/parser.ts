@@ -219,33 +219,7 @@ export class Parser {
           if (this.check(TokenType.Comma)) this.advance();
           continue;
         }
-        // Collect value: everything until next key or closing brace
-        // Handles rgba(255,255,255,0.06), multi-word values, etc.
-        let valueParts: string[] = [];
-        let parenDepth = 0;
-        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-          const next = this.peek();
-          // Track paren depth for rgba(...) etc.
-          if (next.value === '(') parenDepth++;
-          if (next.value === ')') parenDepth--;
-          // Outside parens: if we see an identifier that looks like a new key, stop
-          if (parenDepth <= 0 && next.type === TokenType.Identifier && valueParts.length > 0) {
-            const nextNext = this.tokens[this.pos + 1];
-            if (!nextNext || nextNext.value !== '(') break;
-          }
-          // Commas inside parens are part of the value
-          if (next.type === TokenType.Comma) {
-            if (parenDepth > 0) {
-              valueParts.push(this.advance().value);
-              continue;
-            } else {
-              this.advance(); // skip entry separator
-              break;
-            }
-          }
-          valueParts.push(this.advance().value);
-        }
-        entries[key] = valueParts.join('');
+        entries[key] = this.collectCSSValue();
       }
 
       this.consume(TokenType.RightBrace);
@@ -836,6 +810,35 @@ export class Parser {
    * Parse `script { ... }` — raw JavaScript block.
    * Content between braces is raw JS, no escaping.
    */
+  /**
+   * Collect a CSS value from the token stream, handling:
+   * - Function calls: var(), rgba(), calc()
+   * - Comma-separated values inside parens
+   * - String literals as complete values
+   * Returns when it hits the next property name or closing brace.
+   */
+  private collectCSSValue(): string {
+    // String literal = complete value
+    if (this.peek().type === TokenType.String) {
+      return this.advance().value;
+    }
+    let parts: string[] = [];
+    let parenDepth = 0;
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      const next = this.peek();
+      if (next.type === TokenType.LeftParen) { parenDepth++; this.advance(); parts.push('('); continue; }
+      if (next.type === TokenType.RightParen) { parenDepth = Math.max(0, parenDepth - 1); this.advance(); parts.push(')'); continue; }
+      if (parenDepth > 0) { parts.push(this.advance().value); continue; }
+      if (next.type === TokenType.Comma) { this.advance(); break; }
+      if (next.type === TokenType.Identifier && parts.length > 0) {
+        const after = this.tokens[this.pos + 1];
+        if (!after || after.type !== TokenType.LeftParen) break;
+      }
+      parts.push(this.advance().value);
+    }
+    return parts.join('');
+  }
+
   private parsePreset(): any {
     const start = this.consume(TokenType.Preset);
     const name = this.consumeIdentifier();
@@ -844,22 +847,8 @@ export class Parser {
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       if (this.peek().type !== TokenType.Identifier) break;
       const prop = this.advance().value;
-      let valueParts: string[] = [];
-      let parenDepth = 0;
-      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-        const next = this.peek();
-        if (next.type === TokenType.LeftParen) { parenDepth++; this.advance(); valueParts.push('('); continue; }
-        if (next.type === TokenType.RightParen) { parenDepth = Math.max(0, parenDepth - 1); this.advance(); valueParts.push(')'); continue; }
-        if (parenDepth > 0) { valueParts.push(this.advance().value); continue; }
-        if (next.type === TokenType.Comma) { this.advance(); break; }
-        if (next.type === TokenType.Identifier && valueParts.length > 0) {
-          const after = this.tokens[this.pos + 1];
-          if (after && after.type === TokenType.LeftParen) { valueParts.push(this.advance().value); continue; }
-          break;
-        }
-        valueParts.push(this.advance().value);
-      }
-      if (valueParts.length > 0) styles.push({ name: prop, value: valueParts.join('') });
+      const value = this.collectCSSValue();
+      if (value) styles.push({ name: prop, value });
     }
     this.consume(TokenType.RightBrace);
     return { type: 'Preset', name, styles, line: start.line, col: start.col };
