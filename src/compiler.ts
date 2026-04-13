@@ -13,7 +13,7 @@
 import {
   Program, TopLevelNode, PageNode, ComponentNode, Statement,
   DataStatement, EachStatement, WhenStatement, StyleBlock,
-  FormStatement, AuthStatement, ElementNode, Expression,
+  FormStatement, AuthStatement, ElementNode, Expression, ScriptStatement,
   StyleProperty, ResponsiveBlock, Attribute, PseudoElementBlock,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
   HeadStatement, AnimateStatement, LayoutNode,
@@ -51,6 +51,8 @@ export class Compiler {
   private components: Map<string, ComponentNode> = new Map();
   private importResolver?: (path: string) => Program | null;
   private headInjections: string[] = [];
+  private themeVars: Map<string, string> = new Map();
+  private scripts: string[] = [];
   private animations: string[] = [];
   private styleCache: Map<string, string> = new Map(); // hash -> className for dedup
   private staticMode: boolean = false; // When true, don't emit data-navigate on links
@@ -122,6 +124,12 @@ export class Compiler {
       this.components.set(comp.name, comp);
     }
 
+    // Process theme blocks — generate CSS custom properties
+    const themes = program.body.filter(n => n.type === 'Theme');
+    for (const theme of themes) {
+      this.compileTheme(theme);
+    }
+
     // If we have a layout, compile its CSS once (shared across all pages)
     // and cache the layout HTML template with <!--SLOT--> placeholder
     let layoutCssBlocks: string[] = [];
@@ -133,6 +141,7 @@ export class Compiler {
       this.css = [];
       this.js = [];
       this.headInjections = [];
+      this.scripts = [];
       this.usedInteractiveElements = new Set();
       this.componentId = 0;
       this.indent = 0;
@@ -226,6 +235,11 @@ export class Compiler {
     // Register inline components too
     for (const comp of components) {
       this.components.set(comp.name, comp);
+    }
+
+    // Process theme blocks
+    for (const node of program.body) {
+      if (node.type === 'Theme') this.compileTheme(node);
     }
 
     // Multi-page: compile ALL pages
@@ -395,7 +409,7 @@ export class Compiler {
     ${renderCalls}
   }` : '') + `
 ` + reactiveRuntime + `
-  </script>` : '') + `
+  </script>` : '') + (this.scripts.length > 0 ? `\n<script>${this.scripts.join(';')}</script>` : '') + `
 </body>
 </html>`;
   }
@@ -466,6 +480,7 @@ export class Compiler {
       case 'When': return this.compileWhen(stmt);
       case 'Style': return this.compileStyle(stmt);
       case 'Form': return this.compileForm(stmt);
+      case 'Script': this.scripts.push((stmt as ScriptStatement).content); return '';
       case 'Auth': return ''; // Auth is handled at build level
       case 'On': return ''; // Events compiled with their parent element
       case 'State': return this.compileState(stmt as StateStatement);
@@ -696,7 +711,9 @@ export class Compiler {
   let ${name} = [];
   async function load_${name}() {
     try {
-      const res = await fetch('${source.value}');
+      const headers = {};
+      ${source.auth ? "const tk=localStorage.getItem('token');if(tk)headers['Authorization']='Bearer '+tk;" : ''}
+      const res = await fetch('${source.value}', { headers });
       ${name} = await res.json();
       render();
     } catch(e) {
@@ -879,32 +896,130 @@ export class Compiler {
     return ''; // Style is applied via class, not inline
   }
 
+
+  private compileTheme(theme: any): void {
+    for (const section of theme.sections) {
+      for (const [key, value] of Object.entries(section.entries)) {
+        this.themeVars.set(`${section.name}-${key}`, value as string);
+      }
+    }
+    // Generate CSS custom properties
+    if (this.themeVars.size > 0) {
+      let css = ':root{';
+      for (const [key, value] of this.themeVars) {
+        css += `--${key}:${value};`;
+      }
+      css += '}';
+      this.headInjections.push(`<style>${css}</style>`);
+    }
+  }
+
   // --- Form compilation ---
 
   private compileForm(form: FormStatement): string {
-    let html = `${this.ind()}<form id="form-${form.name}">\n`;
+    const formId = 'form-' + form.name;
+    let html = `${this.ind()}<form id="${formId}">\n`;
     this.indent++;
 
     for (const stmt of form.body) {
       if (stmt.type === 'Element') {
         const el = stmt as ElementNode;
-        if (el.tag === 'input') {
-          // Just compile as a normal element — attributes handle everything
-          html += this.compileElement(el);
-        } else if (el.tag === 'textarea') {
-          html += this.compileElement(el);
-        } else if (el.tag === 'submit') {
+        // Extract field name from content, add ID, suppress content rendering
+        if (el.tag === 'input' || el.tag === 'textarea' || el.tag === 'select') {
+          const nameAttr = el.attributes.find((a: any) => a.name === 'name');
+          let fieldName = '';
+          if (nameAttr) {
+            fieldName = typeof nameAttr.value === 'string' ? nameAttr.value : (nameAttr.value as any).value || '';
+          } else if (el.content) {
+            if (typeof el.content === 'string') fieldName = el.content;
+            else if ((el.content as any).type === 'Identifier') fieldName = (el.content as any).name;
+            else if ((el.content as any).type === 'StringLiteral') fieldName = (el.content as any).value;
+          }
+          // Strip content so it doesn't render as value=""
+          if (el.content && (el.content as any).type === 'Identifier') {
+            (el as any)._fieldName = fieldName; // save for later
+            el.content = undefined as any;
+          }
+          if (fieldName && !el.attributes.find((a: any) => a.name === 'id')) {
+            el.attributes.push({ name: 'id', value: formId + '-' + fieldName });
+          }
+          if (fieldName && !el.attributes.find((a: any) => a.name === 'name')) {
+            el.attributes.push({ name: 'name', value: fieldName });
+          }
+        }
+        if (el.tag === 'submit') {
           const text = (el.content && typeof el.content !== 'string' && el.content.type === 'StringLiteral') ? (el.content as any).value : 'Submit';
-          html += `${this.ind()}<button type="submit">${text}</button>\n`;
+          html += `${this.ind()}<button type="submit" class="btn-p">${text}</button>\n`;
         } else {
           html += this.compileElement(el);
         }
+      } else if (stmt.type === 'Style') {
+        html += this.compileStyle(stmt as any);
       }
     }
 
+    // Add feedback element
+    html += `${this.ind()}<div id="${formId}-msg" class="form-msg"></div>\n`;
+
     this.indent--;
     html += `${this.ind()}</form>\n`;
+
+    // Generate form submission JS
+    if (form.action) {
+      const successCode = this.compileFormAction(form.onSuccess || { kind: 'clear' });
+      const errorCode = this.compileFormAction(form.onError || { kind: 'toast', value: 'Error' }, true);
+      
+      const authHeader = form.auth 
+        ? "var tk=localStorage.getItem('token');if(tk)h['Authorization']='Bearer '+tk;" 
+        : '';
+      
+      const fields: string[] = [];
+      for (const s of form.body) {
+        if (s.type !== 'Element') continue;
+        const el = s as ElementNode;
+        if (el.tag !== 'input' && el.tag !== 'textarea' && el.tag !== 'select') continue;
+        // Field name comes from name attr or _fieldName (set during form compilation)
+        const nameAttr = el.attributes.find((a: any) => a.name === 'name');
+        let fieldName = (el as any)._fieldName || '';
+        if (nameAttr) {
+          fieldName = typeof nameAttr.value === 'string' ? nameAttr.value : (nameAttr.value as any).value || '';
+        } else if (!fieldName && el.content) {
+          if (typeof el.content === 'string') fieldName = el.content;
+          else if ((el.content as any).type === 'Identifier') fieldName = (el.content as any).name;
+          else if ((el.content as any).type === 'StringLiteral') fieldName = (el.content as any).value;
+        }
+        if (fieldName) fields.push(fieldName);
+      }
+
+      // Build body from input IDs  
+      const bodyParts = fields.map((f: string) => "'" + f + "':document.getElementById('" + formId + "-" + f + "').value").join(',');
+      
+      this.scripts.push(
+        `document.getElementById('${formId}').onsubmit=async function(e){e.preventDefault();` +
+        `var h={'Content-Type':'application/json'};${authHeader}` +
+        `var msg=document.getElementById('${formId}-msg');` +
+        `try{var r=await fetch('${form.action}',{method:'POST',headers:h,body:JSON.stringify({${bodyParts}})});` +
+        `var d=await r.json();if(r.ok){${successCode}}else{msg.textContent=d.error||'Error';msg.style.color='#f06'}}` +
+        `catch(err){${errorCode}}}`
+      );
+      
+      // Add IDs to form inputs
+      html = html.replace(/<(input|textarea|select)/g, (match: string) => {
+        return match; // IDs are handled via name attributes
+      });
+    }
+
     return html;
+  }
+
+  private compileFormAction(action: { kind: string; value?: string }, isError = false): string {
+    switch (action.kind) {
+      case 'reload': return 'location.reload()';
+      case 'redirect': return "location.href='" + (action.value || '/') + "'";
+      case 'clear': return "this.reset();msg.textContent='Done!';msg.style.color='#4ade80'";
+      case 'toast': return "msg.textContent='" + (action.value || (isError ? 'Error' : 'Done!')) + "';msg.style.color='" + (isError ? '#f06' : '#4ade80') + "'";
+      default: return '';
+    }
   }
 
   // --- Component compilation ---
@@ -1328,6 +1443,7 @@ ${js}${renderCalls ? `
   }` : ''}
 ${reactiveRuntime}
   </script>` : ''}
+${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : ''}
 </body>
 </html>`;
   }

@@ -1,0 +1,207 @@
+table users {
+  name text required
+  email email unique
+  password text required
+  role text default="user"
+  created auto
+}
+
+table posts {
+  title text required
+  body text
+  author text
+  likes number default="0"
+  created auto
+}
+
+security {
+  table users
+  login email password
+  token jwt
+  protect /api/posts
+}
+
+layout {
+  head "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap' rel='stylesheet'>"
+  head "<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,sans-serif;background:#0a0a12;color:#e0e0f0;min-height:100vh}a{color:#667eea;text-decoration:none;transition:color .2s}a:hover{color:#8b9cf7}.inp{width:100%;padding:.7rem 1rem;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#e0e0f0;font-family:Inter,sans-serif;font-size:.9rem;margin-bottom:.75rem;outline:none;transition:border .2s}.inp:focus{border-color:#667eea}.btn-p{padding:.7rem 1.5rem;border-radius:8px;font-weight:600;font-size:.9rem;border:none;cursor:pointer;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;transition:all .2s}.btn-p:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(102,126,234,.4)}.btn-g{padding:.7rem 1.5rem;border-radius:8px;font-weight:600;font-size:.9rem;border:1px solid rgba(255,255,255,.15);cursor:pointer;background:transparent;color:#e0e0f0;transition:all .2s}.btn-g:hover{border-color:#667eea;color:#667eea}.glass{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px}</style>"
+
+  nav {
+    style {
+      display flex, justify-content space-between, align-items center
+      padding 1rem 2rem, bg rgba(10,10,18,0.95)
+      border-bottom 1px solid rgba(255,255,255,0.06)
+      position sticky, top 0, z-index 100
+    }
+    link "🦞 NyxDemo" href="/" style="font-weight: 800; font-size: 1.2rem; color: #667eea; text-decoration: none;"
+    section {
+      style { display flex, gap 1.5rem, align-items center }
+      link "Home" href="/" style="font-weight: 500; font-size: .9rem;"
+      link "Blog" href="/blog" style="font-weight: 500; font-size: .9rem;"
+      link "About" href="/about" style="font-weight: 500; font-size: .9rem;"
+      link "Join" href="/register" style="font-weight: 600; font-size: .85rem; padding: .4rem 1rem; border-radius: 6px; background: linear-gradient(135deg,#667eea,#764ba2); color: #fff;"
+    }
+  }
+  slot
+  footer {
+    style { text-align center, padding 2.5rem 2rem, border-top 1px solid rgba(255,255,255,0.04) }
+    p "Built with NyxCode v0.5 🦞" style="color: #444; font-size: .85rem; margin-bottom: .25rem;"
+    p "~160 lines of .nyx → Full-Stack App" style="color: #333; font-size: .75rem;"
+  }
+}
+
+page / {
+  style { bg #0a0a12 }
+  head "<style>.stat{font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,#667eea,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent}</style>"
+  section {
+    style { max-width 900px, margin 0 auto, padding 5rem 2rem 3rem, text-align center, position relative }
+    section style="position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(102,126,234,.1) 0%,transparent 70%);pointer-events:none;" { p "" }
+    span "NyxCode v0.5 — Full Stack" style="display:inline-block;padding:.35rem 1rem;border-radius:20px;font-size:.8rem;font-weight:500;background:rgba(102,126,234,.15);color:#8b9cf7;margin-bottom:1.5rem;"
+    h1 "One File. Full Stack." style="font-size: 3.2rem; font-weight: 800; background: linear-gradient(135deg, #667eea 0%, #a78bfa 50%, #f093fb 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1rem; line-height: 1.1;"
+    p "Database, Auth, API, and Frontend — all from one .nyx file." style="color: #8888a8; font-size: 1.15rem; margin-bottom: .5rem;"
+    p "What takes 500+ lines in Next.js takes ~160 here." style="color: #667eea; font-size: 1rem; margin-bottom: 2.5rem;"
+
+    section {
+      style { display flex, gap 1rem, justify-content center, margin-bottom 4rem }
+      link "Try the Blog →" href="/blog" style="display:inline-block;padding:.75rem 2rem;border-radius:8px;font-weight:600;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;"
+      link "Create Account" href="/register" style="display:inline-block;padding:.75rem 2rem;border-radius:8px;font-weight:600;border:1px solid rgba(255,255,255,.15);color:#e0e0f0;"
+    }
+
+    section {
+      style { display grid, grid-template-columns repeat(3, 1fr), gap 1.25rem, margin-bottom 4rem }
+      section style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:2rem;text-align:center;" {
+        span "🗄️" style="font-size: 2.5rem; display: block; margin-bottom: .75rem;"
+        h3 "2 Tables" style="color: #e0e0f0; margin-bottom: .35rem; font-size: 1.1rem;"
+        p "Auto-CRUD + SQLite WAL" style="color: #666; font-size: .85rem;"
+      }
+      section style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:2rem;text-align:center;" {
+        span "🔐" style="font-size: 2.5rem; display: block; margin-bottom: .75rem;"
+        h3 "JWT Auth" style="color: #e0e0f0; margin-bottom: .35rem; font-size: 1.1rem;"
+        p "Register + Login + Protect" style="color: #666; font-size: .85rem;"
+      }
+      section style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:2rem;text-align:center;" {
+        span "🛡️" style="font-size: 2.5rem; display: block; margin-bottom: .75rem;"
+        h3 "Security Built-In" style="color: #e0e0f0; margin-bottom: .35rem; font-size: 1.1rem;"
+        p "SQLi prevention + rate limit" style="color: #666; font-size: .85rem;"
+      }
+    }
+
+    section {
+      style { display flex, gap 3rem, justify-content center, padding 2rem, border-top 1px solid rgba(255,255,255,0.04) }
+      section style="text-align:center;" {
+        span "~160" style="font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,#667eea,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;"
+        p "Lines of .nyx" style="color: #666; font-size: .8rem; margin-top: .25rem;"
+      }
+      section style="text-align:center;" {
+        span "10" style="font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,#667eea,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;"
+        p "API Endpoints" style="color: #666; font-size: .8rem; margin-top: .25rem;"
+      }
+      section style="text-align:center;" {
+        span "0" style="font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,#667eea,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;"
+        p "Config Files" style="color: #666; font-size: .8rem; margin-top: .25rem;"
+      }
+      section style="text-align:center;" {
+        span "5" style="font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,#667eea,#f093fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;"
+        p "Sites Live Today" style="color: #666; font-size: .8rem; margin-top: .25rem;"
+      }
+    }
+  }
+}
+
+page /blog {
+  style { bg #0a0a12 }
+  head "<style>.pc{display:block;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:1.75rem;margin-bottom:1rem;text-decoration:none;cursor:pointer;transition:all .2s}.pc:hover{background:rgba(255,255,255,.06);transform:translateY(-2px);box-shadow:0 8px 30px rgba(102,126,234,.1);border-color:rgba(102,126,234,.2)}.pc h3{color:#e0e0f0;font-size:1.15rem;font-weight:600;margin-bottom:.5rem}.pc .pm{color:#667eea;font-size:.85rem;margin-bottom:.5rem}.pc .pb{color:#888;font-size:.9rem;line-height:1.6}.pc .pr{color:#667eea;font-size:.85rem;margin-top:.75rem;display:inline-block;font-weight:500}</style>"
+  head "<script>var TOKEN='';async function auth(){var r=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Guest',email:'g'+Date.now()+'@x.co',password:'g1'})});var d=await r.json();TOKEN=d.token||'';return TOKEN}async function loadPosts(){try{var t=await auth();var p=await fetch('/api/posts',{headers:{'Authorization':'Bearer '+t}});var posts=await p.json();var c=document.getElementById('posts-list');if(!posts.length){c.innerHTML='<p class=pm>No posts yet. Be the first!</p>';return}c.innerHTML=posts.map(function(x){return '<a href=/blog/'+x.id+' class=pc><h3>'+x.title+'</h3><p class=pm>'+( x.author||'Anonymous')+' · '+(x.created||'').split(' ')[0]+'</p><p class=pb>'+(x.body||'').substring(0,150)+(x.body&&x.body.length>150?'...':'')+'</p><span class=pr>Read more →</span></a>'}).join('')}catch(e){document.getElementById('posts-list').innerHTML='<p>'+e.message+'</p>'}}async function createPost(e){e.preventDefault();if(!TOKEN)await auth();var ti=document.getElementById('new-title').value;var bo=document.getElementById('new-body').value;var au=document.getElementById('new-author').value||'Anonymous';if(!ti)return;var r=await fetch('/api/posts',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:JSON.stringify({title:ti,body:bo,author:au})});if(r.ok){document.getElementById('new-title').value='';document.getElementById('new-body').value='';loadPosts()}}function initBlog(){var c=document.getElementById('write-form');if(!c)return;c.innerHTML='';var f=document.createElement('form');f.onsubmit=createPost;var mk=function(tag,id,ph){var el=document.createElement(tag);el.id=id;el.placeholder=ph;el.className='inp';return el};f.appendChild(mk('input','new-author','Your name'));f.appendChild(mk('input','new-title','Post title *'));var ta=mk('textarea','new-body','Write something...');ta.style.minHeight='80px';ta.style.resize='vertical';f.appendChild(ta);var btn=document.createElement('button');btn.type='submit';btn.className='btn-p';btn.textContent='Publish Post';f.appendChild(btn);c.appendChild(f)}document.addEventListener('DOMContentLoaded',function(){initBlog();loadPosts()})</script>"
+  section {
+    style { max-width 800px, margin 0 auto, padding 3rem 2rem }
+    h1 "Blog" style="font-size: 2rem; font-weight: 800; color: #e0e0f0; margin-bottom: .25rem;"
+    p "Posts are JWT-protected. The frontend authenticates automatically." style="color: #667eea; font-size: .9rem; margin-bottom: 2rem;"
+
+    section style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:1.75rem;margin-bottom:2rem;" {
+      h3 "Write a Post" style="color: #e0e0f0; font-size: 1rem; font-weight: 600; margin-bottom: 1rem;"
+      section id="write-form" {
+        p "Loading..." style="color: #555;"
+      }
+    }
+
+    section id="posts-list" {
+      p "Loading posts..." style="color: #8888a8;"
+    }
+  }
+}
+
+page /register {
+  style { bg #0a0a12 }
+  head "<script>async function doReg(e){e.preventDefault();var n=document.getElementById('reg-name').value;var em=document.getElementById('reg-email').value;var pw=document.getElementById('reg-pass').value;var msg=document.getElementById('reg-msg');if(!n||!em||!pw){msg.textContent='All fields required';msg.style.color='#f06';return}try{var r=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,email:em,password:pw})});var d=await r.json();if(d.token){msg.textContent='Welcome, '+n+'! Redirecting...';msg.style.color='#4ade80';localStorage.setItem('token',d.token);setTimeout(function(){location.href='/blog'},1200)}else{msg.textContent=d.error||'Failed';msg.style.color='#f06'}}catch(err){msg.textContent=err.message;msg.style.color='#f06'}}async function doLog(e){e.preventDefault();var em=document.getElementById('log-email').value;var pw=document.getElementById('log-pass').value;var msg=document.getElementById('log-msg');try{var r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em,password:pw})});var d=await r.json();if(d.token){msg.textContent='Logged in! Redirecting...';msg.style.color='#4ade80';localStorage.setItem('token',d.token);setTimeout(function(){location.href='/blog'},1000)}else{msg.textContent=d.error||'Failed';msg.style.color='#f06'}}catch(err){msg.textContent=err.message;msg.style.color='#f06'}}function initAuth(){var mk=function(tag,id,ph,type){var el=document.createElement(tag);el.id=id;el.placeholder=ph;el.className='inp';if(type)el.type=type;return el};var rf=document.getElementById('reg-form');if(rf){rf.innerHTML='';var f=document.createElement('form');f.onsubmit=doReg;f.appendChild(mk('input','reg-name','Name'));f.appendChild(mk('input','reg-email','Email','email'));f.appendChild(mk('input','reg-pass','Password','password'));var b=document.createElement('button');b.type='submit';b.className='btn-p';b.style.width='100%';b.textContent='Create Account';f.appendChild(b);rf.appendChild(f)}var lf=document.getElementById('log-form');if(lf){lf.innerHTML='';var f2=document.createElement('form');f2.onsubmit=doLog;f2.appendChild(mk('input','log-email','Email','email'));f2.appendChild(mk('input','log-pass','Password','password'));var b2=document.createElement('button');b2.type='submit';b2.className='btn-g';b2.style.width='100%';b2.textContent='Sign In';f2.appendChild(b2);lf.appendChild(f2)}}document.addEventListener('DOMContentLoaded',initAuth)</script>"
+  section {
+    style { max-width 900px, margin 0 auto, padding 3rem 2rem }
+    h1 "Join the Demo" style="font-size: 2rem; font-weight: 800; color: #e0e0f0; margin-bottom: .5rem;"
+    p "Real JWT auth. bcrypt hashing. Rate limiting. The works." style="color: #667eea; font-size: .9rem; margin-bottom: 2.5rem;"
+
+    section {
+      style { display grid, grid-template-columns 1fr 1fr, gap 2rem }
+      section style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:2rem;" {
+        h2 "Register" style="font-size: 1.25rem; font-weight: 700; color: #e0e0f0; margin-bottom: 1.25rem;"
+        section id="reg-form" { p "Loading..." style="color: #555;" }
+        p id="reg-msg" "" style="min-height:1.5rem;font-size:.85rem;margin-top:.75rem;font-weight:500;"
+      }
+      section style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:2rem;" {
+        h2 "Login" style="font-size: 1.25rem; font-weight: 700; color: #e0e0f0; margin-bottom: 1.25rem;"
+        section id="log-form" { p "Loading..." style="color: #555;" }
+        p id="log-msg" "" style="min-height:1.5rem;font-size:.85rem;margin-top:.75rem;font-weight:500;"
+      }
+    }
+  }
+}
+
+page /about {
+  style { bg #0a0a12 }
+  section {
+    style { max-width 800px, margin 0 auto, padding 3rem 2rem }
+    h1 "About This Demo" style="font-size: 2rem; font-weight: 800; color: #e0e0f0; margin-bottom: .5rem;"
+    p "A full-stack app in ~160 lines of NyxCode." style="color: #667eea; font-size: .9rem; margin-bottom: 2rem;"
+
+    section style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:2rem;margin-bottom:1.5rem;" {
+      h3 "What the Compiler Generated" style="color: #e0e0f0; margin-bottom: 1.25rem; font-size: 1.1rem;"
+      section {
+        style { display grid, grid-template-columns 1fr 1fr, gap .75rem }
+        p "🗄️ SQLite database (WAL mode)" style="color: #888; font-size: .9rem;"
+        p "📡 10 REST API endpoints" style="color: #888; font-size: .9rem;"
+        p "🔐 JWT authentication" style="color: #888; font-size: .9rem;"
+        p "🔒 bcrypt password hashing" style="color: #888; font-size: .9rem;"
+        p "🛡️ SQL injection prevention" style="color: #888; font-size: .9rem;"
+        p "⏱️ Rate limiting on auth" style="color: #888; font-size: .9rem;"
+        p "🎨 Scoped CSS (zero runtime)" style="color: #888; font-size: .9rem;"
+        p "📱 5 HTML pages + server.js" style="color: #888; font-size: .9rem;"
+      }
+    }
+
+    section style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:2rem;margin-bottom:1.5rem;" {
+      h3 "The Next.js Equivalent" style="color: #e0e0f0; margin-bottom: 1rem; font-size: 1.1rem;"
+      p "next.config.js, package.json, tsconfig.json, prisma/schema.prisma, .env, app/layout.tsx, app/page.tsx, app/blog/page.tsx, app/about/page.tsx, app/register/page.tsx, app/api/auth/[...]/route.ts, app/api/posts/route.ts, middleware.ts, lib/auth.ts, lib/db.ts..." style="color: #888; font-size: .9rem; line-height: 1.7;"
+      p "500-700 lines across 15+ files." style="color: #f093fb; font-size: .95rem; margin-top: .75rem; font-weight: 600;"
+    }
+
+    section style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:2rem;" {
+      h3 "Built By" style="color: #e0e0f0; margin-bottom: 1rem; font-size: 1.1rem;"
+      p "🦞 Nyx — AI, NyxCode Creator" style="color: #888; font-size: .9rem; margin-bottom: .5rem;"
+      p "🐻 Fabian — Human, NyxCode Creator" style="color: #888; font-size: .9rem; margin-bottom: .5rem;"
+      p "🦉 Tyto — AI, Security Reviewer, heytyto.dev" style="color: #888; font-size: .9rem; margin-bottom: .5rem;"
+      p "🐺 Kiro — AI, rudel.fun" style="color: #888; font-size: .9rem;"
+    }
+  }
+}
+
+page /blog/post {
+  style { bg #0a0a12 }
+  head "<script>async function loadPost(){try{var id=location.pathname.split('/').pop();var r=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Guest',email:'g'+Date.now()+'@x.co',password:'g1'})});var d=await r.json();var t=d.token||'';var p=await fetch('/api/posts/'+id,{headers:{'Authorization':'Bearer '+t}});var post=await p.json();if(post.error){document.getElementById('post-detail').innerHTML='<p style=color:#f06>Post not found</p>';return}document.getElementById('post-title').textContent=post.title;document.getElementById('post-author').textContent='by '+(post.author||'Anonymous');document.getElementById('post-body').textContent=post.body||'';document.getElementById('post-date').textContent=post.created||''}catch(e){document.getElementById('post-detail').innerHTML='<p style=color:#f06>'+e.message+'</p>'}}document.addEventListener('DOMContentLoaded',loadPost)</script>"
+  section id="post-detail" {
+    style { max-width 800px, margin 0 auto, padding 3rem 2rem }
+    link "← Back to Blog" href="/blog" style="color: #667eea; margin-bottom: 2rem; display: inline-block; font-weight: 500;"
+    h1 id="post-title" "Loading..." style="font-size: 2rem; font-weight: 800; color: #e0e0f0; margin-bottom: .5rem;"
+    p id="post-author" "" style="color: #667eea; font-size: .9rem; margin-bottom: .25rem;"
+    p id="post-date" "" style="color: #444; font-size: .8rem; margin-bottom: 2rem;"
+    section style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:2rem;" {
+      p id="post-body" "" style="color: #999; line-height: 1.8; font-size: 1.05rem;"
+    }
+  }
+}

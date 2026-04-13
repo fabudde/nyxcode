@@ -24,6 +24,7 @@ import {
   LimitStatement, QueryStatement, ResponsiveBlock, SecurityNode, SecurityRule,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
   HeadStatement, AnimateStatement, PseudoElementBlock, LayoutNode,
+  ScriptStatement, FormAction,
 } from './ast.js';
 
 /** Set of tags that are recognized as built-in elements */
@@ -353,6 +354,7 @@ export class Parser {
         }
         return this.parseStyle();
       case TokenType.Form: return this.parseForm();
+      case TokenType.Script: return this.parseScript();
       case TokenType.Auth: return this.parseAuth();
       case TokenType.On: return this.parseOn();
       case TokenType.Validate: return this.parseValidate();
@@ -422,7 +424,17 @@ export class Parser {
       this.consume(TokenType.RightBrace);
     }
 
-    return { kind, value, body };
+    // Check for 'auth' keyword after path
+    let auth = false;
+    if (this.check(TokenType.Auth)) {
+      this.advance();
+      auth = true;
+    } else if (this.check(TokenType.Identifier) && this.peek().value === 'auth') {
+      this.advance();
+      auth = true;
+    }
+    
+    return { kind, value, body, auth };
   }
 
   private parseEach(): EachStatement {
@@ -734,15 +746,91 @@ export class Parser {
 
   private parseForm(): FormStatement {
     const start = this.consume(TokenType.Form);
-    const name = this.consumeIdentifier();
+    
+    // Parse action URL or name
+    let action: string | undefined;
+    let name = '';
+    
+    // Next token is the name/path
+    const nameOrPath = this.consumeIdentifier();
+    if (nameOrPath.startsWith('/')) {
+      action = nameOrPath;
+      name = nameOrPath.replace(/^\//, '').replace(/\//g, '-');
+    } else {
+      name = nameOrPath;
+    }
+    
+    // Check for 'auth' keyword before brace
+    let auth = false;
+    if (this.check(TokenType.Auth)) {
+      this.advance();
+      auth = true;
+    } else if (this.check(TokenType.Identifier) && this.peek().value === 'auth') {
+      this.advance();
+      auth = true;
+    }
+    
     this.consume(TokenType.LeftBrace);
-    const body = this.parseBody();
+    
+    // Parse body, extracting success/error handlers
+    const body: Statement[] = [];
+    let onSuccess: FormAction | undefined;
+    let onError: FormAction | undefined;
+    
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      if (this.check(TokenType.Identifier) && (this.peek().value === 'success' || this.peek().value === 'error')) {
+        const handlerType = this.advance().value;
+        this.consume(TokenType.Arrow);
+        const actionKind = this.advance().value as FormAction['kind'];
+        let actionValue: string | undefined;
+        if (actionKind === 'redirect' || actionKind === 'toast') {
+          actionValue = this.check(TokenType.String) ? this.consume(TokenType.String).value : this.consumeIdentifier();
+        }
+        const formAction: FormAction = { kind: actionKind, value: actionValue };
+        if (handlerType === 'success') onSuccess = formAction;
+        else onError = formAction;
+      } else {
+        const stmt = this.parseStatement(); if (stmt) body.push(stmt);
+      }
+    }
+    
     this.consume(TokenType.RightBrace);
 
-    return { type: 'Form', name, body, line: start.line, col: start.col };
+    return { type: 'Form', name, action, auth, body, onSuccess, onError, line: start.line, col: start.col };
   }
 
-  private parseAuth(): AuthStatement {
+
+  /**
+   * Parse `script { ... }` — raw JavaScript block.
+   * Content between braces is raw JS, no escaping.
+   */
+  private parseScript(): ScriptStatement {
+    const start = this.consume(TokenType.Script);
+    this.consume(TokenType.LeftBrace);
+    
+    // Collect raw content until matching closing brace
+    let content = '';
+    let depth = 1;
+    while (depth > 0 && !this.isAtEnd()) {
+      const tok = this.advance();
+      if (tok.type === TokenType.LeftBrace as any) depth++;
+      else if (tok.type === TokenType.RightBrace as any) {
+        depth--;
+        if (depth === 0) break;
+      }
+      // Reconstruct the source text
+      if (tok.type === TokenType.String as any) {
+        content += '"' + tok.value.replace(/"/g, '\\"') + '"';
+      } else {
+        content += tok.value;
+      }
+      content += ' ';
+    }
+    
+    return { type: 'Script', content: content.trim(), line: start.line, col: start.col };
+  }
+
+    private parseAuth(): AuthStatement {
     const start = this.consume(TokenType.Auth);
     const level = this.consumeIdentifier();
     return { type: 'Auth', level, line: start.line, col: start.col };
@@ -910,7 +998,7 @@ export class Parser {
       // Stop at top-level keywords that start NEW statements (but NOT 'state' which can appear in expressions)
       if (parenDepth === 0 && [
         TokenType.Data, TokenType.Each, TokenType.When, TokenType.Style,
-        TokenType.Form, TokenType.Auth, TokenType.On, TokenType.Validate,
+        TokenType.Form, TokenType.Auth, TokenType.On, TokenType.Validate, TokenType.Script,
         TokenType.Respond, TokenType.Limit, TokenType.Query, TokenType.Else,
         TokenType.State, TokenType.Effect, TokenType.Computed,
       ].includes(next.type) && expression.length > 0 && !expression.endsWith('.')) break;

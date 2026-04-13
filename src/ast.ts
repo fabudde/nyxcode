@@ -101,7 +101,8 @@ export type Statement =
   | ComputedStatement
   | RawExpression
   | HeadStatement
-  | AnimateStatement;
+  | AnimateStatement
+  | ScriptStatement;
 
 /** `head { ... }` — inject into <head>: fonts, meta, raw CSS */
 export interface HeadStatement extends BaseNode {
@@ -128,6 +129,7 @@ export interface DataSource {
   kind: 'get' | 'post' | 'query' | 'patch' | 'delete';
   value: string; // URL or SQL string
   body?: Record<string, string>;
+  auth?: boolean; // include JWT Bearer token
 }
 
 /** `each collection -> element { ... }` */
@@ -174,11 +176,26 @@ export interface ResponsiveBlock {
   properties: StyleProperty[];
 }
 
-/** `form name { ... }` */
+/** `form /api/path auth { ... success -> reload }` */
 export interface FormStatement extends BaseNode {
   type: 'Form';
-  name: string;
+  name: string;       // legacy compat
+  action?: string;    // URL path like /api/posts
+  auth?: boolean;     // include JWT token
   body: Statement[];
+  onSuccess?: FormAction;
+  onError?: FormAction;
+}
+
+export interface FormAction {
+  kind: 'reload' | 'redirect' | 'clear' | 'toast';
+  value?: string; // redirect path or toast message
+}
+
+/** `script { ... }` — raw JS block, no escaping */
+export interface ScriptStatement extends BaseNode {
+  type: 'Script';
+  content: string;
 }
 
 /** `auth required|admin|none` */
