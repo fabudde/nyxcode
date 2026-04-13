@@ -104,6 +104,8 @@ page / {
 
     span "" style="position: absolute; bottom: 0; left: 0; width: 100%; height: 40%; background: linear-gradient(180deg, transparent, #0a0a12); pointer-events: none; z-index: 0;"
 
+    span "page / {\n  head \"...\"\n  section {\n    style {\n      bg #0a0a12\n      color green\n    }\n    h1 \"Fabian\"\n  }\n}" class="hero-code hero-code-left" style="animation: pulseGlow 4s ease-in-out infinite;"
+    span "component Card {\n  props icon title\n  section {\n    span .icon\n    h3 .title\n    link \"→\" href=.url\n  }\n}" class="hero-code hero-code-right" style="animation: pulseGlow 4s ease-in-out infinite 2s;"
 
     span ">" style="font-size: 2rem; display: block; margin-bottom: 1rem; animation: float 3s ease-in-out infinite; position: relative; z-index: 1; color: #00d26a; font-family: 'JetBrains Mono', monospace; font-weight: 700;"
     h1 "Fabian Budde" style="font-size: 4rem; font-weight: 900; margin: 0 0 1rem 0; background: linear-gradient(135deg, #00d26a 0%, #00c853 50%, #00e676 100%); background-size: 200% 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: gradientShift 4s ease infinite; position: relative; z-index: 1; letter-spacing: -0.02em; line-height: 1.1;"
