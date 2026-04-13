@@ -212,9 +212,33 @@ export class Parser {
       const entries: Record<string, string> = {};
       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
         const key = this.consumeIdentifier();
-        const value = this.advance().value; // Could be color, font name, size
-        entries[key] = value;
-        if (this.check(TokenType.Comma)) this.advance();
+        // Collect value: everything until next key or closing brace
+        // Handles rgba(255,255,255,0.06), multi-word values, etc.
+        let valueParts: string[] = [];
+        let parenDepth = 0;
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          const next = this.peek();
+          // Track paren depth for rgba(...) etc.
+          if (next.value === '(') parenDepth++;
+          if (next.value === ')') parenDepth--;
+          // Outside parens: if we see an identifier that looks like a new key, stop
+          if (parenDepth <= 0 && next.type === TokenType.Identifier && valueParts.length > 0) {
+            const nextNext = this.tokens[this.pos + 1];
+            if (!nextNext || nextNext.value !== '(') break;
+          }
+          // Commas inside parens are part of the value
+          if (next.type === TokenType.Comma) {
+            if (parenDepth > 0) {
+              valueParts.push(this.advance().value);
+              continue;
+            } else {
+              this.advance(); // skip entry separator
+              break;
+            }
+          }
+          valueParts.push(this.advance().value);
+        }
+        entries[key] = valueParts.join('');
       }
 
       this.consume(TokenType.RightBrace);

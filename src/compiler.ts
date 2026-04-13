@@ -125,9 +125,17 @@ export class Compiler {
     }
 
     // Process theme blocks — generate CSS custom properties
+    let themeCSS = '';
     const themes = program.body.filter(n => n.type === 'Theme');
     for (const theme of themes) {
       this.compileTheme(theme);
+    }
+    if (this.themeVars.size > 0) {
+      themeCSS = ':root{';
+      for (const [key, value] of this.themeVars) {
+        themeCSS += '--' + key + ':' + value + ';';
+      }
+      themeCSS += '}';
     }
 
     // If we have a layout, compile its CSS once (shared across all pages)
@@ -150,6 +158,7 @@ export class Compiler {
       this.staticMode = false;
       layoutCssBlocks = [...this.css];
       layoutHeadInjections = [...this.headInjections];
+      if (themeCSS) layoutHeadInjections.unshift('<style>' + themeCSS + '</style>');
       layoutInteractiveElements = new Set(this.usedInteractiveElements);
     }
 
