@@ -41,7 +41,7 @@ page / {
 
   section style="max-width: 900px; margin: 0 auto; padding: 2rem;" {
     p "SEE THE DIFFERENCE" preset=label style="text-align: center; margin-bottom: 0.75rem;"
-    h2 "30 lines. Full-stack blog." style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 2rem;"
+    div { h2 "30 lines. Full-stack blog." style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 2rem;" }
     div style="background: #0d0d1a; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 1.5rem; font-family: 'Courier New', monospace; font-size: 0.85rem; line-height: 1.7; overflow-x: auto; color: #c8d6e5; white-space: pre; text-align: left;" {
       span "table posts { title text required, body text }" style="display: block; color: #82aaff;"
       span "security { login email password, protect /api/posts }" style="display: block; color: #c792ea;"
@@ -68,7 +68,7 @@ page / {
 
   section style="max-width: 1200px; margin: 0 auto; padding: 2rem;" {
     p "TOKEN EFFICIENCY" preset=label style="text-align: center; margin-bottom: 0.75rem;"
-    h2 "Less tokens = less cost = faster" style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 3rem;"
+    div { h2 "Less tokens = less cost = faster" style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 3rem;" }
     div grid=3 gap=1.5rem {
       div preset=card style="text-align: center; border: 1px solid rgba(102,126,234,0.15);" {
         p "-25%" style="font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg,#667eea,#764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
@@ -92,7 +92,7 @@ page / {
 
   section style="max-width: 1200px; margin: 0 auto; padding: 2rem;" {
     p "FEATURES" preset=label style="text-align: center; margin-bottom: 0.75rem;"
-    h2 "Everything you need, nothing you don't" style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 3rem;"
+    div { h2 "Everything you need, nothing you don't" style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 3rem;" }
     div grid=2 gap=1.25rem {
       div preset=card style="border: 1px solid rgba(255,255,255,0.04);" {
         h3 "⚡ Instant Compile" style="font-size: 1.1rem; font-weight: 600;"
@@ -125,7 +125,7 @@ page / {
 
   section style="max-width: 1200px; margin: 0 auto; padding: 2rem;" {
     p "BUILT WITH NYXCODE" preset=label style="text-align: center; margin-bottom: 0.75rem;"
-    h2 "7 production sites and counting" style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 3rem;"
+    div { h2 "7 production sites and counting" style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 3rem;" }
     div grid=3 gap=1.25rem {
       div style="padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); text-align: center; background: rgba(255,255,255,0.02);" {
         a "nyxcode.io →" href="https://nyxcode.io" style="color: inherit; text-decoration: none; font-weight: 600;"
@@ -151,7 +151,7 @@ page / {
   div style="height: 1px; background: linear-gradient(90deg,transparent,rgba(102,126,234,0.2),transparent); margin: 2rem auto; max-width: 1200px;"
 
   section style="max-width: 700px; margin: 0 auto; padding: 2rem 2rem 6rem; text-align: center;" {
-    h2 "Start building in seconds" style="font-size: 2rem; font-weight: 700;"
+    div { h2 "Start building in seconds" style="font-size: 2rem; font-weight: 700;" }
     p "Install NyxCode and build your first app." style="color: #64748b; margin-top: 0.75rem; margin-bottom: 2rem;"
     pre style="background: #0d0d1a; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 1.5rem; font-family: monospace; font-size: 0.85rem; line-height: 1.7; text-align: left; color: #c8d6e5;" {
       code "npm install -g @fabudde/nyxcode" 
