@@ -640,5 +640,45 @@ page / {
 **30 lines. Database + Auth + Form + Theme + Data binding. One file.**
 
 ## Version
-v0.6.0 — Forms, Theme Variables, Script Blocks, Data Auth
+v0.7.0 — Style Presets, Theme Fonts, Forms, Themes, Scripts, Data Auth
 Docs: https://nyxcode.io/docs/
+
+### Style Presets (v0.7) — Reusable Named Styles
+```nyx
+preset label {
+  font-size 0.7rem
+  color var(--colors-primary)
+  font-weight 700
+  text-transform uppercase
+  letter-spacing 0.25em
+}
+
+preset card {
+  background var(--colors-card)
+  border-radius 12px
+  padding 2rem
+}
+
+page / {
+  p "SECTION" preset=label
+  section preset=card {
+    h3 "Reusable card style"
+    p "No inline styles needed"
+  }
+}
+```
+Presets generate CSS classes (`.nyx-p_label`, `.nyx-p_card`). Use `preset=name` on any element. Combine with `style {}` for overrides.
+
+### Theme Fonts (v0.7) — Auto Font Assignment
+```nyx
+theme {
+  fonts {
+    heading "Space Grotesk, sans-serif"
+    body "Inter, sans-serif"
+  }
+  colors {
+    primary #667eea
+  }
+}
+```
+`heading` auto-applies to h1-h6. `body` auto-applies to body, p, span, li, input, textarea. **Quote font values that contain commas.**
