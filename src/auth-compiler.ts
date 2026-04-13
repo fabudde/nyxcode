@@ -38,10 +38,15 @@ export function compileAuth(security: SecurityNode, tables: TableNode[]): string
   ).join(', ');
 
   let code = `
-// ── Auth (bcryptjs + jsonwebtoken) ──────────────────────────────────
+// ── Auth (bcryptjs + jsonwebtoken + rate-limit) ─────────────────────
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: 'Too many attempts, try again later' } });
+app.use('/api/auth', authLimiter);
+
 const JWT_SECRET = process.env.JWT_SECRET || 'nyx-dev-' + require('crypto').randomBytes(8).toString('hex');
+if (!process.env.JWT_SECRET) console.warn('⚠️  No JWT_SECRET set — using random secret (tokens expire on restart)');
 
 // Register
 app.post('/api/auth/register', (req, res) => {

@@ -79,13 +79,17 @@ function crudForTable(table: TableNode): string {
   const n = table.name;
   const insertCols = table.columns.filter(c => !isAutoColumn(c));
   const colNames = insertCols.map(c => c.name);
+  const hasPassword = table.columns.some(c => c.name === 'password' || c.type === 'password');
+  const stripPassword = hasPassword ? '.map(({ password: _, ...r }) => r)' : '';
   const placeholders = colNames.map(() => '?').join(', ');
   const colList = colNames.join(', ');
 
-  // Dynamic SET clause for PUT
+  // Dynamic SET clause for PUT — ALLOWLISTED columns only (SQL injection safe)
+  const validColSet = JSON.stringify(colNames);
   const updateBody = `
-  const fields = Object.keys(req.body).filter(k => k !== 'id');
-  if (!fields.length) return res.status(400).json({ error: 'No fields to update' });
+  const validCols = new Set(${validColSet});
+  const fields = Object.keys(req.body).filter(k => k !== 'id' && validCols.has(k));
+  if (!fields.length) return res.status(400).json({ error: 'No valid fields to update' });
   const sets = fields.map(f => f + ' = ?').join(', ');
   const vals = fields.map(f => req.body[f]);
   vals.push(req.params.id);
@@ -97,12 +101,13 @@ function crudForTable(table: TableNode): string {
 // ── ${n} CRUD ──────────────────────────────────────
 
 app.get('/api/${n}', (req, res) => {
-  res.json(db.prepare('SELECT * FROM ${n}').all());
+  res.json(db.prepare('SELECT * FROM ${n}').all()` + stripPassword + `);
 });
 
 app.get('/api/${n}/:id', (req, res) => {
   const row = db.prepare('SELECT * FROM ${n} WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Not found' });
+  if (row.password) { const { password: _, ...safe } = row; return res.json(safe); }
   res.json(row);
 });
 
