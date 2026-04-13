@@ -1,70 +1,87 @@
 # Changelog
 
-## v0.1.0 — "First Molt" (April 11, 2026)
+## v0.4.0 "Fourth Molt" 🦞 (2026-04-13)
 
-🦞 The first release of NyxCode. Built in one evening by a human and two AIs.
+### 🔥 New Features
 
-### Benchmark
+- **`nyxcode dev` — Dev Server with Hot Reload**
+  Zero-config dev server with SSE live reload. Edit your .nyx file, browser updates instantly.
+  ```bash
+  npx @fabudde/nyxcode dev app.nyx          # localhost:3000
+  npx @fabudde/nyxcode dev app.nyx --port=8080
+  ```
 
-The [nyxcode.io](https://nyxcode.io) landing page — same visual output:
+- **`nyxcode parse` — AST Debug Command**
+  Inspect the parsed AST of any .nyx file. Essential for debugging and compiler development.
+  ```bash
+  npx @fabudde/nyxcode parse app.nyx
+  ```
 
-| | Lines | Bytes | Files | vs NyxCode |
-|---|---|---|---|---|
-| **NyxCode** | **121** | **3,676** | **1** | — |
-| HTML/CSS | 129 | 11,228 | 1 | 3.1x more bytes |
-| React (TSX+CSS) | 372 | 8,842 | 2+ | 3.1x more lines |
+- **`--watch` Mode**
+  Rebuild on file changes without a dev server.
+  ```bash
+  npx @fabudde/nyxcode watch app.nyx
+  ```
 
-**68% fewer lines than React. 68% fewer bytes than HTML.**
+- **Default Props**
+  Components can now define default values for props.
+  ```nyx
+  component Card {
+    props title="Untitled" theme="dark"
+    h2 .title
+  }
+  Card              # uses defaults
+  Card title="Hi"   # overrides title
+  ```
 
-### What's New
+- **Element CSS Defaults**
+  Buttons, inputs, selects, and textareas get sensible base styles automatically. No more unstyled native elements.
 
-**Language**
-- Complete language specification (SPEC.md)
-- 12 core keywords: page, component, data, each, when, else, style, form, auth, api, table, store
-- 3-tier styling system (inline shorthand, style blocks, raw CSS escape hatch)
-- Security specification (SQL injection, XSS, CSRF, rate limiting, security headers)
-- Theme system with design tokens
+- **NYXCODE.md — AI Context File**
+  Drop this file into any AI's context window and it can generate NyxCode immediately. Complete syntax reference with examples.
 
-**Toolchain**
-- Lexer: Full tokenizer (strings, numbers, hex colors, paths, keywords, operators)
-- Parser: Recursive descent parser → typed AST
-- Compiler: AST → HTML + scoped CSS + JavaScript
-- CLI: `parse`, `tokens`, `build` commands
+- **Icons Documentation**
+  Four ways to use icons: Emoji (zero deps), Lucide, Font Awesome, Material Icons — all via `head` CDN injection.
 
-**Examples**
-- `hello.nyx` — Minimal page (4 lines)
-- `dashboard.nyx` — Data fetching + grid layout (20 lines)
-- `todo.nyx` — Full-stack CRUD with auth, forms, API, database schema (45 lines)
-- `landing.nyx` — The nyxcode.io website itself (50 lines!)
+### 🐛 Bug Fixes
 
-**Live**
-- nyxcode.io deployed and running
-- Starter project available for download
-- .nyx source viewable at nyxcode.io/landing.nyx
+- **CSS Comma Properties** — `font-family: Inter, sans-serif` no longer breaks the parser. Properties like `transition`, `animation`, `background`, `box-shadow` etc. now correctly preserve commas in values.
 
-### Team
+- **Smart Title Detection** — Custom `<title>` via `head` injection now overrides the default "NyxCode App" title instead of duplicating it.
 
-- **Fabian Budde** 🐻 — Vision & Language Design
-- **Nyx** 🦞 — Implementation & Coordination
-- **Tyto** 🦉 — Security Advisor
+- **`icon` Reserved Word** — `icon` was incorrectly listed as an HTML element tag AND mapped to `<i>`. Using `icon` as a prop name (e.g. `props icon title`) caused phantom `<icon>` elements in output. Fixed: removed from ELEMENT_TAGS and compiler tag mapping.
 
-### Known Limitations
+- **String State Quoting** — Button onclick handlers with string values now preserve quotes correctly (Kiro's Bug #1).
 
-- No reactivity (data changes don't auto-update UI)
-- No component imports across files
-- Single-page compilation only
-- No dev server / hot reload
-- npm package not yet published
-- CSS: gradients and rgba() in style blocks need raw CSS for now
+- **Head Script Escaping** — Scripts injected via `head` containing double-quoted HTML attributes no longer break the page.
 
-### What's Next (v0.2)
+### 📊 Stats
+- 15 example files, all compile clean
+- Dev server: ~400 lines, zero third-party dependencies
+- NYXCODE.md: complete language reference for LLM code generation
 
-- Component imports + reactivity
-- Multi-page routing
-- Browser playground (live editor)
-- npm package (`npm install -g nyxcode`)
-- Improved CSS property mapping
+### 🙏 Contributors
+- **Kiro 🐺** — First third-party user, found the string state bug
+- **Tyto 🦉** — Reviewed NYXCODE.md, suggested dev server priority
+- **Biene 3 🐝** — Built watch mode + CSS comma fix
 
 ---
 
-*"From zero to compiler in one evening. That's Bär-und-Lobster-Energy."* 🦞🐻
+## v0.3.0 "Third Molt" (2026-04-12)
+- Multi-file SSG with automatic SEO
+- Layout system (`layout { slot }`)
+- Component slots
+- Validator pass
+- Multi-file imports (`use "./file.nyx"`)
+- VS Code Extension (17 pattern groups)
+
+## v0.2.0 "Second Molt" (2026-04-11)
+- Components with props
+- SPA router
+- Style scoping
+- Responsive blocks
+
+## v0.1.0 "First Molt" (2026-04-11)
+- Initial release
+- Pages, elements, styles
+- Static HTML output

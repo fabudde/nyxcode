@@ -1,8 +1,8 @@
-# NyxCode Language Specification v0.3
+# NyxCode Language Specification v0.4
 
 > **Vision:** NyxCode is a language that completely replaces TypeScript/Next.js — but significantly more token-efficient and built for AIs.
 >
-> **Status:** v0.3 shipped. Layout system, multi-file SSG, validator, VS Code extension.
+> **Status:** v0.4 shipped. Layout system, multi-file SSG, validator, VS Code extension.
 
 ## 1. File Structure
 
@@ -321,9 +321,9 @@ component Greeting {
 
 Each component usage gets a unique class. If `Card` is used 3 times, each gets `nyx-c-1`, `nyx-c-2`, `nyx-c-3` with identical but scoped styles.
 
-> **v0.3 optimization:** Hash-based deduplication will share classes for identical style blocks.
+> **v0.4 optimization:** Hash-based deduplication will share classes for identical style blocks.
 
-## 6. Layout System (v0.3)
+## 6. Layout System (v0.4)
 
 ### 6.1 Basic Layout
 
@@ -376,7 +376,7 @@ Layout styles are compiled once and shared across all pages (not duplicated per-
 - `slot` MUST appear inside a layout or component (validator error otherwise)
 - Layout `head` injections are applied to every page
 
-## 7. Validation (v0.3)
+## 7. Validation (v0.4)
 
 The validator runs BEFORE the compiler.
 
@@ -440,7 +440,7 @@ if (!__nyx.subscribers.has(name)) return;
 
 All dynamic content in `each` templates is escaped via `textContent` (not `innerHTML`). XSS via user input in templates is structurally impossible.
 
-### 7.4 CSRF on Forms (Planned v0.3)
+### 7.4 CSRF on Forms (Planned v0.4)
 
 Forms using `post`, `put`, `delete` will auto-include CSRF tokens.
 
@@ -498,7 +498,7 @@ For AI coding platforms (Lovable, Bolt, Cursor, v0), this means:
 ### Shipped
 - [x] **v0.1** — Lexer, Parser, Compiler, CLI, Landing Page, GitHub Release
 - [x] **v0.2** — Reactive State, Components, Security Hardening, npm Package, Animations, Responsive, head injection
-- [x] **v0.3** — Multi-file SSG, Layout system (`layout { slot }`), Validator (Levenshtein typo detection), VS Code extension, multi-file imports, style dedup
+- [x] **v0.4** — Multi-file SSG, Layout system (`layout { slot }`), Validator (Levenshtein typo detection), VS Code extension, multi-file imports, style dedup
 
 ### Planned
 - [ ] **v0.4** — Default props, `--watch` mode, data fetching (`data = get /api/...`), API endpoints
