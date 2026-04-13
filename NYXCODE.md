@@ -347,5 +347,152 @@ border-radius: 12px;                  radius 12px
 | Next.js   | 22    | 1200  | 5 files |
 | NyxCode   | 1     | 545   | 0 files |
 
+## Full-Stack (Backend)
+
+`nyx build` generates **both** `index.html` (frontend) and `server.js` (backend) from a single `.nyx` file.
+
+**Required npm packages:** `express`, `better-sqlite3`, `bcryptjs`, `jsonwebtoken`, `express-rate-limit`
+
+### Tables (= Database)
+```nyx
+table users {
+  name text required
+  email email unique
+  password text required
+  role text default="user"
+  created auto
+}
+
+table posts {
+  title text required
+  body text
+  author users          # Foreign key → users(id)
+  published bool default=false
+  created auto
+}
+```
+
+Every table gets an `id` (auto-increment primary key) automatically. Each table generates a full CRUD REST API:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/users` | GET | List all |
+| `/api/users/:id` | GET | Get one |
+| `/api/users` | POST | Create |
+| `/api/users/:id` | PUT | Update |
+| `/api/users/:id` | DELETE | Delete |
+
+**Column types:**
+
+| NyxCode | SQLite | Notes |
+|---------|--------|-------|
+| `text` | TEXT | General string |
+| `email` | TEXT | Treated as text in DB |
+| `number` / `int` | INTEGER | Whole numbers |
+| `float` / `decimal` | REAL | Decimal numbers |
+| `bool` | INTEGER | 0/1 |
+| `auto` | DATETIME | Auto-set to `CURRENT_TIMESTAMP` |
+| `users` (table name) | INTEGER | Foreign key → `users(id)` |
+
+**Constraints:** `required` (NOT NULL), `unique` (UNIQUE), `default="value"` (DEFAULT)
+
+### Security (= Auth)
+```nyx
+security {
+  table users             # Which table stores users
+  login email password    # Fields for authentication
+  token jwt               # JWT-based tokens
+  protect /api/posts      # Require auth for this path
+}
+```
+
+This generates:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/register` | POST | Create account (hashes password with bcrypt) |
+| `/api/auth/login` | POST | Returns JWT token (7-day expiry) |
+| `/api/auth/me` | GET | Get current user (requires token) |
+
+Protected routes require `Authorization: Bearer <token>` header. Rate-limited to 20 requests per 15 minutes.
+
+Passwords are **never returned** in any API response.
+
+### Data Binding (Frontend → Backend)
+```nyx
+data users = get /api/users
+data posts = get /api/posts
+```
+
+- Fetches the URL on page load
+- Stores the result in a JS variable
+- Use with `each` to render lists:
+
+```nyx
+data posts = get /api/posts
+
+each posts -> post {
+  h3 .title
+  p .body
+}
+```
+
+### Complete Full-Stack Example
+
+**30 lines → full-stack app with database, auth, CRUD API, and frontend:**
+
+```nyx
+# Full-Stack NyxCode Demo
+# 30 lines → complete app with DB, Auth, CRUD API
+
+table users {
+  name text required
+  email email unique
+  password text required
+  role text default="user"
+  created auto
+}
+
+table posts {
+  title text required
+  body text
+  author users
+  published bool default=false
+  created auto
+}
+
+security {
+  table users
+  login email password
+  token jwt
+  protect /api/posts
+}
+
+page / {
+  h1 "My Blog"
+
+  data posts = get /api/posts
+
+  each posts -> post {
+    section {
+      style { bg #1a1a2e, radius 12px, padding 1.5rem, margin-bottom 1rem }
+      h3 .title
+      p .body
+    }
+  }
+}
+```
+
+**What `nyx build` generates from this:**
+- `index.html` — SPA with routing, components, reactive state
+- `server.js` — Express server with SQLite, CRUD for `users` + `posts`, JWT auth, bcrypt password hashing, rate limiting
+
+**Token efficiency:**
+
+| Stack | Lines | Files |
+|-------|-------|-------|
+| TypeScript + Express + Prisma + React | ~500 | 10+ |
+| NyxCode | 30 | 1 |
+
 ## Version
 v0.3.1 — Docs: https://nyxcode.io/docs/

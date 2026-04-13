@@ -10,5 +10,5 @@ page / {
 
 page /about {
   h1 "About"
-  p "Static page without data binding."
+  p "This is the about page."
 }

@@ -760,11 +760,16 @@ export class Compiler {
     const tag = this.mapTag(el.tag);
     let content = '';
 
-    if (el.content && typeof el.content !== 'string') {
-      if (el.content.type === 'PropertyAccess') {
-        content = `\${${varName}${(el.content as any).path.substring(1)}}`;
+    if (el.content) {
+      if (typeof el.content === 'string') {
+        content = this.escapeContent(el.content);
+      } else if (el.content.type === 'PropertyAccess') {
+        content = `\${${varName}${(el.content as any).path}}`;
       } else if (el.content.type === 'StringLiteral') {
         content = (el.content as any).value;
+      } else if (el.content.type === 'Identifier') {
+        // Direct identifier like "user" — use as variable
+        content = `\${${(el.content as any).name}}`;
       }
     }
 
@@ -776,7 +781,16 @@ export class Compiler {
     }).join(' ');
 
     const attrStr = attrs ? ' ' + attrs : '';
-    return `<${tag}${attrStr}>${content}</${tag}>`;
+
+    // Recurse into children
+    const children = el.children.map(c => {
+      if (c.type === 'Element') {
+        return this.compileElementTemplate(c as ElementNode, varName);
+      }
+      return '';
+    }).join('');
+
+    return `<${tag}${attrStr}>${content}${children}</${tag}>`;
   }
 
   // --- When compilation ---
@@ -1499,7 +1513,7 @@ ${reactiveRuntime}
   }
 
   private nextId(prefix: string): string {
-    return `${prefix}-${++this.componentId}`;
+    return `${prefix}_${++this.componentId}`;
   }
 
   private ind(): string {

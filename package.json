@@ -1,7 +1,7 @@
 {
   "name": "@fabudde/nyxcode",
   "version": "0.5.0",
-  "description": "NyxCode \u2014 The AI-native programming language for the web. 68% fewer tokens than React.",
+  "description": "NyxCode — The AI-native programming language for the web. 68% fewer tokens than React.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -49,6 +49,10 @@
     "node": ">=18"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0"
   }
 }
