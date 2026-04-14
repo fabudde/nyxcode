@@ -19,6 +19,8 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
+const NYXCODE_VERSION = '0.9.2';
+
 export interface CompilerOptions {
   /** Output mode */
   target: 'static' | 'dynamic';
@@ -446,6 +448,7 @@ export class Compiler {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="generator" content="NyxCode v${NYXCODE_VERSION}">
   <title>NyxCode - ${this.escapeHtml(pageTitle)}</title>
   <meta name="description" content="NyxCode documentation - ${this.escapeHtml(pageTitle)}">
   <link rel="canonical" href="https://nyxcode.io${pagePath}">` + headExtra + `
@@ -1005,8 +1008,6 @@ export class Compiler {
     this.css.push(cssBlock);
     return ''; // Style is applied via class, not inline
   }
-
-
   private compilePreset(preset: any): void {
     const className = 'nyx-p_' + preset.name;
     const props = preset.styles.map((s: any) => {
@@ -1626,6 +1627,7 @@ export class Compiler {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="generator" content="NyxCode v${NYXCODE_VERSION}">
   ${headExtra.includes('<title>') ? '' : '<title>NyxCode App</title>'}${headExtra}
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1841,8 +1843,6 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
       return ` ${mappedProp}:${this.resolveThemeValue(mappedProp, value)}`;
     }).join(';').trim();
   }
-
-
   /**
    * Generate CSS defaults for interactive elements (button, input, select, textarea, a).
    * Only includes rules for elements actually used on the page (tree-shaken).

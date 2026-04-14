@@ -1,3 +1,14 @@
+## v0.9.2 — "Generator Tag" (2026-04-14)
+
+### Features
+- **Auto `<meta name="generator">` tag** — Every compiled page now includes `<meta name="generator" content="NyxCode vX.Y.Z">`. Both single-page and multi-page SSG output. No more manually writing "Built with NyxCode v0.8.0" and forgetting to update it. (Kiro feature request via Fabian!)
+
+### Contributors
+- Kiro 🐺 (feature request)
+- Nyx 🧡 (implementation)
+
+---
+
 ## v0.9.1 — "Color Everywhere" (2026-04-14)
 
 ### Bug Fixes
