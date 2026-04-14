@@ -1023,6 +1023,8 @@ export class Parser {
 
   private parseOn(): OnStatement {
     const start = this.consume(TokenType.On);
+    // Handle both "on click ->" and "on:click ->"
+    if (this.check(TokenType.Colon)) this.advance(); // skip optional colon
     const event = this.consumeIdentifier();
     this.consume(TokenType.Arrow);
 
@@ -1324,6 +1326,34 @@ private parseElement(): ElementNode {
       if (this.isStatementStart()) {
         if (this.peekAt(1)?.type === TokenType.Equals) {
           // This is an attribute (style="...", class="...", etc), not a new statement
+        } else if (this.peek().type === TokenType.On && (this.peekAt(1)?.type === TokenType.Colon || this.peekAt(1)?.type === TokenType.Identifier)) {
+          // on:click or on click — inline event handler on element, not a new statement
+          this.advance(); // consume 'on'
+          if (this.check(TokenType.Colon)) this.advance(); // skip optional colon
+          const eventName = this.consumeIdentifier();
+          if (this.check(TokenType.Arrow)) this.advance(); // ->
+          let action = '';
+          while (!this.isAtEnd() && !this.isStatementStart()) {
+            const cur = this.peek();
+            if (cur.type === TokenType.RightBrace) break;
+            if (cur.type === TokenType.LeftBrace) {
+              action += ' {';
+              this.advance();
+              let depth = 1;
+              while (depth > 0 && !this.isAtEnd()) {
+                const t = this.advance();
+                if (t.type === TokenType.LeftBrace) depth++;
+                else if (t.type === TokenType.RightBrace) { depth--; if (depth === 0) { action += ' }'; break; } }
+                action += ' ' + t.value;
+              }
+            } else {
+              const tok = this.advance();
+              if (tok.type === TokenType.String) action += (action ? ' ' : '') + '"' + tok.value + '"';
+              else action += (action ? ' ' : '') + tok.value;
+            }
+          }
+          attributes.push({ name: 'on' + eventName.charAt(0).toUpperCase() + eventName.slice(1), value: action.trim() });
+          continue;
         } else {
           break;
         }
