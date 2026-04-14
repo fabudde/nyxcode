@@ -328,8 +328,16 @@ each users -> div { h3 .name, p .email }
 # Named element in loop
 each users -> Card { h3 .name }
 
-# Conditionals
-when .role == "admin" { button "Delete" }
+# Conditionals with else
+when .role == "admin" {
+  button "Delete"
+  button "Ban User"
+} else {
+  p "Access denied"
+}
+
+# Short form with arrow
+when .premium -> badge "PRO"
 ```
 
 ## Forms (v0.6+)
