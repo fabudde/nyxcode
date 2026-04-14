@@ -1,3 +1,14 @@
+## v0.9.3 — "Version Keyword" (2026-04-14)
+
+### Features
+- **`__version__` keyword in content** — Write `p "Built with NyxCode v__version__"` and the compiler replaces it with the actual version. Auto-updates on every rebuild. No more stale version strings on your site!
+
+### Contributors
+- Fabian 🐻 (idea)
+- Nyx 🧡 (implementation)
+
+---
+
 ## v0.9.2 — "Generator Tag" (2026-04-14)
 
 ### Features

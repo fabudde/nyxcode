@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = '0.9.2';
+const NYXCODE_VERSION = '0.9.3';
 
 export interface CompilerOptions {
   /** Output mode */
@@ -1965,8 +1965,10 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
   }
 
   private escapeContent(str: string): string {
+    // Replace __version__ with actual NyxCode version
+    let result = str.replace(/__version__/g, NYXCODE_VERSION);
     // For text content between tags, quotes don't need escaping
-    return str
+    return result
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
