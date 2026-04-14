@@ -220,7 +220,7 @@ try {
         const authCode = compileAuth(security, tables);
         // Inject protect middleware AFTER auth definition but BEFORE CRUD  
         const protectLines = protectedPaths.map(p => 
-          `\n// Protect ${p}\napp.use('${p}', authMiddleware);`
+          `\n// Protect ${p}\napp.use('/api/${p}', authMiddleware);`
         ).join('\n');
         serverCode = serverCode.replace(
           '// ── Create tables',

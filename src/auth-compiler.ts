@@ -41,7 +41,7 @@ export function compileAuth(security: SecurityNode, tables: TableNode[]): string
 // ── Auth (bcryptjs + jsonwebtoken + rate-limit) ─────────────────────
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const rateLimit = require('express-rate-limit');
+// rateLimit already declared by backend compiler
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: 'Too many attempts, try again later' } });
 app.use('/api/auth', authLimiter);
 

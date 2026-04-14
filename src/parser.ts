@@ -156,10 +156,16 @@ export class Parser {
       let colType = 'text'; // default type
       const constraints: string[] = [];
 
-      // Next token should be the TYPE (text, email, number, etc.) or a table ref
+      // Next token should be the TYPE (text, email, number, etc.) or a table ref [tablename]
       if (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
         const next = this.peek();
-        if (next.type === TokenType.Identifier) {
+        if (next.type === TokenType.LeftBracket) {
+          // Foreign key reference: [tablename]
+          this.advance(); // consume [
+          const refName = this.consumeIdentifier();
+          this.consume(TokenType.RightBracket);
+          colType = `[${refName}]`;
+        } else if (next.type === TokenType.Identifier) {
           colType = this.advance().value;
         }
       }
