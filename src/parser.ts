@@ -1514,8 +1514,8 @@ private parseElement(): ElementNode {
       return { type: 'NumberLiteral', value: parseFloat(token.value), line: token.line, col: token.col };
     }
 
-    // Identifier
-    if (token.type === TokenType.Identifier) {
+    // Identifier (including keywords used as variable names in expressions)
+    if (token.type === TokenType.Identifier || this.isKeywordToken(token)) {
       this.advance();
       return { type: 'Identifier', name: token.value, line: token.line, col: token.col };
     }
@@ -1563,11 +1563,16 @@ private parseElement(): ElementNode {
   }
 
   private isKeywordToken(token: Token): boolean {
-    // Backend keywords that can also be used as HTML element names
+    // ALL keywords — allowed as identifiers in expression context (e.g. state page = "x"; when page == "x")
     const keywordTypes: Set<TokenType> = new Set([
-      TokenType.Table, TokenType.Api, TokenType.Auth,
-      TokenType.Data, TokenType.Respond, TokenType.Query,
-      TokenType.Head, TokenType.Style,
+      TokenType.Page, TokenType.Component, TokenType.Layout, TokenType.State,
+      TokenType.Data, TokenType.Each, TokenType.When, TokenType.Else,
+      TokenType.Form, TokenType.Table, TokenType.Auth, TokenType.Security,
+      TokenType.On, TokenType.Theme, TokenType.Preset, TokenType.Validate,
+      TokenType.Script, TokenType.Use, TokenType.Api, TokenType.Respond,
+      TokenType.Query, TokenType.Head, TokenType.Style, TokenType.Store,
+      TokenType.Raw, TokenType.Limit, TokenType.Animate, TokenType.Effect,
+      TokenType.Computed,
     ]);
     return keywordTypes.has(token.type);
   }
