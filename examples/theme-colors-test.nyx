@@ -2,26 +2,37 @@ theme {
   colors {
     primary #667eea
     accent #00d26a
+    accent2 #764ba2
     text-muted #8892b0
     bg-dark #0b0b14
     surface #1a1a2e
+    accent-border #333355
   }
 }
 
 page / {
-  h1 "Theme Colors Test"
+  h1 "Implicit Theme Colors v0.9.1"
 
-  p "Primary color" style="c: primary;"
-  p "Accent color" style="c: accent;"
-  p "Muted text" style="c: text-muted;"
-  p "Dark bg" style="bg: bg-dark;"
-  p "Surface bg" style="bgc: surface;"
+  p "Simple: primary" style="c: primary;"
+  p "Simple: accent" style="c: accent;"
+  p "Simple: text-muted" style="c: text-muted;"
+  p "Hex untouched" style="c: #ff0000;"
+  p "RGB untouched" style="c: rgb(255,0,0);"
+  p "Var untouched" style="c: var(--custom);"
 
-  p "Hex stays" style="c: #ff0000;"
-  p "RGB stays" style="c: rgb(255,0,0);"
-  p "Var stays" style="c: var(--custom);"
+  div "Border with color" {
+    style {
+      border 1px solid accent-border
+    }
+  }
 
-  div "Style block test" {
+  div "Shadow with color" {
+    style {
+      box-shadow 0 4px 25px accent
+    }
+  }
+
+  div "Style block simple" {
     style {
       c primary
       bg surface

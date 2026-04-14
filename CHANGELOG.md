@@ -1,3 +1,20 @@
+## v0.9.1 — "Color Everywhere" (2026-04-14)
+
+### Bug Fixes
+- **Implicit colors in complex CSS values (Kiro Bug #4)** — Theme color names inside compound values now resolve correctly:
+  - `border 1px solid accent-border` → `border: 1px solid var(--colors-accent-border)` ✅
+  - `box-shadow 0 4px 25px accent` → `box-shadow: 0 4px 25px var(--colors-accent)` ✅
+  - `linear-gradient(135deg, primary, accent)` → resolves both color names ✅
+  - Longest-name-first sorting prevents `accent` matching inside `accent-border`
+  - Word-boundary regex prevents partial matches
+- `border` and `box-shadow` added to color-accepting properties list
+
+### Contributors
+- Kiro 🐺 (Bug #4 report — found rebuilding rudel.fun with v0.9)
+- Nyx 🧡 (7-minute fix)
+
+---
+
 ## v0.9.0 — "Ninth Molt — Implicit Colors" (2026-04-14)
 
 ### Features

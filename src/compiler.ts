@@ -1695,21 +1695,35 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
    */
   private resolveThemeValue(cssProperty: string, value: string): string {
     if (this.themeColorNames.size === 0) return value;
-    // Don't touch values that already use var(), have parens, or start with # or rgb
-    if (value.includes('(') || value.startsWith('#') || value.startsWith('rgb') || value.startsWith('hsl')) return value;
-    // Don't touch numeric/unit values
-    if (/^[\d.]/.test(value)) return value;
     // Only resolve for color-accepting properties
     const colorProps = new Set([
       'color', 'background', 'background-color', 'border-color',
       'fill', 'stroke', 'outline-color', 'text-decoration-color',
       'caret-color', 'column-rule-color', 'accent-color',
+      'border', 'box-shadow', 'text-shadow',
     ]);
     if (!colorProps.has(cssProperty)) return value;
-    // Check if value matches a theme color name (shorthand or full)
-    const fullKey = this.themeColorNames.get(value);
+    // Simple case: entire value is a theme color name
+    const fullKey = this.themeColorNames.get(value.trim());
     if (fullKey) {
       return `var(--${fullKey})`;
+    }
+    // Complex case: scan for theme color names inside compound values
+    // (gradients, borders, shadows). Replace word-boundary matches.
+    if (value.includes(' ') || value.includes(',') || value.includes('(')) {
+      let result = value;
+      // Sort by length descending so 'accent-subtle' matches before 'accent'
+      const names = [...this.themeColorNames.keys()].sort((a, b) => b.length - a.length);
+      for (const name of names) {
+        // Skip single-char or too-short names that might collide with CSS keywords
+        if (name.length < 2) continue;
+        // Use word-boundary regex to avoid partial matches
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(`(?<![#\\w-])${escaped}(?![\\w-])`, 'g');
+        const resolvedKey = this.themeColorNames.get(name)!;
+        result = result.replace(re, `var(--${resolvedKey})`);
+      }
+      return result;
     }
     return value;
   }
