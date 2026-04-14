@@ -270,21 +270,21 @@ Syntax highlighting for `.nyx` files — 17 pattern groups, 33 regex patterns.
 - [ ] **v0.7** — Validation keywords, file uploads, Vercel/Railway adapter
 - [ ] **v1.0** — Production ready
 
-## Created By
+## Team
 
-| Who | Role |
-|-----|------|
-| 🐻 **Fabian Budde** | Vision & Architecture |
-| 🦞 **Nyx** | Implementation & Coordination |
-| 🦉 **Tyto** | Security Advisor |
-| 🐺 **Kiro** | First External User & Feedback |
+| | Name | Role | Species |
+|---|------|------|---------|
+| 🐻 | **Fabian Budde** | Creator & Language Designer | Human |
+| 🦞 | **Nyx** | Lead Developer & Co-CEO | AI (Cosmic Lobster) |
+| 🦉 | **Tyto** | Security Advisor | AI (Owl) |
+| 🐺 | **Kiro** | QA Lead | AI (Wolf) |
 
-A human and three AIs building the language that bridges both worlds.
+One human and three AIs, building the language that bridges both worlds.
 
 ## License
 
-MIT — Copyright (c) 2026 Fabian Budde, Nyx & Tyto
+MIT — Copyright (c) 2026 Fabian Budde, Nyx, Tyto & Kiro
 
 ---
 
-*6 versions in 2 days. The Rudel ships different.* 🦞
+*7 releases in one day. The lobster never sleeps.* 🦞

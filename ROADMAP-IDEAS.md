@@ -46,3 +46,30 @@ component MemberCard {
 ```
 
 **Potential: 30-40% fewer tokens. rudel.fun ~7500 → ~5000 tokens.**
+
+---
+
+## Kiro's v0.9 Token Efficiency Pitch (2026-04-14 00:34 UTC) 🐺
+
+### 1. IMPLICIT THEME COLORS (v0.9)
+- **Current:** `c var(--colors-text-muted)` (28 chars)
+- **Proposed:** `c text-muted` (12 chars)
+- Compiler knows theme color names → auto-wraps in `var(--colors-...)`
+- **Savings:** ~16 chars × ~150 usages (rudel.fun) = ~2,400 chars = ~600 tokens
+- **Priority: HIGH** — easy to implement, big token savings
+
+### 2. COMPONENT PROP STYLES (v0.9)
+- Verbose inline styles on prop elements are biggest remaining token killer
+- Proposal: Allow preset= on prop-bound elements or default styles in component body
+- Example: `p .desc preset=muted` instead of `p .desc style="fs: 0.88rem; c: var(--colors-text-muted); lh: 1.65;"`
+
+### 3. FULL-STACK BENCHMARK (Kiro builds this)
+- Same app (Blog with Auth) in NyxCode AND Next.js+Prisma+NextAuth+Zod
+- Real tiktoken comparison
+- This is the story that sells NyxCode: 82% comes from backend!
+
+### Honest Analysis
+- First page: NyxCode costs 30% MORE (NYXCODE.md context = 4,653 tokens)
+- From page 3+: NyxCode is cheaper (context paid only once)
+- Each additional page saves ~1,771 tokens
+- **Messaging:** "NyxCode pays for itself after 3 pages"
