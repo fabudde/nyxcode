@@ -737,7 +737,7 @@ export class Parser {
     if (!this.check(TokenType.Identifier)) return false;
     const name = this.peek().value;
     // Known CSS element selectors that might appear in style blocks
-    const CSS_SELECTORS = new Set(['html', 'body', 'main', 'header', 'footer', 'nav', 'section', 'article', 'aside', 'div', 'span', 'p', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'img', 'button', 'input', 'select', 'textarea', 'table', 'form', 'label', '*']);
+    const CSS_SELECTORS = new Set(['html', 'body', 'main', 'header', 'footer', 'nav', 'section', 'article', 'aside', 'div', 'span', 'p', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'img', 'button', 'input', 'select', 'textarea', 'table', 'form', 'label', 'blockquote', 'pre', 'code', 'details', 'summary', 'thead', 'tbody', 'tr', 'td', 'th', 'figcaption', 'figure', 'strong', 'em', 'small', 'sub', 'sup', 'mark', 'del', 'ins', 'abbr', 'cite', 'dfn', 'time', 'var', 'kbd', 'samp', 'video', 'audio', 'canvas', 'svg', 'path', 'fieldset', 'legend', 'datalist', 'progress', 'meter', 'dialog', 'hr', 'br', '*']);
     if (!CSS_SELECTORS.has(name)) return false;
     // Look ahead for { or space+{ pattern
     let i = this.pos + 1;

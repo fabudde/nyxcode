@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.11.1";
+const NYXCODE_VERSION = "0.11.2";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -454,7 +454,7 @@ export class Compiler {
   <link rel="canonical" href="https://nyxcode.io${pagePath}">` + headExtra + `
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, sans-serif; }` + animCSS + elementDefaults + `
+    :where(body) { font-family: system-ui, -apple-system, sans-serif; }` + animCSS + elementDefaults + `
 ` + (css ? '    ' + css.split('\n').join('\n    ') : '') + `
   </style>
 </head>
@@ -1706,7 +1706,7 @@ export class Compiler {
   ${headExtra.includes('<title>') ? '' : '<title>NyxCode App</title>'}${headExtra}
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, sans-serif; }${animCSS}${elementDefaults}
+    :where(body) { font-family: system-ui, -apple-system, sans-serif; }${animCSS}${elementDefaults}
 ${css ? '    ' + css.split('\n').join('\n    ') : ''}
   </style>
 </head>
@@ -1770,7 +1770,26 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
    * auto-wrap it in var(--section-name). Saves ~16 chars per usage.
    * Only applies to color-accepting properties.
    */
+  private processFontFamily(value: string): string {
+    // If value is a quoted string containing commas, split into font stack
+    // e.g. "Playfair Display, serif" → "Playfair Display", serif
+    const stripped = value.trim();
+    if ((stripped.startsWith('"') && stripped.endsWith('"')) || 
+        (stripped.startsWith("'") && stripped.endsWith("'"))) {
+      const inner = stripped.slice(1, -1);
+      if (inner.includes(',')) {
+        return inner.split(',').map(s => {
+          const t = s.trim();
+          // Quote font names that contain spaces
+          return t.includes(' ') ? `"${t}"` : t;
+        }).join(', ');
+      }
+    }
+    return value;
+  }
+
   private resolveThemeValue(cssProperty: string, value: string): string {
+    if (cssProperty === 'font-family') return this.processFontFamily(value);
     if (this.themeColorNames.size === 0) return value;
     // Only resolve for color-accepting properties
     const colorProps = new Set([
@@ -1840,7 +1859,9 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
       'h': 'height',
       'minw': 'min-width',
       'maxw': 'max-width',
+      'mw': 'max-width',
       'minh': 'min-height',
+      'mih': 'min-height',
       'maxh': 'max-height',
       
       // Typography
