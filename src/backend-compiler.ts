@@ -34,7 +34,7 @@ const SQL_TYPE: Record<string, string> = {
 function sqlType(col: ColumnDef): string {
   if (col.type.startsWith('[') && col.type.endsWith(']')) {
     const ref = col.type.slice(1, -1);
-    return `INTEGER REFERENCES ${ref}(id)`;
+    return `INTEGER REFERENCES ${ref}(id) ON DELETE CASCADE`;
   }
   return SQL_TYPE[col.type] || 'TEXT';
 }
@@ -167,11 +167,15 @@ function crudForTable(table: TableNode, allTables: TableNode[]): string {
   if (row.password) { const { password: _, ...safe } = row; return res.json(safe); }
   res.json(row);`;
 
+  let postResponse = `res.status(201).json(db.prepare('SELECT * FROM ${n} WHERE id = ?').get(info.lastInsertRowid));`;
+
   if (joinCode) {
     mapperBlock = '\n' + joinCode.mapperFn;
     getAllExpr = joinCode.getAllExpr;
     getOneExpr = joinCode.getOneExpr;
     getOneResponse = `\n  res.json(mapRow_${n}(row));`;
+    postResponse = `const created = ${joinCode.getOneExpr.replace('req.params.id', 'info.lastInsertRowid')};
+    res.status(201).json(mapRow_${n}(created));`;
   }
 
   // Cascade delete: delete children that reference this table BEFORE deleting parent
@@ -213,7 +217,7 @@ app.post('/api/${n}', writeLimiter, (req, res) => {
     const info = db.prepare(
       'INSERT INTO ${n} (${colList}) VALUES (${placeholders})'
     ).run(${colNames.join(', ')});
-    res.status(201).json(db.prepare('SELECT * FROM ${n} WHERE id = ?').get(info.lastInsertRowid));
+    ${postResponse}
   } catch (e) {
     res.status(400).json({ error: e.message });
   }

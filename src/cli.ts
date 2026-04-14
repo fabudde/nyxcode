@@ -219,8 +219,10 @@ try {
         // Inject auth AFTER express.json() but BEFORE create tables
         const authCode = compileAuth(security, tables);
         // Inject protect middleware AFTER auth definition but BEFORE CRUD  
-        const protectLines = protectedPaths.map(p => 
-          `\n// Protect ${p}\napp.use('/api/${p}', authMiddleware);`
+        const protectLines = protectedPaths.map(p => {
+          const path = p.startsWith('/api/') ? p : `/api/${p}`;
+          return `\n// Protect ${path}\napp.use('${path}', authMiddleware);`;
+        }
         ).join('\n');
         serverCode = serverCode.replace(
           '// ── Create tables',
