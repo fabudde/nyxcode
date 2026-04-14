@@ -1493,6 +1493,11 @@ private parseElement(): ElementNode {
       }
       // Identifier after element: could be content reference, boolean attribute, or layout shorthand
       else if (next.type === TokenType.Identifier && !ELEMENT_TAGS.has(next.value) && !this.isKeyword(next)) {
+        // Form handler keywords: success/error followed by -> are NOT attributes
+        const FORM_HANDLERS = new Set(['success', 'error']);
+        if (FORM_HANDLERS.has(next.value) && this.tokens[this.pos + 1]?.type === TokenType.Arrow) {
+          break; // Let form parser handle these
+        }
         // Layout shorthand booleans: center, between, around, evenly, wrap, nowrap
         const LAYOUT_BOOLEANS = new Set(['center', 'between', 'around', 'evenly', 'wrap', 'nowrap']);
         if (LAYOUT_BOOLEANS.has(next.value)) {

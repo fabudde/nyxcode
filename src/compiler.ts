@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.12.3";
+const NYXCODE_VERSION = "0.12.4";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -1166,7 +1166,17 @@ export class Compiler {
         }
         if (el.tag === 'submit') {
           const text = (el.content && typeof el.content !== 'string' && el.content.type === 'StringLiteral') ? (el.content as any).value : 'Submit';
-          html += `${this.ind()}<button type="submit" class="btn-p">${text}</button>\n`;
+          const presetAttr = el.attributes.find((a: any) => a.name === 'preset');
+          const styleAttr = el.attributes.find((a: any) => a.name === 'style');
+          let btnAttrs = 'type="submit"';
+          if (presetAttr) {
+            btnAttrs += ` class="nyx-p_${presetAttr.value}"`;
+          }
+          if (styleAttr) {
+            const expanded = this.expandInlineShorthands(styleAttr.value as string);
+            btnAttrs += ` style="${expanded}"`;
+          }
+          html += `${this.ind()}<button ${btnAttrs}>${this.escapeContent(text)}</button>\n`;
         } else {
           html += this.compileElement(el);
         }
