@@ -20,7 +20,7 @@ theme { colors { primary #667eea, bg #0a0a12, card #1a1a2e } }
 preset card { bg card, r 12px, p 2rem }
 
 page / {
-  section style="max-width: 800px; margin: 0 auto; padding: 2rem;" {
+  section style={ mw 800px, mx auto, p 2rem } {
     h1 "My Blog"
     form /api/posts auth { input title, submit "Post", success -> reload }
     data posts = get /api/posts auth
@@ -579,7 +579,18 @@ data posts = get /api/posts auth {
   error -> p "Something went wrong!"
   empty -> p "No posts yet. Write one!"
 }
-each posts -> Card { h3 .title, p .body }
+each posts -> post {
+  Card title=.title body=.body author=.author.name
+}
+```
+- `.field` = data path → `${item.field}` in JS template.
+- `.author.name` = nested → `${item.author?.name}` (optional chaining, safe on null).
+- Components resolved to HTML in templates (v0.12.5+).
+- `$preset` works inside each bodies.
+
+```nyx
+# Inline each (no component):
+each posts -> post { div { h3 .title, span .author.name } }
 ```
 - `loading` → shown during fetch, hidden when done
 - `error` → hidden by default, shown on fetch failure
