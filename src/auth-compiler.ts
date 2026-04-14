@@ -45,8 +45,8 @@ const rateLimit = require('express-rate-limit');
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: 'Too many attempts, try again later' } });
 app.use('/api/auth', authLimiter);
 
-const JWT_SECRET = process.env.JWT_SECRET || 'nyx-dev-' + require('crypto').randomBytes(8).toString('hex');
-if (!process.env.JWT_SECRET) console.warn('⚠️  No JWT_SECRET set — using random secret (tokens expire on restart)');
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { console.error('❌ FATAL: JWT_SECRET not set in production!'); process.exit(1); })() : 'nyx-dev-' + require('crypto').randomBytes(8).toString('hex'));
+if (!process.env.JWT_SECRET && process.env.NODE_ENV !== 'production') console.warn('⚠️  No JWT_SECRET set — using random dev secret (tokens expire on restart)');
 
 // Register
 app.post('/api/auth/register', (req, res) => {

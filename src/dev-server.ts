@@ -204,6 +204,11 @@ export class DevServer {
       const resolveImport = (importPath: string): Program | null => {
         try {
           const resolved = resolve(this.baseDir, importPath);
+          // Path traversal protection: imports must stay within project
+          if (!resolved.startsWith(this.baseDir)) {
+            console.warn(`⚠️  Blocked import outside project: ${importPath}`);
+            return null;
+          }
           const importSource = readFileSync(resolved, 'utf-8');
           return parse(importSource);
         } catch {

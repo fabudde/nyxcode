@@ -50,7 +50,7 @@ function sqlConstraints(col: ColumnDef): string {
     else if (c === 'unique') parts.push('UNIQUE');
     else if (c.startsWith('default=')) {
       const val = c.slice('default='.length).replace(/^"|"$/g, '');
-      parts.push(`DEFAULT '${val}'`);
+      parts.push(`DEFAULT '${val.replace(/'/g, "''")}'`);
     }
   }
 
@@ -111,7 +111,7 @@ app.get('/api/${n}/:id', (req, res) => {
   res.json(row);
 });
 
-app.post('/api/${n}', (req, res) => {
+app.post('/api/${n}', writeLimiter, (req, res) => {
   try {
     const { ${colList} } = req.body;
     const info = db.prepare(
@@ -123,14 +123,14 @@ app.post('/api/${n}', (req, res) => {
   }
 });
 
-app.put('/api/${n}/:id', (req, res) => {
+app.put('/api/${n}/:id', writeLimiter, (req, res) => {
   try {${updateBody}
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
 });
 
-app.delete('/api/${n}/:id', (req, res) => {
+app.delete('/api/${n}/:id', writeLimiter, (req, res) => {
   const info = db.prepare('DELETE FROM ${n} WHERE id = ?').run(req.params.id);
   if (!info.changes) return res.status(404).json({ error: 'Not found' });
   res.json({ deleted: true });
@@ -163,6 +163,12 @@ app.${method}('${api.path}', (req, res) => {
  * 3. Registers any custom api routes defined in .nyx source
  */
 export function compileBackend(tables: TableNode[], apis: ApiNode[] = []): string {
+  // Validate table names against SQL injection (Tyto Audit)
+  for (const t of tables) {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(t.name)) {
+      throw new Error(`Invalid table name: "${t.name}" — must be alphanumeric/underscore`);
+    }
+  }
   const createStatements = tables.map(t => `db.exec(\`${createTableSQL(t)}\`);`).join('\n');
   const crudBlocks = tables.map(t => crudForTable(t)).join('\n');
   const apiBlocks = apis.map(a => compileApiRoute(a)).join('\n');
@@ -174,9 +180,13 @@ export function compileBackend(tables: TableNode[], apis: ApiNode[] = []): strin
 
 const express = require('express');
 const Database = require('better-sqlite3');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.use(express.json());
+
+// Rate limiting on write endpoints
+const writeLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { error: 'Too many requests' } });
 
 const db = new Database(process.env.DB_PATH || 'app.db');
 db.pragma('journal_mode = WAL');
