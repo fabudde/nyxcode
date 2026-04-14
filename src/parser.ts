@@ -1444,10 +1444,15 @@ private parseElement(): ElementNode {
       if (next.type === TokenType.String) {
         content = { type: 'StringLiteral', value: this.advance().value, line: next.line, col: next.col };
       }
-      // Property access: .name
+      // Property access: .name or .author.name (nested)
       else if (next.type === TokenType.Dot) {
         this.advance();
-        const path = '.' + this.consumeIdentifier();
+        let path = '.' + this.consumeIdentifier();
+        // Continue for nested: .author.name, .user.profile.avatar
+        while (this.check(TokenType.Dot) && this.peekAt(1)?.type === TokenType.Identifier) {
+          this.advance(); // .
+          path += '.' + this.consumeIdentifier();
+        }
         content = { type: 'PropertyAccess', path, line: next.line, col: next.col };
       }
       // Attribute: key=value or key="complex value" (including keyword tokens like style=)

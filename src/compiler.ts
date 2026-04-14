@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.12.5";
+const NYXCODE_VERSION = "0.12.6";
 
 export interface CompilerOptions {
   /** Output mode */
