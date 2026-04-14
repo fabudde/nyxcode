@@ -220,8 +220,19 @@ try {
         const authCode = compileAuth(security, tables);
         // Inject protect middleware AFTER auth definition but BEFORE CRUD  
         const protectLines = protectedPaths.map(p => {
-          const path = p.startsWith('/api/') ? p : `/api/${p}`;
-          return `\n// Protect ${path}\napp.use('${path}', authMiddleware);`;
+          // Parse "path [write|read|all]" — default is "write" (GET stays open)
+          const parts = p.trim().split(/\s+/);
+          const rawPath = parts[0];
+          const mode = parts[1] || 'write'; // write = POST/PUT/DELETE only, all = everything, read = GET only
+          const path = rawPath.startsWith('/api/') ? rawPath : `/api/${rawPath}`;
+          if (mode === 'all') {
+            return `\n// Protect ${path} (all methods)\napp.use('${path}', authMiddleware);`;
+          } else if (mode === 'read') {
+            return `\n// Protect ${path} (read only)\napp.use('${path}', (req, res, next) => { if (req.method === 'GET') return authMiddleware(req, res, next); next(); });`;
+          } else {
+            // write (default): protect POST, PUT, DELETE — GET stays open
+            return `\n// Protect ${path} (write only)\napp.use('${path}', (req, res, next) => { if (req.method !== 'GET') return authMiddleware(req, res, next); next(); });`;
+          }
         }
         ).join('\n');
         serverCode = serverCode.replace(
