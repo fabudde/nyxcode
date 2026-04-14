@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.11.3";
+const NYXCODE_VERSION = "0.11.4";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -1212,7 +1212,7 @@ export class Compiler {
         `var h={'Content-Type':'application/json'};${authHeader}` +
         `var msg=document.getElementById('${formId}-msg');` +
         `try{var r=await fetch('${form.action}',{method:'POST',headers:h,body:JSON.stringify({${bodyParts}})});` +
-        `var d=await r.json();if(r.ok){${successCode}}else{msg.textContent=d.error||'Error';msg.style.color='#f06'}}` +
+        `var d=await r.json();if(r.ok){if(d.token)localStorage.setItem('token',d.token);${successCode}}else{msg.textContent=d.error||'Error';msg.style.color='#f06'}}` +
         `catch(err){${errorCode}}}`
       );
       
