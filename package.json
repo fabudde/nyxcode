@@ -1,6 +1,6 @@
 {
   "name": "@fabudde/nyxcode",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "description": "NyxCode \u2014 The AI-native programming language for the web. 68% fewer tokens than React.",
   "type": "module",
   "main": "dist/index.js",

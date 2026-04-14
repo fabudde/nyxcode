@@ -241,22 +241,39 @@ export class Parser {
       const entries: Record<string, string> = {};
       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
         const key = this.consumeIdentifier();
-        // If next is a string literal, use directly (handles "Space Grotesk, sans-serif")
+        // If next is a string literal, use directly
         if (this.peek().type === TokenType.String) {
           entries[key] = this.advance().value;
           if (this.check(TokenType.Comma)) this.advance();
           continue;
         }
-        // For fonts section: collect everything until comma or next known entry
         if (sectionName === 'fonts') {
+          // Fonts: collect until comma, }, or known font key (heading/body/mono/code/display/ui)
+          const FONT_KEYS = new Set(['heading', 'body', 'mono', 'code', 'display', 'ui', 'sans', 'serif']);
           let parts: string[] = [];
           while (!this.check(TokenType.RightBrace) && !this.check(TokenType.Comma) && !this.isAtEnd()) {
+            // If this identifier is a known font key and we already have parts → new entry
+            if (this.check(TokenType.Identifier) && parts.length > 0 && FONT_KEYS.has(this.peek().value)) {
+              break;
+            }
             parts.push(this.advance().value);
           }
           if (this.check(TokenType.Comma)) this.advance();
           entries[key] = parts.join(' ');
         } else {
-          entries[key] = this.collectCSSValue();
+          // Colors/other: simple single value (no multi-word needed)
+          let parts: string[] = [];
+          let parenDepth = 0;
+          while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            if (this.check(TokenType.LeftParen)) { parenDepth++; parts.push(this.advance().value); continue; }
+            if (this.check(TokenType.RightParen)) { parenDepth--; parts.push(this.advance().value); continue; }
+            if (parenDepth > 0) { parts.push(this.advance().value); continue; }
+            if (this.check(TokenType.Comma)) { this.advance(); break; }
+            // If we have a value and next is an identifier, it's a new key
+            if (parts.length > 0 && this.check(TokenType.Identifier)) break;
+            parts.push(this.advance().value);
+          }
+          entries[key] = parts.join('');
         }
       }
 
