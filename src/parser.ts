@@ -38,6 +38,28 @@ const ELEMENT_TAGS = new Set([
   'slot', 'submit', 'br', 'hr',
 ]);
 
+const CSS_SHORTHANDS = new Set([
+  'bg', 'bgc', 'bgi', 'bgs', 'bgp', 'bgr', 'r', 'radius', 'shadow', 'tshadow',
+  'op', 'z', 'pos', 'p', 'pt', 'pr', 'pb', 'pl', 'px', 'py',
+  'm', 'mt', 'mr', 'mb', 'ml', 'mx', 'my', 'gap', 'gg',
+  'w', 'h', 'minw', 'maxw', 'minh', 'maxh', 'mw', 'mh', 'miw', 'mih',
+  'fs', 'fw', 'ff', 'lh', 'ls', 'ta', 'td', 'tt', 'ws', 'wb', 'c',
+  'border', 'bt', 'bb', 'bl', 'bc', 'bw', 'bs',
+  'ai', 'jc', 'ac', 'as', 'fd', 'fg', 'fb', 'fsk',
+  'gc', 'gr', 'gtc', 'gtr', 'ga',
+  'd', 'of', 'ox', 'oy', 'v', 'cur',
+  'tf', 'tr', 'anim', 'fi',
+  'pe', 'us', 'ap', 'rs', 'ol', 'wc', 'ct', 'iso',
+  'obf', 'obp', 'bf', 'fil', 'mix', 'si', 'sa',
+  'ji', 'js', 'oc', 'ow', 'o',
+  // Full CSS names that are common
+  'background', 'color', 'padding', 'margin', 'width', 'height',
+  'display', 'position', 'top', 'bottom', 'left', 'right',
+  'font-size', 'font-weight', 'border-radius', 'opacity', 'overflow',
+  'transition', 'transform', 'animation', 'cursor', 'box-shadow',
+]);
+
+
 export class Parser {
   private tokens: Token[];
   private pos: number = 0;
@@ -1159,7 +1181,91 @@ export class Parser {
     return result;
   }
 
-  private parseElement(): ElementNode {
+  
+  // Check if { } block looks like CSS properties (for shorthand style blocks)
+  private looksLikeStyleBlock(): boolean {
+    // Peek past { and check if first identifier is a CSS shorthand
+    if (!this.check(TokenType.LeftBrace)) return false;
+    const after = this.peekAt(1);
+    if (!after) return false;
+    if (after.type === TokenType.Identifier && CSS_SHORTHANDS.has(after.value)) return true;
+    // Also handle pseudo-classes like hover { }
+    if (after.type === TokenType.Identifier && ['hover', 'focus', 'active'].includes(after.value)) return true;
+    return false;
+  }
+
+  // Parse { fs 1.3rem, c text } as a StyleBlock (without 'style' keyword)
+  private parseStyleBlockInline(): StyleBlock {
+    const start = this.peek();
+    this.consume(TokenType.LeftBrace);
+
+    const properties: StyleProperty[] = [];
+    const responsive: ResponsiveBlock[] = [];
+    let hover: StyleProperty[] | undefined;
+    let focus: StyleProperty[] | undefined;
+    let active: StyleProperty[] | undefined;
+
+    const PSEUDO_CLASSES: Record<string, string> = { 'hover': 'hover', 'focus': 'focus', 'active': 'active' };
+
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      // Skip commas
+      if (this.check(TokenType.Comma)) { this.advance(); continue; }
+
+      // Responsive: @mobile { }, @tablet { }
+      if (this.check(TokenType.At)) {
+        this.advance();
+        const bp = this.consumeIdentifier();
+        this.consume(TokenType.LeftBrace);
+        const respProps: StyleProperty[] = [];
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          if (this.check(TokenType.Comma)) { this.advance(); continue; }
+          const rp = this.parseStyleProperty();
+          if (rp) respProps.push(rp);
+        }
+        this.consume(TokenType.RightBrace);
+        responsive.push({ breakpoint: bp, properties: respProps });
+        continue;
+      }
+
+      // Pseudo-class: hover { }, focus { }, active { }
+      const name = this.peek().value;
+      if (this.peek().type === TokenType.Identifier && PSEUDO_CLASSES[name] && this.peekAt(1)?.type === TokenType.LeftBrace) {
+        this.advance();
+        this.consume(TokenType.LeftBrace);
+        const pseudoProps: StyleProperty[] = [];
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          if (this.check(TokenType.Comma)) { this.advance(); continue; }
+          const pp = this.parseStyleProperty();
+          if (pp) pseudoProps.push(pp);
+        }
+        this.consume(TokenType.RightBrace);
+        if (name === 'hover') hover = pseudoProps;
+        else if (name === 'focus') focus = pseudoProps;
+        else if (name === 'active') active = pseudoProps;
+        continue;
+      }
+
+      // Regular property: bg red, fs 1.3rem
+      const prop = this.parseStyleProperty();
+      if (prop) properties.push(prop);
+    }
+
+    this.consume(TokenType.RightBrace);
+
+    return {
+      type: 'Style',
+      properties,
+      responsive,
+      hover,
+      focus,
+      active,
+      raw: false,
+      line: start.line,
+      col: start.col,
+    };
+  }
+
+private parseElement(): ElementNode {
     const start = this.peek();
     const tag = this.consumeIdentifier();
 
@@ -1224,11 +1330,17 @@ export class Parser {
           attributes.push({ name: this.advance().value, value: 'true' });
         }
       }
-      // Children block: { ... }
+      // Children/Style block: { ... }
       else if (next.type === TokenType.LeftBrace) {
-        this.advance();
-        children = this.parseBody();
-        this.consume(TokenType.RightBrace);
+        // If element has .prop content and { } looks like style properties, parse as inline style block
+        if (content && (content as any).type === 'PropertyAccess' && this.looksLikeStyleBlock()) {
+          const styleBlock = this.parseStyleBlockInline();
+          children = [styleBlock];
+        } else {
+          this.advance();
+          children = this.parseBody();
+          this.consume(TokenType.RightBrace);
+        }
         break;
       }
       // Arrow (event on element): button "Go" -> navigate /home
