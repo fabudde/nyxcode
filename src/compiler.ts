@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.12.6";
+const NYXCODE_VERSION = "0.12.7";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -970,11 +970,19 @@ export class Compiler {
     return `<${tag}${attrStr}>${content}${children}</${tag}>`;
   }
 
+  private toOptionalChain(path: string): string {
+    // .author.name → .author?.name (optional chaining for nested access)
+    const parts = path.split('.');
+    if (parts.length <= 2) return path; // .title → no change needed
+    // .author.name → .author?.name
+    return parts[0] + '.' + parts.slice(1).join('?.');
+  }
+
   private resolveTemplateContent(content: any, varName: string): string {
     if (!content) return '';
     if (typeof content === 'string') return this.escapeContent(content);
     if (content.type === 'PropertyAccess') {
-      return `\${${varName}${content.path}}`;
+      return `\${${varName}${this.toOptionalChain(content.path)}}`;
     }
     if (content.type === 'StringLiteral') return content.value;
     if (content.type === 'Identifier') return `\${${content.name}}`;
@@ -987,7 +995,7 @@ export class Compiler {
         // Resolve .field references in attribute values
         let val = a.value;
         if (val.startsWith('.')) {
-          val = `\${${varName}${val}}`;
+          val = `\${${varName}${this.toOptionalChain(val)}}`;
         }
         if (a.name === 'preset') return `class="nyx-p_${a.value}"`;
         if (a.name === 'style') {
@@ -1007,7 +1015,7 @@ export class Compiler {
     for (const attr of el.attributes) {
       if (typeof attr.value === 'string') {
         if (attr.value.startsWith('.')) {
-          props.set(attr.name, `\${${varName}${attr.value}}`);
+          props.set(attr.name, `\${${varName}${this.toOptionalChain(attr.value)}}`);
         } else {
           props.set(attr.name, attr.value);
         }

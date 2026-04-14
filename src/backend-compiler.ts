@@ -140,6 +140,13 @@ function crudForTable(table: TableNode, allTables: TableNode[]): string {
   const n = table.name;
   const insertCols = table.columns.filter(c => !isAutoColumn(c));
   const colNames = insertCols.map(c => c.name);
+  // Separate user FK columns (auto-set from JWT) from body columns
+  const userFkCols = insertCols.filter(c => c.type === '[users]');
+  const bodyCols = insertCols.filter(c => c.type !== '[users]');
+  const bodyColList = bodyCols.map(c => c.name).join(', ');
+  const autoUserCols = userFkCols.map(c => 
+    `const ${c.name} = req.user ? req.user.id : req.body.${c.name};\n    `
+  ).join('');
   const hasPassword = table.columns.some(c => c.name === 'password' || c.type === 'password');
   const stripPassword = hasPassword ? '.map(({ password: _, ...r }) => r)' : '';
   const placeholders = colNames.map(() => '?').join(', ');
@@ -213,8 +220,8 @@ app.get('/api/${n}/:id', (req, res) => {
 
 app.post('/api/${n}', writeLimiter, (req, res) => {
   try {
-    const { ${colList} } = req.body;
-    const info = db.prepare(
+    const { ${bodyColList} } = req.body;
+    ${autoUserCols}const info = db.prepare(
       'INSERT INTO ${n} (${colList}) VALUES (${placeholders})'
     ).run(${colNames.join(', ')});
     ${postResponse}
