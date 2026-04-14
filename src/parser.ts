@@ -34,7 +34,7 @@ const ELEMENT_TAGS = new Set([
   'button', 'input', 'select', 'checkbox', 'radio', 'toggle', 'slider', 'textarea',
   'card', 'badge', 'table', 'list', 'metric', 'chart', 'avatar', 'tag',
   'alert', 'toast', 'modal', 'tooltip', 'progress', 'spinner',
-  'div', 'row', 'col', 'grid', 'stack', 'container', 'section', 'aside', 'nav', 'footer', 'header', 'main', 'article', 'figure', 'figcaption', 'ul', 'ol', 'li',
+  'div', 'row', 'col', 'grid', 'stack', 'container', 'section', 'aside', 'nav', 'footer', 'header', 'main', 'article', 'figure', 'figcaption', 'ul', 'ol', 'li', 'a', 'label', 'form', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'blockquote', 'pre', 'code', 'strong', 'em', 'small', 'sup', 'sub', 'details', 'summary',
   'slot', 'submit', 'br', 'hr',
 ]);
 
@@ -420,7 +420,48 @@ export class Parser {
 
     const source = this.parseDataSource();
 
-    return { type: 'Data', name, typeAnnotation, source, line: start.line, col: start.col };
+    // Optional { loading -> ..., error -> ..., empty -> ... } block
+    let loadingBlock: Statement[] | undefined;
+    let errorBlock: Statement[] | undefined;
+    let emptyBlock: Statement[] | undefined;
+
+    if (this.check(TokenType.LeftBrace)) {
+      this.advance();
+      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+        if (this.check(TokenType.Comma)) { this.advance(); continue; }
+        const keyword = this.peek();
+        if (keyword.type === TokenType.Identifier && ['loading', 'error', 'empty'].includes(keyword.value)) {
+          const which = this.advance().value;
+          if (this.check(TokenType.Arrow)) this.advance(); // ->
+          // Parse the block or single element
+          if (this.check(TokenType.LeftBrace)) {
+            this.advance();
+            const body = this.parseBody();
+            this.consume(TokenType.RightBrace);
+            if (which === 'loading') loadingBlock = body;
+            else if (which === 'error') errorBlock = body;
+            else if (which === 'empty') emptyBlock = body;
+          } else {
+            // Single element: loading -> p "Loading..."
+            // Parse ONE element — consume tag + string content only, stop before next keyword
+            const elemTag = this.consumeIdentifier();
+            let elemContent: Expression | undefined;
+            if (this.peek().type === TokenType.String) {
+              elemContent = { type: 'StringLiteral', value: this.advance().value, line: this.peek().line, col: this.peek().col };
+            }
+            const elemNode: ElementNode = { type: 'Element', tag: elemTag, content: elemContent, attributes: [], children: [], line: start.line, col: start.col };
+            if (which === 'loading') loadingBlock = [elemNode];
+            else if (which === 'error') errorBlock = [elemNode];
+            else if (which === 'empty') emptyBlock = [elemNode];
+          }
+        } else {
+          break;
+        }
+      }
+      this.consume(TokenType.RightBrace);
+    }
+
+    return { type: 'Data', name, typeAnnotation, source, loadingBlock, errorBlock, emptyBlock, line: start.line, col: start.col };
   }
 
   private parseDataSource(): DataSource {
@@ -436,7 +477,8 @@ export class Parser {
     const value = this.consumeIdentifier();
     let body: Record<string, string> | undefined;
 
-    if (this.check(TokenType.LeftBrace)) {
+    // Parse body { } only for POST/PATCH/DELETE — not GET (GET uses { } for loading/error/empty states)
+    if (this.check(TokenType.LeftBrace) && kind !== 'get') {
       this.advance();
       body = {};
       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {

@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.10.0";
+const NYXCODE_VERSION = "0.10.1";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -855,42 +855,59 @@ export class Compiler {
 
   private compileData(data: DataStatement): string {
     const { name, source } = data;
+    const hasStates = data.loadingBlock || data.errorBlock || data.emptyBlock;
+    const loadingId = hasStates ? this.nextId('dl') : '';
+    const errorId = hasStates ? this.nextId('de') : '';
+    const emptyId = hasStates ? this.nextId('dm') : '';
 
-    if (source.kind === 'get') {
+    if (source.kind === 'get' || source.kind === 'query') {
+      const url = source.kind === 'query' ? `/api/__generated/${name}` : source.value;
       this.js.push(`
   // Data: ${name}
   let ${name} = [];
+  let ${name}__loading = true;
+  let ${name}__error = null;
   async function load_${name}() {
+    ${name}__loading = true;
+    ${name}__error = null;
+    ${hasStates ? `if(document.getElementById('${loadingId}'))document.getElementById('${loadingId}').style.display='';` : ''}
+    ${hasStates ? `if(document.getElementById('${errorId}'))document.getElementById('${errorId}').style.display='none';` : ''}
     try {
       const headers = {};
       ${source.auth ? "const tk=localStorage.getItem('token');if(tk)headers['Authorization']='Bearer '+tk;" : ''}
-      const res = await fetch('${source.value}', { headers });
+      const res = await fetch('${url}', { headers });
+      if(!res.ok) throw new Error('HTTP '+res.status);
       ${name} = await res.json();
+      ${name}__loading = false;
+      ${hasStates ? `if(document.getElementById('${loadingId}'))document.getElementById('${loadingId}').style.display='none';` : ''}
+      ${hasStates ? `if(document.getElementById('${emptyId}'))document.getElementById('${emptyId}').style.display=${name}.length===0?'':'none';` : ''}
       render();
     } catch(e) {
+      ${name}__loading = false;
+      ${name}__error = e.message;
       console.error('Failed to load ${name}:', e);
-    }
-  }
-  load_${name}();`);
-    } else if (source.kind === 'query') {
-      // In dynamic mode, queries become API calls
-      const endpoint = `/api/__generated/${name}`;
-      this.js.push(`
-  // Data: ${name} (query: ${source.value.substring(0, 50)}...)
-  let ${name} = [];
-  async function load_${name}() {
-    try {
-      const res = await fetch('${endpoint}');
-      ${name} = await res.json();
-      render();
-    } catch(e) {
-      console.error('Failed to load ${name}:', e);
+      ${hasStates ? `if(document.getElementById('${loadingId}'))document.getElementById('${loadingId}').style.display='none';` : ''}
+      ${hasStates ? `if(document.getElementById('${errorId}'))document.getElementById('${errorId}').style.display='';` : ''}
     }
   }
   load_${name}();`);
     }
 
-    return ''; // Data doesn't produce HTML directly
+    // Generate loading/error/empty HTML blocks
+    let html = '';
+    if (data.loadingBlock) {
+      const loadingHtml = data.loadingBlock.map(s => this.compileStatement(s)).join('');
+      html += `<div id="${loadingId}">${loadingHtml}</div>\n`;
+    }
+    if (data.errorBlock) {
+      const errorHtml = data.errorBlock.map(s => this.compileStatement(s)).join('');
+      html += `<div id="${errorId}" style="display:none">${errorHtml}</div>\n`;
+    }
+    if (data.emptyBlock) {
+      const emptyHtml = data.emptyBlock.map(s => this.compileStatement(s)).join('');
+      html += `<div id="${emptyId}" style="display:none">${emptyHtml}</div>\n`;
+    }
+    return html;
   }
 
   // --- Each compilation ---

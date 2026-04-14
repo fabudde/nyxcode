@@ -125,6 +125,9 @@ export interface DataStatement extends BaseNode {
   name: string;
   typeAnnotation?: string;
   source: DataSource;
+  loadingBlock?: Statement[];
+  errorBlock?: Statement[];
+  emptyBlock?: Statement[];
 }
 
 export interface DataSource {
