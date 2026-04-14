@@ -34,8 +34,8 @@ const ELEMENT_TAGS = new Set([
   'button', 'input', 'select', 'checkbox', 'radio', 'toggle', 'slider', 'textarea',
   'card', 'badge', 'table', 'list', 'metric', 'chart', 'avatar', 'tag',
   'alert', 'toast', 'modal', 'tooltip', 'progress', 'spinner',
-  'row', 'col', 'grid', 'stack', 'container', 'section', 'aside', 'nav', 'footer',
-  'slot', 'submit',
+  'div', 'row', 'col', 'grid', 'stack', 'container', 'section', 'aside', 'nav', 'footer', 'header', 'main', 'article', 'figure', 'figcaption', 'ul', 'ol', 'li',
+  'slot', 'submit', 'br', 'hr',
 ]);
 
 export class Parser {
@@ -1201,7 +1201,13 @@ export class Parser {
         if (valToken.type === TokenType.String) {
           attributes.push({ name, value: this.advance().value });
         } else {
-          attributes.push({ name, value: this.advance().value });
+          let val = this.advance().value;
+          // Responsive shorthand: value@mobileValue (e.g., grid=3@1)
+          if (this.check(TokenType.At) && (this.peekAt(1)?.type === TokenType.Identifier || this.peekAt(1)?.type === TokenType.Number)) {
+            val += this.advance().value; // @
+            val += this.advance().value; // mobile value
+          }
+          attributes.push({ name, value: val });
         }
       }
       // Identifier after element: could be content reference, boolean attribute, or layout shorthand

@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.9.6";
+const NYXCODE_VERSION = "0.9.7";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -590,7 +590,17 @@ export class Compiler {
     if (el.tag === 'grid') {
       const cols = el.attributes.find(a => a.name === 'cols');
       const gap = el.attributes.find(a => a.name === 'gap');
-      extraStyles.push(`display:grid`, `grid-template-columns:repeat(${cols?.value || 3},1fr)`);
+      const colVal = cols?.value || '3';
+      if (typeof colVal === 'string' && colVal.includes('@')) {
+        const [desktop, mobile] = colVal.split('@');
+        extraStyles.push(`display:grid`, `grid-template-columns:repeat(${desktop},1fr)`);
+        const respClass = `nyx-r_${this.nextId('r')}`;
+        const mobileCols = /^\d+$/.test(mobile) ? `repeat(${mobile},1fr)` : mobile;
+        this.css.push(`@media(max-width:768px){.${respClass}{grid-template-columns:${mobileCols}!important}}`);
+        if (!scopeClass) { scopeClass = respClass; } else { scopeClass += ' ' + respClass; }
+      } else {
+        extraStyles.push(`display:grid`, `grid-template-columns:repeat(${colVal},1fr)`);
+      }
       if (gap) extraStyles.push(`gap:${gap.value}`);
     } else if (el.tag === 'row') {
       extraStyles.push('display:flex');
@@ -609,7 +619,17 @@ export class Compiler {
       } else if (attr.name === 'grid' && el.tag !== 'grid') {
         extraStyles.push('display:grid');
         const v = typeof attr.value === 'string' ? attr.value : '';
-        if (/^\d+$/.test(v)) extraStyles.push(`grid-template-columns:repeat(${v},1fr)`);
+        // Responsive shorthand: grid=3@1 → 3 cols desktop, 1 col mobile
+        if (v.includes('@')) {
+          const [desktop, mobile] = v.split('@');
+          if (/^\d+$/.test(desktop)) extraStyles.push(`grid-template-columns:repeat(${desktop},1fr)`);
+          else extraStyles.push(`grid-template-columns:${desktop}`);
+          // Generate responsive class
+          const respClass = `nyx-r_${this.nextId('r')}`;
+          const mobileCols = /^\d+$/.test(mobile) ? `repeat(${mobile},1fr)` : mobile;
+          this.css.push(`@media(max-width:768px){.${respClass}{grid-template-columns:${mobileCols}!important}}`);
+          if (!scopeClass) { scopeClass = respClass; } else { scopeClass += ' ' + respClass; }
+        } else if (/^\d+$/.test(v)) extraStyles.push(`grid-template-columns:repeat(${v},1fr)`);
         else if (v) extraStyles.push(`grid-template-columns:${v}`);
       } else if (attr.name === 'gap' && el.tag !== 'grid' && el.tag !== 'row') {
         extraStyles.push(`gap:${attr.value}`);
@@ -663,6 +683,11 @@ export class Compiler {
       }
     }
     const nonPresetAttrs = filteredAttrs.filter(a => a.name !== 'preset');
+
+    // Auto-inject loading="lazy" on img elements (unless explicitly set)
+    if (tag === 'img' && !nonPresetAttrs.some(a => a.name === 'loading')) {
+      nonPresetAttrs.push({ name: 'loading', value: 'lazy' });
+    }
 
     let attrs = this.compileAttributes(nonPresetAttrs);
     const classes = [scopeClass, presetClass].filter(Boolean).join(' ');
