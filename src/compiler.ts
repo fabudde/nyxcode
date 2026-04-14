@@ -159,6 +159,16 @@ export class Compiler {
       this.usedInteractiveElements = new Set();
       this.componentId = 0;
       this.indent = 0;
+      // Extract head/script/preset nodes BEFORE compileLayoutBody (which skips them)
+      for (const stmt of this.layout.body) {
+        if (stmt.type === 'Head') {
+          this.headInjections.push((stmt as HeadStatement).content);
+        } else if (stmt.type === 'Script') {
+          this.scripts.push((stmt as any).content);
+        } else if (stmt.type === 'Preset') {
+          this.compilePreset(stmt as any);
+        }
+      }
       this.staticMode = true;
       layoutHtmlTemplate = this.compileLayoutBody(this.layout.body, '<!--SLOT-->');
       this.staticMode = false;
@@ -263,10 +273,30 @@ export class Compiler {
       if (node.type === 'Preset') this.compilePreset(node as any);
     }
 
+    // If we have a layout, extract head/script nodes from layout body
+    // and compile layout elements to wrap page content
+    if (this.layout) {
+      // Extract head injections + scripts from layout body (non-element nodes)
+      for (const stmt of this.layout.body) {
+        if (stmt.type === 'Head') {
+          this.headInjections.push((stmt as HeadStatement).content);
+        } else if (stmt.type === 'Script') {
+          this.scripts.push((stmt as any).content);
+        } else if (stmt.type === 'Preset') {
+          this.compilePreset(stmt as any);
+        }
+      }
+    }
+
     // Multi-page: compile ALL pages
     let html = '';
     if (pages.length === 1) {
-      html = this.compilePage(pages[0]);
+      const pageHtml = this.compilePage(pages[0]);
+      if (this.layout) {
+        html = this.compileLayoutBody(this.layout.body, pageHtml);
+      } else {
+        html = pageHtml;
+      }
     } else if (pages.length > 1) {
       html = this.compileMultiPage(pages);
     }
@@ -343,6 +373,9 @@ export class Compiler {
       if (stmt.type === 'Element' && (stmt as ElementNode).tag === 'slot') {
         // Replace slot with page content
         html += slotContent;
+      } else if (stmt.type === 'Head' || stmt.type === 'Script' || stmt.type === 'Preset') {
+        // Skip — already extracted in compile() or compileMultiFile()
+        continue;
       } else {
         html += this.compileStatement(stmt);
       }
@@ -1240,7 +1273,7 @@ export class Compiler {
     }
 
     // Build attributes, substituting prop references in values
-    const filteredAttrs = el.attributes.map(a => {
+    let filteredAttrs = el.attributes.map(a => {
       let val = a.value;
       if (typeof val === 'string') {
         for (const [propName, propVal] of Object.entries(props)) {
@@ -1252,6 +1285,61 @@ export class Compiler {
       return { name: a.name, value: val };
     });
 
+    // Layout shorthand attributes → inline style generation (same as compileElement)
+    const LAYOUT_ATTRS = new Set(['flex', 'grid', 'gap', 'center', 'between', 'around', 'evenly', 'wrap', 'nowrap', 'cols', 'rows', 'place']);
+    const extraStyles: string[] = [];
+    for (const attr of filteredAttrs) {
+      if (attr.name === 'flex') {
+        extraStyles.push('display:flex');
+        const v = typeof attr.value === 'string' ? attr.value : '';
+        if (v === 'col' || v === 'column') extraStyles.push('flex-direction:column');
+        else if (v === 'row') extraStyles.push('flex-direction:row');
+        else if (v === 'wrap') extraStyles.push('flex-wrap:wrap');
+      } else if (attr.name === 'grid') {
+        extraStyles.push('display:grid');
+        const v = typeof attr.value === 'string' ? attr.value : '';
+        if (/^\d+$/.test(v)) extraStyles.push(`grid-template-columns:repeat(${v},1fr)`);
+        else if (v) extraStyles.push(`grid-template-columns:${v}`);
+      } else if (attr.name === 'gap') {
+        extraStyles.push(`gap:${attr.value}`);
+      } else if (attr.name === 'center') {
+        extraStyles.push('align-items:center', 'justify-content:center');
+      } else if (attr.name === 'between') {
+        extraStyles.push('justify-content:space-between');
+      } else if (attr.name === 'around') {
+        extraStyles.push('justify-content:space-around');
+      } else if (attr.name === 'evenly') {
+        extraStyles.push('justify-content:space-evenly');
+      } else if (attr.name === 'wrap') {
+        extraStyles.push('flex-wrap:wrap');
+      } else if (attr.name === 'place') {
+        const v = typeof attr.value === 'string' ? attr.value : '';
+        if (v === 'center') extraStyles.push('place-items:center');
+        else if (v) extraStyles.push(`place-items:${v}`);
+      }
+    }
+    filteredAttrs = filteredAttrs.filter(a => !LAYOUT_ATTRS.has(a.name));
+    if (extraStyles.length > 0) {
+      const extraStyle = extraStyles.join(';');
+      const existingStyle = filteredAttrs.find(a => a.name === 'style');
+      if (existingStyle) {
+        existingStyle.value = extraStyle + ';' + existingStyle.value;
+      } else {
+        filteredAttrs.push({ name: 'style', value: extraStyle });
+      }
+    }
+
+    // Handle preset= attribute → add preset CSS class
+    let presetClass = '';
+    const presetAttr = filteredAttrs.find(a => a.name === 'preset');
+    if (presetAttr) {
+      const presetName = typeof presetAttr.value === 'string' ? presetAttr.value : '';
+      if (this.presets.has(presetName)) {
+        presetClass = this.presets.get(presetName)!;
+      }
+    }
+    filteredAttrs = filteredAttrs.filter(a => a.name !== 'preset');
+
     // For link elements with internal href, add data-navigate for SPA routing
     // Skip in static mode — links are plain <a href> without JS
     if (el.tag === 'link' && !this.staticMode) {
@@ -1261,9 +1349,17 @@ export class Compiler {
       }
     }
 
+    // Expand inline style shorthands (v0.8.1)
+    for (const attr of filteredAttrs) {
+      if (attr.name === 'style' && typeof attr.value === 'string') {
+        attr.value = this.expandInlineShorthands(attr.value);
+      }
+    }
+
     let attrs = this.compileAttributes(filteredAttrs);
-    if (scopeClass) {
-      attrs = ` class="${scopeClass}"${attrs}`;
+    const classes = [scopeClass, presetClass].filter(Boolean).join(' ');
+    if (classes) {
+      attrs = ` class="${classes}"${attrs}`;
     }
 
     // Filter out style blocks from children, recurse into the rest
@@ -1700,19 +1796,19 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
     let css = '\n    /* NyxCode Element Defaults */\n';
 
     if (this.usedInteractiveElements.has('button')) {
-      css += '    button { font-family: inherit; font-size: inherit; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #1a1a2e; color: inherit; cursor: pointer; transition: opacity 0.15s; }\n';
-      css += '    button:hover { opacity: 0.85; }\n';
+      css += '    :where(button) { font-family: inherit; font-size: inherit; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #1a1a2e; color: inherit; cursor: pointer; transition: opacity 0.15s; }\n';
+      css += '    :where(button):hover { opacity: 0.85; }\n';
     }
     if (this.usedInteractiveElements.has('input') || this.usedInteractiveElements.has('select') || this.usedInteractiveElements.has('textarea')) {
       const selectors: string[] = [];
-      if (this.usedInteractiveElements.has('input')) selectors.push('input');
-      if (this.usedInteractiveElements.has('select')) selectors.push('select');
-      if (this.usedInteractiveElements.has('textarea')) selectors.push('textarea');
+      if (this.usedInteractiveElements.has('input')) selectors.push(':where(input)');
+      if (this.usedInteractiveElements.has('select')) selectors.push(':where(select)');
+      if (this.usedInteractiveElements.has('textarea')) selectors.push(':where(textarea)');
       css += `    ${selectors.join(', ')} { font-family: inherit; font-size: inherit; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #0d0d1a; color: inherit; }\n`;
     }
     if (this.usedInteractiveElements.has('a')) {
-      css += '    a { color: #667eea; text-decoration: none; }\n';
-      css += '    a:hover { text-decoration: underline; }\n';
+      css += '    :where(a) { color: #667eea; text-decoration: none; }\n';
+      css += '    :where(a):hover { text-decoration: underline; }\n';
     }
 
     return css;

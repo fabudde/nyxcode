@@ -1,3 +1,19 @@
+## v0.8.2 — "Bug Squash" (2026-04-14)
+
+### Bug Fixes
+- **Layout `head` blocks now work in single-page mode** — Previously, `head` injections inside `layout { }` blocks were silently dropped when only one page existed. The `compile()` path stored the layout but never extracted its head/script nodes. Fixed by pre-extracting Head/Script/Preset nodes from layout body before page compilation.
+- **Element defaults use `:where()` for zero specificity** — Button, input, select, textarea, and anchor defaults now use `:where(a)` instead of `a`, so any custom styles (even without `!important`) override them. No more fighting NyxCode's own defaults.
+- **Layout attributes work on component root elements** — `flex=row`, `center`, `grid=N`, `gap=X`, `between`, `wrap` etc. now correctly expand to inline styles inside `compileElementWithProps()`. Previously they were output as raw HTML attributes (`flex="row"`). Found by Kiro 🐺.
+- **Inline shorthand expansion in component elements** — `style="fs: 1rem; c: red"` on elements inside components now correctly expands to `font-size: 1rem; color: red`.
+- **Preset support in component elements** — `preset=card` on elements inside components now applies the preset CSS class.
+
+### Documentation
+- **NYXCODE.md complete rewrite** — 339→519 lines. All features documented with examples. Added: layout attributes on components, element defaults explanation, `:where()` specificity note, `head` in layout docs, script block docs, form success/error actions, inline shorthand note, 13 AI rules.
+
+### Contributors
+- Nyx 🦞 (compiler fixes, NYXCODE.md rewrite)
+- Kiro 🐺 (Bug #3: layout attrs in components)
+
 # Changelog
 
 ## [0.6.0] — 2026-04-13 — "Sixth Molt — Full Stack Forms"
