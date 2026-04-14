@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.9.1)
+# NYXCODE.md — AI Context File (v0.9.8)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -28,65 +28,80 @@ page / {
   }
 }
 page /register {
-  h1 "Register"
-  form /api/register { input email, input password type=password, submit "Sign Up" }
+  form /api/auth/register { input email, input password, submit "Register", success -> redirect / }
 }
 ```
-**Generates:** SQLite DB + JWT auth + CRUD API + reactive frontend. Zero config.
+This generates: `index.html`, `register/index.html`, AND `server.js` (10 CRUD endpoints + JWT auth + SQLite).
 
----
+## CSS Shorthands — ALWAYS USE THESE
+Property shorthands work in `style {}` blocks, `preset` definitions, inline styles, and CSS rules.
 
-## CSS Shorthands — ALWAYS USE THESE (60+)
-
-| Short | CSS | Short | CSS |
-|-------|-----|-------|-----|
+| Short | CSS Property | Short | CSS Property |
+|-------|-------------|-------|-------------|
 | `bg` | background | `c` | color |
-| `p` | padding | `m` | margin |
-| `pt pb pl pr` | padding-top/bottom/left/right | `mt mb ml mr` | margin-top/bottom/left/right |
-| `px` | padding-inline | `py` | padding-block |
-| `mx` | margin-inline | `my` | margin-block |
+| `m` | margin | `p` | padding |
+| `mt` | margin-top | `pt` | padding-top |
+| `mb` | margin-bottom | `pb` | padding-bottom |
+| `ml` | margin-left | `pl` | padding-left |
+| `mr` | margin-right | `pr` | padding-right |
+| `mx` | margin-inline | `px` | padding-inline |
+| `my` | margin-block | `py` | padding-block |
 | `w` | width | `h` | height |
-| `minw` | min-width | `maxw` | max-width |
-| `minh` | min-height | `maxh` | max-height |
-| `r` | border-radius | `fs` | font-size |
-| `fw` | font-weight | `ff` | font-family |
-| `lh` | line-height | `ls` | letter-spacing |
-| `ta` | text-align | `tt` | text-transform |
-| `td` | text-decoration | `ws` | white-space |
+| `mw` | max-width | `mh` | max-height |
+| `miw` | min-width | `mih` | min-height |
+| `r` | border-radius | `bw` | border-width |
+| `bc` | border-color | `bs` | border-style |
 | `d` | display | `pos` | position |
-| `z` | z-index | `op` | opacity |
-| `cur` | cursor | `v` | visibility |
-| `ai` | align-items | `jc` | justify-content |
-| `as` | align-self | `js` | justify-self |
-| `fd` | flex-direction | `fw` | flex-wrap (context) |
-| `fg` | flex-grow | `fb` | flex-basis |
-| `gap` | gap | `of` | overflow |
-| `shadow` | box-shadow | `tf` | transform |
-| `tr` | transition | `anim` | animation |
+| `t` | top | `b` | bottom |
+| `l` | left | `z` | z-index |
+| `fs` | font-size | `fw` | font-weight |
+| `ff` | font-family | `lh` | line-height |
+| `ls` | letter-spacing | `ta` | text-align |
+| `td` | text-decoration | `tt` | text-transform |
+| `ws` | white-space | `wb` | word-break |
+| `op` | opacity | `cur` | cursor |
+| `of` | overflow | `ox` | overflow-x |
+| `oy` | overflow-y | `v` | visibility |
+| `tr` | transition | `tf` | transform |
+| `anim` | animation | `shadow` | box-shadow |
+| `tshadow` | text-shadow | `o` | outline |
+| `oc` | outline-color | `ow` | outline-width |
+| `ai` | align-items | `ac` | align-content |
+| `as` | align-self | `jc` | justify-content |
+| `ji` | justify-items | `js` | justify-self |
+| `fi` | flex | `fb` | flex-basis |
+| `fg` | flex-grow | `fsk` | flex-shrink |
+| `fd` | flex-direction | `fw` | flex-wrap |
 | `gtc` | grid-template-columns | `gtr` | grid-template-rows |
 | `gc` | grid-column | `gr` | grid-row |
-| `pi` | place-items | `bs` | border-style |
-| `bw` | border-width | `bc` | border-color |
+| `ga` | grid-area | `pe` | pointer-events |
+| `us` | user-select | `ap` | appearance |
+| `rs` | resize | `ol` | outline |
+| `wc` | will-change | `ct` | content |
+| `gg` | gap | `iso` | isolation |
+| `obf` | object-fit | `obp` | object-position |
+| `bgi` | background-image | `bgs` | background-size |
+| `bgp` | background-position | `bgr` | background-repeat |
+| `bgc` | background-clip | `bf` | backdrop-filter |
+| `fil` | filter | `mix` | mix-blend-mode |
+| `si` | scroll-snap-type | `sa` | scroll-snap-align |
 
-**Shorthands work in:** `style { }` blocks, `preset` definitions, AND inline `style="fs: 1rem; c: red"`.
-
----
-
-## Layout Attributes — On ANY Element (incl. Components)
+## Layout Attributes — On Any Element
 ```nyx
-section flex=col center gap=2rem { }     # Flexbox column, centered
-nav flex=row between { }                  # Flex row, space-between
-div grid=3 gap=1.5rem { }                # 3-column grid
-div flex=wrap gap=1rem { }               # Flex with wrapping
+div flex=col center gap=2rem { ... }     # Flexbox column, centered, 2rem gap
+div flex=row between wrap { ... }         # Flex row, space-between, wrapping
+div grid=3 gap=1rem { ... }              # 3-column grid
+div grid=3@1 gap=2rem { ... }            # 3 cols desktop, 1 col mobile! (v0.9.7+)
 ```
 
-| Attr | CSS |
-|------|-----|
+| Attribute | Effect |
+|-----------|--------|
 | `flex=col` | `display:flex; flex-direction:column` |
 | `flex=row` | `display:flex; flex-direction:row` |
 | `flex=wrap` | `display:flex; flex-wrap:wrap` |
-| `grid=3` | `display:grid; grid-template-columns:repeat(3,1fr)` |
-| `gap=X` | `gap:X` |
+| `grid=N` | `display:grid; grid-template-columns:repeat(N,1fr)` |
+| `grid=N@M` | N cols desktop, M cols mobile (auto @media) (v0.9.7+) |
+| `gap=X` | `gap: X` |
 | `center` | `align-items:center; justify-content:center` |
 | `between` | `justify-content:space-between` |
 | `around` | `justify-content:space-around` |
@@ -94,434 +109,372 @@ div flex=wrap gap=1rem { }               # Flex with wrapping
 | `wrap` | `flex-wrap:wrap` |
 | `place=center` | `place-items:center` |
 
-**⚠️ `center` + `between` conflict!** `center` sets `justify-content:center` which overrides `between`. For vertical centering + horizontal space-between, use:
-```nyx
-section flex=row between {
-  style { ai center }
-}
-```
-
----
-
 ## Style Presets — Define Once, Use Everywhere
 ```nyx
-preset label { fs 0.7rem, fw 700, tt uppercase, c primary }
-preset card { bg card, r 12px, p 2rem }
+preset card { bg #1a1a2e, r 12px, p 2rem, shadow 0 4px 12px rgba(0,0,0,0.2) }
+preset label { fs 0.7rem, fw 700, tt uppercase, ls 0.05em, c #888 }
 
-p "SECTION TITLE" preset=label
-section preset=card { h3 "Card Content" }
-```
-**Preset + style combo:** `preset=` applies the preset class, additional `style { }` block adds more:
-```nyx
-div preset=card { style { shadow 0 4px 20px rgba(0,0,0,0.2) } }
-```
-
----
-
-## Theme — Global Design Tokens
-```nyx
-theme {
-  colors { primary #667eea, accent #f093fb, bg #0a0a12, card #1a1a2e, text #e2e8f0 }
-  fonts { heading "Space Grotesk, sans-serif", body "Inter, sans-serif" }
+page / {
+  div preset=card { h2 "Hello", span "Tag" preset=label }
 }
 ```
-- Colors → CSS variables: `var(--colors-primary)`, `var(--colors-bg)`
-- **✨ IMPLICIT THEME COLORS (v0.9):** Use color names directly in color properties!
-  - `c primary` → compiles to `color: var(--colors-primary)`
-  - `bg card` → compiles to `background: var(--colors-card)`
-  - `bgc accent` → compiles to `background-color: var(--colors-accent)`
-  - Works in: `style {}` blocks, `preset {}` blocks, inline `style=""` attributes
-  - Only on color-accepting properties (color, background, background-color, border-color, fill, stroke)
-  - Hex/RGB/HSL/var() values are NEVER touched
-  - Both short (`primary`) and full (`colors-primary`) names work
-- `heading` font auto-applies to `h1`–`h6`
-- `body` font auto-applies to `body`, `p`, `span`, `li`
-- **Quote font values with commas:** `"Inter, sans-serif"`
+Generates `.nyx-p_card` and `.nyx-p_label` CSS classes. Saves 30-40% tokens on repeated styling.
 
----
+## Theme — Colors & Fonts
+```nyx
+theme {
+  colors { primary #667eea, bg #0a0a12, card #1a1a2e, accent #f59e0b }
+  fonts { heading "Inter, sans-serif", body "system-ui, sans-serif" }
+}
+```
+- Colors become CSS custom properties: `--colors-primary`, `--colors-bg`, etc.
+- **Implicit theme colors (v0.9.0+):** Write `c primary` instead of `c var(--colors-primary)` — compiler auto-resolves!
+- Works everywhere: style blocks, presets, inline styles, CSS rules.
+- Font heading auto-applies to h1-h6, font body to body/p/span/li.
 
 ## Pages & Routing
 ```nyx
-page / { h1 "Home" }
-page /about { h1 "About" }
-page /blog { h1 "Blog" }
-page /docs/install { h1 "Install" }
+page / { h1 "Home" }                    # → index.html
+page /about { h1 "About" }              # → about/index.html
+page /blog { h1 "Blog" }                # → blog/index.html
 ```
-- Each `page /path { }` = one route → one HTML file (SSG)
-- Single page → `dist-site/index.html`
-- Multi-page → `dist-site/`, `dist-site/about/index.html`, etc.
-- Auto SEO: `<title>`, `<meta description>`, `<link rel="canonical">`
-
----
+- 2+ pages = multi-file static output (SSG), one HTML per page.
+- 1 page = single HTML file with SPA routing.
+- Each page auto-gets `<title>`, `<meta description>`, `<link rel="canonical">`.
 
 ## Elements
+All standard HTML elements are recognized:
+
+### Text
+`h1`-`h6`, `p`, `span`, `text` (→span), `link` (→a)
+
+### Interactive
+`button`, `input`, `select`, `checkbox`, `radio`, `toggle`, `slider`, `textarea`, `submit`
+
+### Media
+`img`, `video`
+- `img` auto-gets `loading="lazy"` (v0.9.7+)
+- `img "alt text" src="url"` → `<img alt="alt text" src="url" loading="lazy" />` (v0.9.8+)
+
+### Structure
+`div`, `section`, `header`, `footer`, `nav`, `aside`, `main`, `article`, `figure`, `figcaption`, `container`, `card`, `row`, `col`, `grid`, `stack`, `ul`, `ol`, `li`
+
+### Void Elements
+`br`, `hr`, `img`, `input` — self-closing, no children needed.
 ```nyx
-# Text
-h1 "Title"                     h2 "Subtitle"
-p "Paragraph"                  span "Inline"
-
-# Links
-a "Click here" href="/about"
-link "Click" href="/about"              # alias for <a>
-
-# Structure (all compile to HTML tags)
-section { }    div { }    nav { }    header { }    footer { }
-main { }       aside { }  article { }
-
-# Media
-img src="/photo.jpg" alt="A photo"
-video src="/clip.mp4" controls
-
-# Form elements
-button "Click me" -> count = count + 1
-input placeholder="Type..." bind=name
-input type=password placeholder="Password"
-input type=email placeholder="Email"
-select { option "Red", option "Blue", option "Green" }
-textarea placeholder="Write something..."
-
-# Attributes on any element
-div id="team"                           # anchor target
-div class="custom-class"               # CSS class
-div style="bg: red; r: 12px;"          # inline (shorthands work!)
+p "Line one"
+br
+p "Line two"
 ```
 
-**⚠️ SIBLING RULE:** Two same-level elements can merge. Always wrap in `div { }`:
-```nyx
-# WRONG — these may merge into one element
-a "Home" href="/"
-a "About" href="/about"
+### Semantic Aliases
+| NyxCode | HTML |
+|---------|------|
+| `link` | `<a>` |
+| `text` | `<span>` |
+| `card` | `<div>` |
+| `container` | `<div>` |
+| `row` | `<div>` (with flex) |
+| `col` | `<div>` |
+| `grid` | `<div>` (with grid) |
+| `stack` | `<div>` |
 
-# RIGHT — wrap each
-div { a "Home" href="/" }
-div { a "About" href="/about" }
+### Element Syntax
+```nyx
+h1 "Hello World"                         # Text content
+link "Click me" href="/about"            # Content + attributes
+img src="photo.jpg" alt="A photo"        # Attributes only (void)
+img "A photo" src="photo.jpg"            # Alt text as content (v0.9.8+)
+div class="hero" id="main" { ... }      # Attributes + children
+button "Submit" style="bg: blue"         # Inline style
+div preset=card { p "Content" }          # Preset class
 ```
 
----
+### IMPORTANT: Sibling Elements
+```nyx
+# WRONG — `link` becomes attribute of `p`
+p "Hello" link "Click" href="/x"
+
+# RIGHT — separate elements
+div {
+  p "Hello"
+  link "Click" href="/x"
+}
+```
+Elements on the same line merge. Use a wrapping `div {}` or put on separate lines inside a block.
 
 ## Styling (3 Tiers)
 
-### Tier 1: Style Blocks (use this 90% of the time)
+### Tier 1: Inline Style (quick)
 ```nyx
-section {
-  style {
-    bg #1a1a2e, c white, p 2rem, r 12px
-    d flex, fd column, gap 1rem
-    maxw 800px, m 0 auto
-  }
-  h1 "Content"
-}
+h1 "Title" style="fs: 2rem; fw: 700; c: primary"
 ```
 
-### Hover / Focus / Active / Pseudo-elements
+### Tier 2: Style Block (hover, responsive, animations)
 ```nyx
 div {
   style {
-    bg #667eea, c white, p 1rem, r 8px
-    tr all 0.3s ease
-    hover { bg #5a6fd6, tf translateY(-2px), shadow 0 8px 20px rgba(0,0,0,0.3) }
-    focus { outline 2px solid #667eea }
-    active { tf scale(0.98) }
-    ::after { content "", d block, w 100%, h 2px, bg #667eea }
+    bg #1a1a2e, r 12px, p 2rem
+    hover { tf translateY(-4px), shadow 0 12px 40px rgba(0,0,0,0.3) }
+    @mobile { p 1rem, fs 0.9rem }
   }
+  h2 "Card Title"
 }
 ```
 
-### Responsive Breakpoints
+### Tier 3: CSS Rules in Style Blocks (v0.9.4+)
+```nyx
+page / {
+  style {
+    * { m 0, p 0, box-sizing border-box }
+    body { bg #0d0d1a, c #f0eaff }
+    .card { bg #1a1a2e, r 12px, p 2rem }
+    .card:hover { tf translateY(-4px) }
+    ::selection { bg rgba(245,158,11,0.3) }
+    footer a { c pink, td none }
+    @keyframes spin {
+      0% { transform rotate(0deg) }
+      100% { transform rotate(360deg) }
+    }
+  }
+  div class="card" { p "Styled!" }
+}
+```
+CSS rules support: `.class`, `tag`, `*`, `.class:pseudo`, `::pseudo-element`, `@keyframes`.
+All CSS shorthands work inside rules. Vendor prefixes (`-webkit-*`) supported (v0.9.5+).
+
+### Pseudo-classes & Responsive
 ```nyx
 style {
-  p 4rem, gtc repeat(3, 1fr)
-  @mobile { p 1rem, gtc 1fr }              # max-width: 768px
-  @tablet { p 2rem, gtc repeat(2, 1fr) }   # max-width: 1024px
+  bg blue
+  hover { bg darkblue }
+  focus { o 2px solid blue }
+  active { tf scale(0.98) }
+  @mobile { fs 0.9rem }        # max-width: 768px
+  @tablet { fs 1rem }          # max-width: 1024px
 }
 ```
 
-### Tier 2: Animate Blocks
+## State & Reactivity
 ```nyx
-animate fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-animate pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+page / {
+  state count = 0
+  button "Count: {count}" on:click -> count = count + 1
 }
 ```
-**Note:** `animate` uses CSS syntax (semicolons + colons), not NyxCode shorthand commas.
-
-### Tier 3: Head CSS Injection (global/complex CSS)
-```nyx
-head "<style>@keyframes spin { to { transform: rotate(360deg) } }</style>"
-head "<link href='https://fonts.googleapis.com/css2?family=Inter&display=swap' rel='stylesheet'>"
-```
-Use for: third-party fonts, complex keyframes, global overrides. Works in both `layout` and `page` blocks.
-
----
 
 ## Components
 ```nyx
 component Card {
-  props title desc icon
-  section preset=card {
-    span .icon style="fs: 2rem;"
-    div { h3 .title }
-    p .desc style="c: #888;"
+  props title, subtitle="Default"
+  div {
+    style { bg #1a1a2e, r 12px, p 2rem }
+    h3 .title
+    p .subtitle
+    slot                                  # ← children go here
   }
 }
 
-# Usage
-Card title="Fast" desc="Milliseconds" icon="⚡"
-```
-
-### Default Props
-```nyx
-component Button {
-  props label="Click" color="#667eea" size="1rem"
-}
-Button label="Submit"                   # Uses default color + size
-Button label="Delete" color="red"      # Override color
-```
-
-### Slots (nested content)
-```nyx
-component Modal {
-  props title
-  section { h2 .title, slot }
-}
-Modal title="Confirm" { p "Are you sure?", button "Yes" }
-```
-
-### Layout Attributes on Components
-```nyx
-component Row {
-  props gap="1rem"
-  section flex=row center gap=.gap { slot }
+page / {
+  Card title="Hello" { p "Slotted content!" }
 }
 ```
-`flex=row`, `center`, `grid=N`, `between`, etc. all work on component root elements.
+- `props` declares accepted properties with optional defaults.
+- `slot` renders children passed to the component.
+- `.propName` accesses prop values as content.
+- Components start with uppercase.
 
----
-
-## Layout — Shared Wrapper
+## Layout (wraps all pages)
 ```nyx
 layout {
-  head "<link href='https://fonts.googleapis.com/...' rel='stylesheet'>"
-  head "<title>My Site</title>"
-  nav flex=row between {
-    div { a "Home" href="/" }
-    div { a "About" href="/about" }
-  }
-  main { slot }
+  nav { link "Home" href="/", link "About" href="/about" }
+  slot                                    # ← page content goes here
   footer { p "© 2026" }
 }
 ```
-- `slot` = where page content goes
-- `head` blocks in layout inject into every page's `<head>`
-- One layout per file (use `use` to import)
+The `layout` block wraps ALL pages automatically. Only one layout per file.
 
----
-
-## Imports (Multi-File)
+## Imports (multi-file)
 ```nyx
-use "./components.nyx"          # Import components
-use "./layout.nyx"              # Import layout
+use "./components.nyx"
+use "./layout.nyx"
+
+page / { MyComponent title="Hello" }
 ```
-Components and layouts from imported files are available in all pages.
-
----
-
-## State & Reactivity
-```nyx
-state count = 0
-state name = "World"
-computed double = count * 2
-computed greeting = "Hello " + name
-
-h1 count                                # Auto-updates
-h2 greeting
-button "+" -> count = count + 1
-button "Reset" -> count = 0
-input bind=name                         # Two-way binding
-```
-
----
-
-## Data Binding (Frontend ↔ API)
-```nyx
-data posts = get /api/posts             # Public fetch
-data posts = get /api/posts auth        # With JWT token
-each posts -> div { h3 .title, p .body }
-```
-
----
+Imports components AND layouts from other `.nyx` files.
 
 ## Iteration & Conditionals
 ```nyx
-# each — loop over data
-each items -> div { h3 .name, p .description }
+# Loop over data
+data users = get /api/users
+each users -> div { h3 .name, p .email }
 
-# when/else — conditional rendering
-when loggedIn -> p "Welcome back!"
-else -> div { a "Login" href="/login" }
+# Named element in loop
+each users -> Card { h3 .name }
+
+# Conditionals
+when .role == "admin" { button "Delete" }
 ```
 
----
-
-## Forms — Declarative, Auth-Aware
+## Forms (v0.6+)
 ```nyx
 form /api/posts auth {
-  input title placeholder="Post title" required
-  textarea body placeholder="Write..."
-  submit "Publish"
-  success -> reload                     # or: redirect "/blog" | toast "Done!" | clear
-  error -> toast "Something went wrong"
+  input title placeholder="Post title"
+  input body placeholder="Content"
+  submit "Create Post"
+  success -> reload
+  error -> toast "Failed to create post"
 }
 ```
-- `auth` → auto-includes `Authorization: Bearer` header from localStorage
-- `success` actions: `reload`, `redirect "/path"`, `toast "message"`, `clear`
-- `error` actions: `toast "message"`
-- Auto-generates: `<form>`, `fetch()`, JSON body, error handling
+- `auth` → auto-includes JWT Bearer token
+- `input fieldname` → `name="fieldname"`, `id="form-endpoint-fieldname"`
+- `success -> reload|redirect /path|toast "msg"|clear`
+- `error -> toast "msg"`
+- Generates complete `<form>` + `fetch()` + error handling. Zero JS.
 
----
-
-## Script Block (Escape Hatch)
+## Script Block (escape hatch)
 ```nyx
-script {
-  document.addEventListener('DOMContentLoaded', function() {
-    // Any JavaScript here
-    console.log('Custom JS');
-  });
+page / {
+  script {
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('Raw JS here!');
+    });
+  }
 }
 ```
-Use sparingly. 95% of apps need zero script blocks.
+Raw JavaScript captured at lexer level. Use sparingly — NyxCode native features preferred.
 
----
+## Icons
+4 methods — no native `icon` element:
+1. **Emoji:** `span "🦞"`
+2. **Lucide CSS:** Add CDN in `head`, use `<i data-lucide="heart"></i>` via script
+3. **Font Awesome:** Add CDN in `head`, `span class="fa-solid fa-heart"`
+4. **Material Icons:** Add CDN in `head`, `span "heart" class="material-icons"`
 
-## Icons — 4 Methods
-
-**Emoji (simplest):**
+## Head Injection
 ```nyx
-span "🦞" style="fs: 2rem;"
+page / {
+  head "<link rel='stylesheet' href='https://cdn.example.com/lib.css'>"
+  head "<script src='https://cdn.example.com/lib.js' defer></script>"
+  head "<style>@keyframes fade { from { opacity: 0 } to { opacity: 1 } }</style>"
+  h1 "Page with third-party libs"
+}
 ```
+- Raw HTML string injected into `<head>`.
+- Use for third-party CDNs, custom meta tags, complex CSS that needs `{}` in strings.
+- If `head` contains `<title>`, compiler skips auto-generated title.
 
-**Lucide Icons:**
+## `__version__` Keyword (v0.9.3+)
 ```nyx
-head "<link href='https://unpkg.com/lucide-static@latest/font/lucide.css' rel='stylesheet'>"
-span "" class="icon-home"
+p "Built with NyxCode __version__"
 ```
-
-**Font Awesome:**
-```nyx
-head "<link href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css' rel='stylesheet'>"
-span "" class="fa-solid fa-house"
-```
-
-**Material Icons:**
-```nyx
-head "<link href='https://fonts.googleapis.com/icon?family=Material+Icons' rel='stylesheet'>"
-span "home" class="material-icons"
-```
-
----
+Auto-replaced with current NyxCode version at compile time.
 
 ## Full-Stack Backend
 
-### Tables → Auto CRUD API
+### Tables (= Database)
 ```nyx
-table posts {
-  title text required
-  body text
-  author users                          # Foreign key → users table
-  views int default="0"
-  featured bool
-  created auto                          # Auto-timestamp
+table users {
+  name text required
+  email email unique
+  password text required
+  role text default="user"
+  avatar text
+  created auto
 }
 ```
-- Auto-generates: `id` INTEGER PRIMARY KEY, all CRUD endpoints (`GET/POST/PUT/DELETE /api/posts`)
-- Types: `text`, `email`, `int`, `float`, `bool`, `auto`, `tablename` (FK)
-- Constraints: `required`, `unique`, `default="value"`
-- DB: SQLite with WAL mode, foreign keys enabled
+**Types:** `text`, `email` → TEXT | `number`, `int` → INTEGER | `float`, `decimal` → REAL | `bool` → INTEGER | `auto` → DATETIME DEFAULT CURRENT_TIMESTAMP | `[tablename]` → FOREIGN KEY
 
-### Security → Auth System
+**Constraints:** `required` → NOT NULL | `unique` → UNIQUE | `default="value"` → DEFAULT 'value'
+
+Auto-generates: CREATE TABLE + 5 CRUD endpoints per table:
+- `GET /api/tablename` — list all
+- `GET /api/tablename/:id` — get by id
+- `POST /api/tablename` — create
+- `PUT /api/tablename/:id` — update
+- `DELETE /api/tablename/:id` — delete
+
+### Security (= Auth)
 ```nyx
 security {
-  table users                           # User storage table
-  login email password                  # Login fields
-  token jwt                             # JWT tokens
-  protect /api/posts                    # Protected endpoints
+  table users
+  login email password
+  token jwt
+  protect /api/posts
 }
 ```
-Generates: `/api/register`, `/api/login`, `/api/me`, JWT middleware, bcrypt hashing, rate limiting.
+Auto-generates: Register, Login, Me, JWT middleware, bcrypt hashing, rate limiting.
 
-**⚠️ `protect /api/posts` applies to ALL methods** (GET included). Users must register/login first.
+**Security features (v0.9.6+):**
+- Table name validation against SQL injection
+- JWT_SECRET hard-fails in production (no random fallback)
+- Rate limiting on auth endpoints (20 req/15min)
+- Rate limiting on write CRUD endpoints (100 req/15min)
+- Path traversal protection on imports
 
-### Runtime Dependencies
-Server (`server.js`) uses: `express`, `better-sqlite3`, `bcryptjs`, `jsonwebtoken`, `express-rate-limit`. Install in your deploy directory.
+### Data Binding (Frontend to Backend)
+```nyx
+data posts = get /api/posts              # Public data
+data posts = get /api/posts auth         # Authenticated (sends JWT)
+```
+Generates `fetch()` calls with optional Bearer token from localStorage.
 
----
+## Default Props (v0.3+)
+```nyx
+component Badge {
+  props label, color="blue"
+  span .label style="bg: {color}"
+}
+Badge label="New"                         # color defaults to "blue"
+Badge label="Hot" color="red"             # override
+```
 
-## Element Defaults
-NyxCode auto-generates base CSS for interactive elements (`button`, `input`, `select`, `textarea`, `a`) using `:where()` selectors (zero specificity). **Your styles always override defaults** — no `!important` needed.
-
----
+## Element CSS Defaults
+Buttons, inputs, selects, textareas auto-get base CSS (font, padding, border-radius, border). Uses `:where()` for zero specificity — your styles always win.
 
 ## Common Mistakes
+```nyx
+# ❌ WRONG: head with CSS containing {} (breaks parser)
+head "<style>.foo { color: red; }</style>"
 
-| Wrong | Right |
-|-------|-------|
-| `<div class="flex">` | `section flex=row { }` |
-| `className="text-lg"` | `style { fs 1.125rem }` |
-| `onClick={() => set(c+1)}` | `button "+" -> count = count + 1` |
-| `import React from 'react'` | `use "./component.nyx"` |
-| `export default function App()` | `page / {` |
-| `background-color: red;` | `bg red` |
-| `border-radius: 12px;` | `r 12px` |
-| `font-size: 0.9rem;` | `fs 0.9rem` |
-| `display: flex;` | `d flex` (or `flex=row`) |
-| `{items.map(i => <li>{i}</li>)}` | `each items -> div { p .name }` |
-| `{show && <p>Hi</p>}` | `when show -> p "Hi"` |
-| `style="background-color: red"` | `style="bg: red"` (shorthands work inline!) |
+# ✅ RIGHT: Use style block with CSS rules instead
+style { .foo { c red } }
 
----
+# ❌ WRONG: CSS shorthands inside @keyframes
+style { @keyframes spin { 0% { tf rotate(0) } } }
+
+# ✅ RIGHT: Full property names in @keyframes
+style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(360deg) } } }
+```
 
 ## Troubleshooting
-
 | Problem | Solution |
 |---------|----------|
-| Style not applied | `style { }` must be INSIDE the element's `{ }`, not after |
-| Component not found | Define components BEFORE pages in the file |
-| Props not showing | Use `.propName` (dot prefix) inside component body |
-| State not updating | Arrow syntax: `-> varName = expression` |
-| Elements merging | Wrap siblings in `div { }` |
-| Import not working | Relative paths: `use "./file.nyx"` |
-| Font commas break | Quote font values: `"Inter, sans-serif"` |
-| `center` + `between` | Use `style { ai center }` separately (see above) |
-| `class` not applied | Works for head-injected CSS classes: `class="my-class"` |
-| Anchor links | Use `div id="section"` for scroll targets |
-| `animate` syntax | Uses CSS syntax (`;` and `:`) not NyxCode commas |
-| Layout head missing | `head` works in both `layout { }` and `page { }` blocks |
-| Default styles too strong | Element defaults use `:where()` — your styles always win |
+| `Unexpected token at top level` | Element not in ELEMENT_TAGS, or missing page wrapper |
+| `{}` in head string breaks parser | Use CSS rules in `style {}` blocks instead |
+| Sibling elements merge | Wrap in `div {}` or put inside page/component block |
+| Inline style commas | Use `;` not `,` in `style="..."` attributes |
+| Theme color not resolving | Must be defined in `theme { colors { name value } }` |
+| `img` shows `value=` instead of `alt=` | Update to v0.9.8+ |
+| `div` absorbed into previous element | Update to v0.9.7+ (div now in ELEMENT_TAGS) |
 
----
+## AI Rules
+1. **USE SHORTHANDS** — `bg` not `background`, `c` not `color`, `r` not `border-radius`
+2. **USE PRESETS** for repeated styling — define once, apply with `preset=name`
+3. **USE LAYOUT ATTRS** — `flex=col center gap=2rem` not separate style blocks
+4. **USE RESPONSIVE SHORTHANDS** — `grid=3@1` not style + @mobile
+5. **USE THEME COLORS** — `c primary` not `c #667eea`, define in `theme {}`
+6. **ONE FILE** when possible — single .nyx = maximum token efficiency
+7. **NO RAW HTML** — NyxCode replaces HTML. Use `head` only for third-party CDNs.
+8. **VOID ELEMENTS** don't need `{}` — `br`, `hr`, `img src="x"` alone is fine.
+9. **`__version__`** auto-replaces with NyxCode version.
+10. **CSS RULES** in style blocks for global/class styling (v0.9.4+).
 
-## AI Rules (READ THIS!)
-1. **USE SHORTHANDS** — `bg c p m r fs fw w h d op z ai jc fd`, never full CSS names
-2. **USE LAYOUT ATTRS** — `flex=col center gap=2rem` not `style { d flex, fd column }`
-3. **USE PRESETS** — define once, `preset=name` everywhere. Avoid repeating styles
-4. **USE THEME** — `c primary` not hardcoded `c #667eea` (implicit theme colors auto-resolve!)
-5. **WRAP SIBLINGS** — `div { element }` to prevent parser merging
-6. **ONE FILE DEFAULT** — put everything in one `.nyx` file. Multi-file with `use` for large apps
-7. **NO CLOSING TAGS** — `{ }` blocks, not `</div>`
-8. **PROPS USE DOT** — `.title` `.name` inside components to reference props
-9. **STRINGS USE `""`** — always double quotes
-10. **COMMENTS USE `#`** — `# This is a comment`
-11. **COMMAS IN STYLE** — `bg red, c white, p 1rem` (commas separate properties)
-12. **NO HTML INJECTION** — use NyxCode elements, not raw HTML (except in `head` blocks)
-13. **`head` TAKES RAW STRING** — `head "<link ...>"` NOT `head { link ... }`
-
----
+## Token Comparison (measured with cl100k_base)
+| What | NyxCode | Alternative | Savings |
+|------|---------|-------------|---------|
+| Static page | 187 tokens | Tailwind HTML: 251 | **-25%** |
+| Full-stack blog | 169 tokens | Next.js+Prisma+NextAuth: 964 | **-82%** |
 
 ## Version
-v0.8.2 — https://nyxcode.io/ — MIT License
-Built by Nyx 🦞 & Fabian
+v0.9.8 — 16 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺 (6 bugs found + fixed).
