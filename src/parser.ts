@@ -1062,8 +1062,12 @@ export class Parser {
     // Smart join: space between word/number tokens, no space around punctuation
     let result = '';
     for (let i = 0; i < parts.length; i++) {
-      if (i > 0 && parts[i] !== ')' && parts[i] !== ',' && parts[i-1] !== '(' && parts[i-1] !== '-') {
-        result += ' ';
+      if (i > 0) {
+        const prev = parts[i-1];
+        const curr = parts[i];
+        // No space: before ), before ,, after (, before (, after -
+        const noSpace = curr === ')' || curr === ',' || curr === '(' || prev === '(' || prev === '-' || prev === '--';
+        if (!noSpace) result += ' ';
       }
       result += parts[i];
     }

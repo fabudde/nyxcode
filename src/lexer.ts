@@ -194,8 +194,10 @@ export class Lexer {
       value += this.advance();
     }
 
-    // Handle units (rem, px, etc.)
-    if (!this.isAtEnd() && this.isAlpha(this.peek())) {
+    // Handle units (rem, px, vh, %, etc.)
+    if (!this.isAtEnd() && this.peek() === '%') {
+      value += this.advance();
+    } else if (!this.isAtEnd() && this.isAlpha(this.peek())) {
       while (!this.isAtEnd() && this.isAlpha(this.peek())) {
         value += this.advance();
       }
