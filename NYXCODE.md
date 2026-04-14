@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.8.2)
+# NYXCODE.md — AI Context File (v0.9.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -17,7 +17,7 @@ nyxcode parse app.nyx          # Debug AST output
 table posts { title text required, body text, created auto }
 security { table users, login email password, token jwt, protect /api/posts }
 theme { colors { primary #667eea, bg #0a0a12, card #1a1a2e } }
-preset card { bg var(--colors-card), r 12px, p 2rem }
+preset card { bg card, r 12px, p 2rem }
 
 page / {
   section style="max-width: 800px; margin: 0 auto; padding: 2rem;" {
@@ -105,8 +105,8 @@ section flex=row between {
 
 ## Style Presets — Define Once, Use Everywhere
 ```nyx
-preset label { fs 0.7rem, fw 700, tt uppercase, c var(--colors-primary) }
-preset card { bg var(--colors-card), r 12px, p 2rem }
+preset label { fs 0.7rem, fw 700, tt uppercase, c primary }
+preset card { bg card, r 12px, p 2rem }
 
 p "SECTION TITLE" preset=label
 section preset=card { h3 "Card Content" }
@@ -126,6 +126,14 @@ theme {
 }
 ```
 - Colors → CSS variables: `var(--colors-primary)`, `var(--colors-bg)`
+- **✨ IMPLICIT THEME COLORS (v0.9):** Use color names directly in color properties!
+  - `c primary` → compiles to `color: var(--colors-primary)`
+  - `bg card` → compiles to `background: var(--colors-card)`
+  - `bgc accent` → compiles to `background-color: var(--colors-accent)`
+  - Works in: `style {}` blocks, `preset {}` blocks, inline `style=""` attributes
+  - Only on color-accepting properties (color, background, background-color, border-color, fill, stroke)
+  - Hex/RGB/HSL/var() values are NEVER touched
+  - Both short (`primary`) and full (`colors-primary`) names work
 - `heading` font auto-applies to `h1`–`h6`
 - `body` font auto-applies to `body`, `p`, `span`, `li`
 - **Quote font values with commas:** `"Inter, sans-serif"`
@@ -501,7 +509,7 @@ NyxCode auto-generates base CSS for interactive elements (`button`, `input`, `se
 1. **USE SHORTHANDS** — `bg c p m r fs fw w h d op z ai jc fd`, never full CSS names
 2. **USE LAYOUT ATTRS** — `flex=col center gap=2rem` not `style { d flex, fd column }`
 3. **USE PRESETS** — define once, `preset=name` everywhere. Avoid repeating styles
-4. **USE THEME** — `var(--colors-primary)` not hardcoded `#667eea` everywhere
+4. **USE THEME** — `c primary` not hardcoded `c #667eea` (implicit theme colors auto-resolve!)
 5. **WRAP SIBLINGS** — `div { element }` to prevent parser merging
 6. **ONE FILE DEFAULT** — put everything in one `.nyx` file. Multi-file with `use` for large apps
 7. **NO CLOSING TAGS** — `{ }` blocks, not `</div>`

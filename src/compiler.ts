@@ -52,6 +52,7 @@ export class Compiler {
   private importResolver?: (path: string) => Program | null;
   private headInjections: string[] = [];
   private themeVars: Map<string, string> = new Map();
+  private themeColorNames: Map<string, string> = new Map(); // value name → full CSS var name (e.g. 'primary' → 'colors-primary')
   private presets: Map<string, string> = new Map(); // preset name → CSS class name
   private scripts: string[] = [];
   private animations: string[] = [];
@@ -694,12 +695,8 @@ export class Compiler {
     let cssBlock = `.${className} {\n`;
     for (const prop of style.properties) {
       const cssProp = this.mapCSSProperty(prop.name);
-      if (cssProp.includes(':')) {
-        // Complex mapping like 'flex' -> 'display: flex; gap'
-        cssBlock += `  ${cssProp}: ${prop.value};\n`;
-      } else {
-        cssBlock += `  ${cssProp}: ${prop.value};\n`;
-      }
+      const cssVal = this.resolveThemeValue(cssProp, prop.value);
+      cssBlock += `  ${cssProp}: ${cssVal};\n`;
     }
     cssBlock += '}\n';
 
@@ -712,7 +709,8 @@ export class Compiler {
       if (pseudoProps) {
         cssBlock += `.${className}:${pseudoName} {\n`;
         for (const prop of pseudoProps) {
-          cssBlock += `  ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+          const cp = this.mapCSSProperty(prop.name);
+          cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
         }
         cssBlock += '}\n';
       }
@@ -724,13 +722,13 @@ export class Compiler {
       for (const pe of style.pseudoElements) {
         if (!ALLOWED_PSEUDO_ELEMENTS.includes(pe.selector)) continue; // Security: skip unknown
         cssBlock += `.${className}::${pe.selector} {\n`;
-        // Ensure content property exists (required for pseudo-elements)
         const hasContent = pe.properties.some(p => p.name === 'content');
         if (!hasContent) {
           cssBlock += `  content: '';\n`;
         }
         for (const prop of pe.properties) {
-          cssBlock += `  ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+          const cp = this.mapCSSProperty(prop.name);
+          cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
         }
         cssBlock += '}\n';
       }
@@ -741,7 +739,8 @@ export class Compiler {
         const bp = this.mapBreakpoint(r.breakpoint);
         cssBlock += `@media (max-width: ${bp}) {\n  .${className} {\n`;
         for (const prop of r.properties) {
-          cssBlock += `    ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+          const cp = this.mapCSSProperty(prop.name);
+          cssBlock += `    ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
         }
         cssBlock += '  }\n}\n';
       }
@@ -954,7 +953,8 @@ export class Compiler {
     let cssBlock = `.${scopeClass} {\n`;
 
     for (const prop of style.properties) {
-      cssBlock += `  ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+      const cp = this.mapCSSProperty(prop.name);
+      cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
     }
     cssBlock += '}\n';
 
@@ -967,7 +967,8 @@ export class Compiler {
       if (pseudoProps) {
         cssBlock += `.${scopeClass}:${pseudoName} {\n`;
         for (const prop of pseudoProps) {
-          cssBlock += `  ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+          const cp = this.mapCSSProperty(prop.name);
+          cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
         }
         cssBlock += '}\n';
       }
@@ -982,7 +983,8 @@ export class Compiler {
         const hasContent = pe.properties.some(p => p.name === 'content');
         if (!hasContent) cssBlock += `  content: '';\n`;
         for (const prop of pe.properties) {
-          cssBlock += `  ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+          const cp = this.mapCSSProperty(prop.name);
+          cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
         }
         cssBlock += '}\n';
       }
@@ -993,7 +995,8 @@ export class Compiler {
         const bp = this.mapBreakpoint(r.breakpoint);
         cssBlock += `@media (max-width: ${bp}) {\n  .${scopeClass} {\n`;
         for (const prop of r.properties) {
-          cssBlock += `    ${this.mapCSSProperty(prop.name)}: ${prop.value};\n`;
+          const cp = this.mapCSSProperty(prop.name);
+          cssBlock += `    ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
         }
         cssBlock += '  }\n}\n';
       }
@@ -1008,7 +1011,7 @@ export class Compiler {
     const className = 'nyx-p_' + preset.name;
     const props = preset.styles.map((s: any) => {
       const prop = this.mapCSSProperty(s.name);
-      return prop + ': ' + s.value;
+      return prop + ': ' + this.resolveThemeValue(prop, s.value);
     }).join('; ');
     this.css.push('.' + className + ' { ' + props + '; }');
     this.presets.set(preset.name, className);
@@ -1025,7 +1028,11 @@ export class Compiler {
         if (body) fontCSS += 'body,p,span,li,td,label,input,textarea,select{font-family:' + body + ';}';
       } else {
         for (const [key, value] of Object.entries(section.entries)) {
-          this.themeVars.set(section.name + '-' + key, value as string);
+          const fullKey = section.name + '-' + key;
+          this.themeVars.set(fullKey, value as string);
+          // Track color names for implicit resolution (e.g. 'primary' → 'colors-primary')
+          this.themeColorNames.set(fullKey, fullKey);  // 'colors-primary' → 'colors-primary'
+          this.themeColorNames.set(key, fullKey);      // 'primary' → 'colors-primary' (shorthand)
         }
       }
     }
@@ -1671,6 +1678,42 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
     return mapping[name] || name;
   }
 
+  /**
+   * Map a property name AND resolve theme colors in the value.
+   * Convenience method: combines mapCSSProperty + resolveThemeValue.
+   */
+  private resolvePropValue(propName: string, value: string): { prop: string; value: string } {
+    const prop = this.mapCSSProperty(propName);
+    return { prop, value: this.resolveThemeValue(prop, value) };
+  }
+
+  /**
+   * Resolve implicit theme color references.
+   * If a CSS value matches a known theme color name (e.g. 'text-muted', 'primary'),
+   * auto-wrap it in var(--section-name). Saves ~16 chars per usage.
+   * Only applies to color-accepting properties.
+   */
+  private resolveThemeValue(cssProperty: string, value: string): string {
+    if (this.themeColorNames.size === 0) return value;
+    // Don't touch values that already use var(), have parens, or start with # or rgb
+    if (value.includes('(') || value.startsWith('#') || value.startsWith('rgb') || value.startsWith('hsl')) return value;
+    // Don't touch numeric/unit values
+    if (/^[\d.]/.test(value)) return value;
+    // Only resolve for color-accepting properties
+    const colorProps = new Set([
+      'color', 'background', 'background-color', 'border-color',
+      'fill', 'stroke', 'outline-color', 'text-decoration-color',
+      'caret-color', 'column-rule-color', 'accent-color',
+    ]);
+    if (!colorProps.has(cssProperty)) return value;
+    // Check if value matches a theme color name (shorthand or full)
+    const fullKey = this.themeColorNames.get(value);
+    if (fullKey) {
+      return `var(--${fullKey})`;
+    }
+    return value;
+  }
+
   private mapCSSProperty(name: string): string {
     const mapping: Record<string, string> = {
       // Layout
@@ -1778,9 +1821,10 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
       const colonIdx = part.indexOf(':');
       if (colonIdx === -1) return part;
       const prop = part.substring(0, colonIdx).trim();
-      const value = part.substring(colonIdx + 1);
+      const value = part.substring(colonIdx + 1).trim();
       if (!prop) return part;
-      return ` ${this.mapCSSProperty(prop)}:${value}`;
+      const mappedProp = this.mapCSSProperty(prop);
+      return ` ${mappedProp}:${this.resolveThemeValue(mappedProp, value)}`;
     }).join(';').trim();
   }
 

@@ -1,0 +1,30 @@
+theme {
+  colors {
+    primary #667eea
+    accent #00d26a
+    text-muted #8892b0
+    bg-dark #0b0b14
+    surface #1a1a2e
+  }
+}
+
+page / {
+  h1 "Theme Colors Test"
+
+  p "Primary color" style="c: primary;"
+  p "Accent color" style="c: accent;"
+  p "Muted text" style="c: text-muted;"
+  p "Dark bg" style="bg: bg-dark;"
+  p "Surface bg" style="bgc: surface;"
+
+  p "Hex stays" style="c: #ff0000;"
+  p "RGB stays" style="c: rgb(255,0,0);"
+  p "Var stays" style="c: var(--custom);"
+
+  div "Style block test" {
+    style {
+      c primary
+      bg surface
+    }
+  }
+}

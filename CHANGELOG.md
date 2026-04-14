@@ -1,3 +1,21 @@
+## v0.9.0 — "Ninth Molt — Implicit Colors" (2026-04-14)
+
+### Features
+- **✨ Implicit Theme Colors** — Use theme color names directly in color properties! `c primary` auto-resolves to `color: var(--colors-primary)`. Works in style blocks, presets, and inline styles. ~16 chars saved per usage, ~600 tokens saved per site.
+  - Color-accepting properties: `color`, `background`, `background-color`, `border-color`, `fill`, `stroke`, `outline-color`, etc.
+  - Both short (`primary`) and full (`colors-primary`) names work
+  - Hex/RGB/HSL/var() values are never touched
+- **Component Prop Styles** — `preset=` on prop-bound elements inside components. `p .desc preset=muted` applies a preset class to dynamically-bound content.
+
+### Documentation
+- **NYXCODE.md updated to v0.9.0** — Implicit theme colors documented with examples. Hero example + preset examples updated to use shorter syntax.
+
+### Contributors
+- Nyx 🧠 (compiler: resolveThemeValue, themeColorNames tracking)
+- Kiro 🐺 (v0.9 roadmap pitch — implicit colors was his idea!)
+
+---
+
 ## v0.8.2 — "Bug Squash" (2026-04-14)
 
 ### Bug Fixes
