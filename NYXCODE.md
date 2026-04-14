@@ -276,6 +276,49 @@ button "Reset" on:click -> count = 0
 Both `on:click` and `on click` syntax work (colon optional).
 Events work inline on elements AND inside when/else blocks.
 
+## Form Blocks (v0.6+)
+Native forms with zero JS. Compiler generates `<form>` + `fetch()` + auth + error handling.
+
+### Basic Form
+```nyx
+form /api/posts auth {
+  input title placeholder="Post title"
+  input body placeholder="Content"
+  submit "Create Post"
+  success -> reload
+  error -> toast "Failed to create post"
+}
+```
+
+### Form Features
+- `form /api/endpoint` — POST to endpoint automatically
+- `form /api/endpoint auth` — includes JWT Bearer token
+- `input fieldname` — field name becomes JSON key
+- `submit "Label"` — submit button text
+- `success -> reload` — reload page on success
+- `success -> redirect /dashboard` — redirect on success
+- `success -> toast "Saved!"` — show toast notification
+- `success -> clear` — clear form fields
+- `error -> toast "msg"` — show error message
+- Field IDs auto-generated: `form-{endpoint}-{field}`
+
+### Login/Register Forms
+```nyx
+form /api/auth/register {
+  input email placeholder="Email"
+  input password placeholder="Password"
+  submit "Register"
+  success -> redirect /login
+}
+
+form /api/auth/login {
+  input email placeholder="Email"
+  input password placeholder="Password"
+  submit "Login"
+  success -> redirect /
+}
+```
+
 ## Components
 ```nyx
 component Card {
