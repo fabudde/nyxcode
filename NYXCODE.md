@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.9.8)
+# NYXCODE.md — AI Context File (v0.10.1)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -154,10 +154,10 @@ All standard HTML elements are recognized:
 ### Media
 `img`, `video`
 - `img` auto-gets `loading="lazy"` (v0.9.7+)
-- `img "alt text" src="url"` → `<img alt="alt text" src="url" loading="lazy" />` (v0.9.8+)
+- `img "alt text" src="url"` → `<img alt="alt text" src="url" loading="lazy" />` (v0.10.1+)
 
 ### Structure
-`div`, `section`, `header`, `footer`, `nav`, `aside`, `main`, `article`, `figure`, `figcaption`, `container`, `card`, `row`, `col`, `grid`, `stack`, `ul`, `ol`, `li`
+`div`, `section`, `header`, `footer`, `nav`, `aside`, `main`, `article`, `figure`, `figcaption`, `container`, `card`, `row`, `col`, `grid`, `stack`, `ul`, `ol`, `li`, `a`, `strong`, `em`, `small`, `sup`, `sub`, `blockquote`, `pre`, `code`, `label`, `details`, `summary`, `table`, `thead`, `tbody`, `tr`, `td`, `th`
 
 ### Void Elements
 `br`, `hr`, `img`, `input` — self-closing, no children needed.
@@ -171,6 +171,7 @@ p "Line two"
 | NyxCode | HTML |
 |---------|------|
 | `link` | `<a>` |
+| `a` | `<a>` (native, v0.10.1+) |
 | `text` | `<span>` |
 | `card` | `<div>` |
 | `container` | `<div>` |
@@ -184,7 +185,7 @@ p "Line two"
 h1 "Hello World"                         # Text content
 link "Click me" href="/about"            # Content + attributes
 img src="photo.jpg" alt="A photo"        # Attributes only (void)
-img "A photo" src="photo.jpg"            # Alt text as content (v0.9.8+)
+img "A photo" src="photo.jpg"            # Alt text as content (v0.10.1+)
 div class="hero" id="main" { ... }      # Attributes + children
 button "Submit" style="bg: blue"         # Inline style
 div preset=card { p "Content" }          # Preset class
@@ -283,6 +284,21 @@ page / {
 - `slot` renders children passed to the component.
 - `.propName` accesses prop values as content.
 - Components start with uppercase.
+
+### Component Style Blocks (v0.10.0+)
+```nyx
+component Card {
+  props title desc
+  div {
+    style { bg #1a1a2e, r 12px, p 2rem }
+    h3 .title { fs 1.3rem, c text, fw 700 }
+    p .desc { fs 0.88rem, c muted, lh 1.65 }
+    slot
+  }
+}
+```
+Style blocks directly on `.prop` elements — no inline `style="..."` needed!
+Supports hover, focus, active, @mobile, @tablet inside the block.
 
 ## Layout (wraps all pages)
 ```nyx
@@ -419,6 +435,21 @@ data posts = get /api/posts auth         # Authenticated (sends JWT)
 ```
 Generates `fetch()` calls with optional Bearer token from localStorage.
 
+### Loading/Error/Empty States (v0.10.1+)
+```nyx
+data posts = get /api/posts auth {
+  loading -> p "Loading posts..."
+  error -> p "Something went wrong!"
+  empty -> p "No posts yet. Write one!"
+}
+each posts -> Card { h3 .title, p .body }
+```
+- `loading` → shown during fetch, hidden when done
+- `error` → hidden by default, shown on fetch failure
+- `empty` → hidden by default, shown when data is empty array
+- Both inline (`loading -> p "..."`) and block (`loading -> { ... }`) syntax
+- Zero JavaScript — compiler generates all state management
+
 ## Default Props (v0.3+)
 ```nyx
 component Badge {
@@ -455,7 +486,7 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 | Sibling elements merge | Wrap in `div {}` or put inside page/component block |
 | Inline style commas | Use `;` not `,` in `style="..."` attributes |
 | Theme color not resolving | Must be defined in `theme { colors { name value } }` |
-| `img` shows `value=` instead of `alt=` | Update to v0.9.8+ |
+| `img` shows `value=` instead of `alt=` | Update to v0.10.1+ |
 | `div` absorbed into previous element | Update to v0.9.7+ (div now in ELEMENT_TAGS) |
 
 ## AI Rules
@@ -477,4 +508,4 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 | Full-stack blog | 169 tokens | Next.js+Prisma+NextAuth: 964 | **-82%** |
 
 ## Version
-v0.9.8 — 16 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺 (6 bugs found + fixed).
+v0.10.1 — 18 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺 (6 bugs found + fixed).
