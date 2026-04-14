@@ -1,0 +1,279 @@
+# NyxCode Blog — Full-Stack Benchmark v0.11.5
+# 1:1 identical to Next.js version
+
+table users {
+  name text required
+  email text required unique
+  password text required
+  role text default="author"
+}
+
+table posts {
+  title text required
+  body text required
+  author [users]
+  created_at auto
+}
+
+table comments {
+  body text required
+  post [posts]
+  author [users]
+  created_at auto
+}
+
+security {
+  table users
+  login email password
+  token jwt
+  protect /api/posts
+  protect /api/comments
+}
+
+theme {
+  colors {
+    primary #f59e0b
+    bg #0a0a12
+    card #12121f
+    surface #1a1a2e
+    text #e8e8e8
+    muted #888
+    accent #22d3ee
+    success #22c55e
+    danger #ef4444
+    border #2a2a3e
+  }
+  fonts {
+    heading Space Grotesk
+    body Inter
+  }
+}
+
+preset container {
+  mw 720px
+  margin 0 auto
+  padding 0 1.5rem
+}
+
+preset input-field {
+  width 100%
+  padding 0.75rem 1rem
+  radius 10px
+  border 1px solid var(--colors-border)
+  bg var(--colors-card)
+  color var(--colors-text)
+  fs 0.95rem
+  mb 0.75rem
+  outline none
+  transition border-color 0.2s
+}
+
+preset btn-primary {
+  bg var(--colors-primary)
+  color #000
+  padding 0.75rem 1.5rem
+  radius 10px
+  border none
+  cursor pointer
+  fw 600
+  fs 0.95rem
+  transition all 0.2s
+}
+
+preset btn-success {
+  bg var(--colors-success)
+  color #fff
+  padding 0.75rem 1.5rem
+  radius 10px
+  border none
+  cursor pointer
+  fw 600
+  fs 0.95rem
+}
+
+component PostCard {
+  props title body authorName date
+  article {
+    style {
+      bg var(--colors-card)
+      radius 16px
+      padding 2rem
+      mb 1.25rem
+      border 1px solid var(--colors-border)
+      transition transform 0.2s, box-shadow 0.2s
+      hover { transform translateY(-2px), box-shadow 0 8px 30px rgba(0,0,0,0.3) }
+    }
+    h3 .title {
+      style { color var(--colors-text), fs 1.35rem, fw 600, mb 0.75rem, ff var(--fonts-heading) }
+    }
+    p .body {
+      style { color var(--colors-muted), line-height 1.7, mb 1.25rem, fs 0.95rem }
+    }
+    div {
+      style { d flex, justify-content space-between, ai center, pt 1rem, border-top 1px solid var(--colors-border) }
+      div {
+        style { d flex, ai center, gap 0.5rem }
+        div {
+          style { width 32px, height 32px, radius 50%, bg var(--colors-primary), d flex, ai center, jc center, fw 600, fs 0.8rem, color #000 }
+          span .authorName style="display:none;" {}
+        }
+        span .authorName { style { color var(--colors-accent), fw 500, fs 0.9rem } }
+      }
+      span .date { style { color var(--colors-muted), fs 0.8rem } }
+    }
+  }
+}
+
+page / {
+  style {
+    body { bg var(--colors-bg), color var(--colors-text), ff var(--fonts-body), line-height 1.6 }
+    a { color var(--colors-accent), text-decoration none }
+    a:hover { text-decoration underline }
+    ::selection { bg var(--colors-primary), color #000 }
+  }
+
+  # Header
+  header {
+    style { border-bottom 1px solid var(--colors-border), mb 3rem }
+    div preset=container {
+      style { d flex, justify-content space-between, ai center, padding-top 1.5rem, padding-bottom 1.5rem }
+      div {
+        style { d flex, ai center, gap 0.75rem }
+        span "🐺" { style { fs 1.5rem } }
+        h1 "NyxBlog" { style { fs 1.25rem, fw 700, color var(--colors-text), ff var(--fonts-heading), m 0 } }
+      }
+      div {
+        style { d flex, ai center, gap 0.5rem }
+        span "Built with" { style { color var(--colors-muted), fs 0.85rem } }
+        a "NyxCode" href="https://nyxcode.io" { style { color var(--colors-primary), fw 600, fs 0.85rem } }
+        span "v0.11.5" { style { color var(--colors-muted), fs 0.75rem, bg var(--colors-surface), padding 0.15rem 0.5rem, radius 6px } }
+      }
+    }
+  }
+
+  div preset=container {
+    # Hero
+    section {
+      style { ta center, mb 3.5rem, pt 1rem }
+      span "✨ Full-Stack in One File" {
+        style { color var(--colors-primary), fs 0.85rem, fw 600, letter-spacing 0.05em, text-transform uppercase }
+      }
+      h2 "The NyxCode Blog Demo" {
+        style { fs 2.75rem, fw 800, color var(--colors-text), ff var(--fonts-heading), mt 0.75rem, mb 0.75rem, line-height 1.15 }
+      }
+      p "Auth, relations, cascade deletes — 127 lines of NyxCode." {
+        style { color var(--colors-muted), fs 1.15rem, mw 500px, margin 0 auto }
+      }
+    }
+
+    # Stats bar
+    div {
+      style { d flex, jc center, gap 2.5rem, mb 3.5rem, padding 1.25rem 2rem, bg var(--colors-card), radius 14px, border 1px solid var(--colors-border) }
+      div {
+        style { ta center }
+        div "127" { style { fs 1.75rem, fw 800, color var(--colors-primary), ff var(--fonts-heading) } }
+        div "Lines" { style { fs 0.75rem, color var(--colors-muted), text-transform uppercase, letter-spacing 0.05em, mt 0.15rem } }
+      }
+      div {
+        style { ta center }
+        div "1,392" { style { fs 1.75rem, fw 800, color var(--colors-accent), ff var(--fonts-heading) } }
+        div "Tokens" { style { fs 0.75rem, color var(--colors-muted), text-transform uppercase, letter-spacing 0.05em, mt 0.15rem } }
+      }
+      div {
+        style { ta center }
+        div "1" { style { fs 1.75rem, fw 800, color var(--colors-success), ff var(--fonts-heading) } }
+        div "File" { style { fs 0.75rem, color var(--colors-muted), text-transform uppercase, letter-spacing 0.05em, mt 0.15rem } }
+      }
+      div {
+        style { ta center }
+        div "66%" { style { fs 1.75rem, fw 800, color var(--colors-danger), ff var(--fonts-heading) } }
+        div "Fewer Tokens" { style { fs 0.75rem, color var(--colors-muted), text-transform uppercase, letter-spacing 0.05em, mt 0.15rem } }
+      }
+    }
+
+    # Auth Section
+    details {
+      style { bg var(--colors-card), radius 16px, padding 1.75rem, mb 2rem, border 1px solid var(--colors-border) }
+      summary "🔐 Account" {
+        style { cursor pointer, fw 600, fs 1rem, color var(--colors-text), ff var(--fonts-heading) }
+      }
+      div {
+        style { d grid, gtc 1fr 1fr, gap 2rem, mt 1.5rem }
+
+        div {
+          h3 "Register" { style { color var(--colors-success), mb 1rem, fs 0.95rem, fw 600 } }
+          form /api/auth/register {
+            input name placeholder="Name" required preset=input-field
+            input email type="email" placeholder="Email" required preset=input-field
+            input password type="password" placeholder="Password" required preset=input-field
+            submit "Create Account" preset=btn-success
+            success -> toast "Account created! Now login."
+            error -> toast "Registration failed"
+          }
+        }
+
+        div {
+          h3 "Login" { style { color var(--colors-primary), mb 1rem, fs 0.95rem, fw 600 } }
+          form /api/auth/login {
+            input email type="email" placeholder="Email" required preset=input-field
+            input password type="password" placeholder="Password" required preset=input-field
+            submit "Sign In" preset=btn-primary
+            success -> toast "Welcome back!"
+            error -> toast "Invalid credentials"
+          }
+        }
+      }
+    }
+
+    # Compose
+    div {
+      style { bg var(--colors-card), radius 16px, padding 1.75rem, mb 2.5rem, border 1px solid var(--colors-border) }
+      div {
+        style { d flex, ai center, gap 0.75rem, mb 1.25rem }
+        span "✍️" { style { fs 1.25rem } }
+        h2 "Write a Post" { style { fs 1.15rem, fw 600, ff var(--fonts-heading), m 0 } }
+      }
+      form /api/posts auth {
+        input title placeholder="Post title" required preset=input-field { style { fs 1.05rem, fw 500 } }
+        textarea body placeholder="What's on your mind?" required preset=input-field { style { mih 140px, resize vertical } }
+        submit "Publish →" preset=btn-primary
+        success -> reload
+        error -> toast "Please sign in first"
+      }
+    }
+
+    # Feed
+    div {
+      style { d flex, ai center, gap 0.75rem, mb 1.5rem }
+      span "📰" { style { fs 1.25rem } }
+      h2 "Latest Posts" { style { fs 1.15rem, fw 600, ff var(--fonts-heading), m 0 } }
+    }
+
+    data posts = get /api/posts
+    each posts -> post {
+      PostCard title=.title body=.body authorName=.author.name date=.created_at
+    }
+
+    # Empty state
+    div {
+      style { ta center, padding 3rem, color var(--colors-muted) }
+      p "No posts yet. Be the first to write one! ✨" { style { fs 1rem } }
+    }
+  }
+
+  # Footer
+  footer {
+    style { border-top 1px solid var(--colors-border), mt 4rem, padding 2rem 0, ta center }
+    div preset=container {
+      p "Built with NyxCode v0.11.5 — 127 lines, 1 file, 66% fewer tokens than Next.js" {
+        style { color var(--colors-muted), fs 0.85rem }
+      }
+      div {
+        style { d flex, jc center, gap 1.5rem, mt 0.75rem }
+        a "GitHub" href="https://github.com/fabudde/nyxcode" { style { color var(--colors-accent), fs 0.85rem } }
+        a "npm" href="https://www.npmjs.com/package/@fabudde/nyxcode" { style { color var(--colors-accent), fs 0.85rem } }
+        a "rudel.fun" href="https://rudel.fun" { style { color var(--colors-accent), fs 0.85rem } }
+      }
+    }
+  }
+}
