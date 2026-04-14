@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.9.7";
+const NYXCODE_VERSION = "0.9.8";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -709,7 +709,8 @@ export class Compiler {
     }
 
     if (this.isVoidElement(tag)) {
-      return `${this.ind()}<${tag}${attrs}${content ? ` value="${this.escapeHtml(content)}"` : ''} />\n`;
+      const contentAttr = tag === 'img' ? 'alt' : 'value';
+      return `${this.ind()}<${tag}${attrs}${content ? ` ${contentAttr}="${this.escapeHtml(content)}"` : ''} />\n`;
     }
 
     if (children) {
