@@ -104,74 +104,41 @@ page / {
     style { max-width 780px, margin 0 auto, padding 0 2rem 5rem }
     div { p "SEE THE DIFFERENCE" preset=label style="text-align: center; margin-bottom: 0.5rem;" }
     div { h2 "Full-stack blog. One file." style="text-align: center; font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem; color: var(--colors-text);" }
-    div {
-      style {
-        background #0c0c18
-        border 1px solid rgba(102,126,234,0.1)
-        border-radius 16px
-        padding 2rem 2.25rem
-        font-family monospace
-        font-size 0.82rem
-        line-height 1.9
-        overflow-x auto
-        color #a0b0c0
-        white-space pre
-      }
-      span style="display: block;" {
-        span "table" style="color: #c792ea; font-weight: 600;"
-        span " posts { " style="color: #babed8;"
-        span "title text required, body text" style="color: #82aaff;"
-        span " }"
-      }
-      span style="display: block;" {
-        span "security" style="color: #c792ea; font-weight: 600;"
-        span " { login email password, " style="color: #babed8;"
-        span "protect /api/posts" style="color: #ffcb6b;"
-        span " }"
-      }
-      span style="display: block;" {
-        span "preset" style="color: #c792ea; font-weight: 600;"
-        span " card { " style="color: #babed8;"
-        span "bg #1a1a2e, r 12px, p 2rem" style="color: #82aaff;"
-        span " }"
-      }
-      span " " style="display: block;"
-      span style="display: block;" {
-        span "page" style="color: #c792ea; font-weight: 600;"
-        span " / {" style="color: #babed8;"
-      }
-      span style="display: block;" {
-        span "  h1 " style="color: #89ddff;"
-        span "\"My Blog\"" style="color: #c3e88d;"
-      }
-      span style="display: block;" {
-        span "  form" style="color: #c792ea;"
-        span " /api/posts " style="color: #89ddff;"
-        span "auth" style="color: #ffcb6b;"
-        span " {" style="color: #babed8;"
-      }
-      span "    input title, submit \"Post\"" style="display: block; color: #82aaff;"
-      span style="display: block;" {
-        span "    success" style="color: #89ddff;"
-        span " -> " style="color: #c792ea;"
-        span "reload" style="color: #ffcb6b;"
-      }
-      span "  }" style="display: block; color: #546e7a;"
-      span style="display: block;" {
-        span "  data" style="color: #c792ea;"
-        span " posts = get /api/posts " style="color: #89ddff;"
-        span "auth" style="color: #ffcb6b;"
-      }
-      span style="display: block;" {
-        span "  each" style="color: #c792ea;"
-        span " posts -> div " style="color: #89ddff;"
-        span "preset=card" style="color: #ffcb6b;"
-        span " {" style="color: #babed8;"
-      }
-      span "    h3 .title" style="display: block; color: #82aaff;"
-      span "    p .body" style="display: block; color: #82aaff;"
-      span "  }" style="display: block; color: #546e7a;"
-      span "}" style="display: block; color: #546e7a;"
+    div id="code-block" style="background: #0c0c18; border: 1px solid rgba(102,126,234,0.1); border-radius: 16px; padding: 2rem 2.25rem; overflow-x: auto;" {
+      p "loading..." style="color: #546e7a; font-family: monospace; font-size: 0.82rem;"
+    }
+    script {
+      document.addEventListener('DOMContentLoaded', function() {
+        var c = document.getElementById('code-block');
+        if (!c) return;
+        var lines = [
+          ['<span style="color:#c792ea;font-weight:600">table</span> posts { <span style="color:#82aaff">title text required, body text</span> }'],
+          ['<span style="color:#c792ea;font-weight:600">security</span> { login email password, <span style="color:#ffcb6b">protect /api/posts</span> }'],
+          ['<span style="color:#c792ea;font-weight:600">preset</span> card { <span style="color:#82aaff">bg #1a1a2e, r 12px, p 2rem</span> }'],
+          [''],
+          ['<span style="color:#c792ea;font-weight:600">page</span> / {'],
+          ['  <span style="color:#89ddff">h1</span> <span style="color:#c3e88d">"My Blog"</span>'],
+          ['  <span style="color:#c792ea">form</span> <span style="color:#89ddff">/api/posts</span> <span style="color:#ffcb6b">auth</span> {'],
+          ['    input title, submit "Post"', '#82aaff'],
+          ['    <span style="color:#89ddff">success</span> <span style="color:#c792ea">-></span> <span style="color:#ffcb6b">reload</span>'],
+          ['  }', '#546e7a'],
+          ['  <span style="color:#c792ea">data</span> <span style="color:#89ddff">posts = get /api/posts</span> <span style="color:#ffcb6b">auth</span>'],
+          ['  <span style="color:#c792ea">each</span> <span style="color:#89ddff">posts -> div</span> <span style="color:#ffcb6b">preset=card</span> {'],
+          ['    h3 .title', '#82aaff'],
+          ['    p .body', '#82aaff'],
+          ['  }', '#546e7a'],
+          ['}', '#546e7a']
+        ];
+        var html = '<pre style="margin:0;font-family:Consolas,Monaco,monospace;font-size:0.82rem;line-height:1.9;color:#a0b0c0">';
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          if (line[1]) html += '<span style="color:' + line[1] + '">' + line[0] + '</span>';
+          else html += line[0];
+          html += '\n';
+        }
+        html += '</pre>';
+        c.innerHTML = html;
+      });
     }
     div { p "→ SQLite DB + JWT auth + CRUD API + reactive UI. Zero config." style="text-align: center; color: var(--colors-muted); font-size: 0.85rem; margin-top: 1.5rem; font-weight: 400;" }
   }
