@@ -161,6 +161,7 @@ export interface StyleBlock extends BaseNode {
   focus?: StyleProperty[];
   active?: StyleProperty[];
   pseudoElements?: PseudoElementBlock[];
+  cssRules?: CssRule[];
 }
 
 export interface PseudoElementBlock {
@@ -175,6 +176,11 @@ export interface StyleProperty {
 
 export interface ResponsiveBlock {
   breakpoint: string; // 'mobile' | 'tablet' | 'desktop'
+  properties: StyleProperty[];
+}
+
+export interface CssRule {
+  selector: string;
   properties: StyleProperty[];
 }
 

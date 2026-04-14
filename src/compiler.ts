@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = '0.9.3';
+const NYXCODE_VERSION = "0.9.4";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -749,6 +749,18 @@ export class Compiler {
       }
     }
 
+    // CSS Rules: .class { props }, tag { props }
+    if (style.cssRules) {
+      for (const rule of style.cssRules) {
+        cssBlock += `${rule.selector} {\n`;
+        for (const prop of rule.properties) {
+          const cp = this.mapCSSProperty(prop.name);
+          cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+        }
+        cssBlock += '}\n';
+      }
+    }
+
     this.css.push(cssBlock);
   }
 
@@ -1002,6 +1014,18 @@ export class Compiler {
           cssBlock += `    ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
         }
         cssBlock += '  }\n}\n';
+      }
+    }
+
+    // CSS Rules: .class { props }, tag { props }
+    if (style.cssRules) {
+      for (const rule of style.cssRules) {
+        cssBlock += `${rule.selector} {\n`;
+        for (const prop of rule.properties) {
+          const cp = this.mapCSSProperty(prop.name);
+          cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+        }
+        cssBlock += '}\n';
       }
     }
 

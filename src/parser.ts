@@ -523,9 +523,20 @@ export class Parser {
 
     const PSEUDO_CLASSES = new Set(['hover', 'focus', 'active']);
     const PSEUDO_ELEMENTS = new Set(['before', 'after']);
+    const cssRules: Array<{selector: string, properties: StyleProperty[]}> = [];
 
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-      if (this.check(TokenType.At)) {
+      // CSS selector rule: .class { props } or .class:pseudo { props } or tag { props }
+      if (this.check(TokenType.Dot) || this.isCssSelectorStart()) {
+        const selector = this.parseCssSelector();
+        this.consume(TokenType.LeftBrace);
+        const ruleProps: StyleProperty[] = [];
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          ruleProps.push(this.parseStyleProperty());
+        }
+        this.consume(TokenType.RightBrace);
+        cssRules.push({ selector, properties: ruleProps });
+      } else if (this.check(TokenType.At)) {
         // Responsive block: @mobile { ... }
         this.advance(); // @
         const breakpoint = this.consumeIdentifier();
@@ -567,6 +578,7 @@ export class Parser {
     return {
       type: 'Style', raw, properties, responsive, hover, focus, active,
       pseudoElements: pseudoElements.length > 0 ? pseudoElements : undefined,
+      cssRules: cssRules.length > 0 ? cssRules : undefined,
       line: start.line, col: start.col
     };
   }
@@ -607,6 +619,42 @@ export class Parser {
     'grid-template-columns', 'grid-template-rows', 'grid-template-areas',
     'transform', 'filter', 'backdrop-filter',
   ]);
+
+  /**
+   * Check if current position looks like a CSS selector start.
+   * Detects: tag-name followed by { or :pseudo {, but NOT CSS property names.
+   */
+  private isCssSelectorStart(): boolean {
+    // Check: identifier followed by { or identifier:pseudo {
+    if (!this.check(TokenType.Identifier)) return false;
+    const name = this.peek().value;
+    // Known CSS element selectors that might appear in style blocks
+    const CSS_SELECTORS = new Set(['html', 'body', 'main', 'header', 'footer', 'nav', 'section', 'article', 'aside', 'div', 'span', 'p', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'img', 'button', 'input', 'select', 'textarea', 'table', 'form', 'label']);
+    if (!CSS_SELECTORS.has(name)) return false;
+    // Look ahead for { or space+{ pattern
+    let i = this.pos + 1;
+    while (i < this.tokens.length && (this.tokens[i].type === TokenType.Identifier || this.tokens[i].value === ':' || this.tokens[i].value === '-')) {
+      i++;
+    }
+    return i < this.tokens.length && this.tokens[i].type === TokenType.LeftBrace;
+  }
+
+  /**
+   * Parse a CSS selector like: .class, .class:hover, .class:pseudo, tag, tag:pseudo
+   * Consumes tokens until we hit LeftBrace.
+   */
+  private parseCssSelector(): string {
+    let selector = '';
+    while (!this.check(TokenType.LeftBrace) && !this.isAtEnd()) {
+      const tok = this.advance();
+      // Add space between identifier tokens, but not after . or : or -
+      if (selector && tok.type === TokenType.Identifier && !selector.endsWith('.') && !selector.endsWith(':') && !selector.endsWith('-')) {
+        selector += ' ';
+      }
+      selector += tok.value;
+    }
+    return selector.trim();
+  }
 
   private parseStyleProperty(): StyleProperty {
     const name = this.consumeIdentifier();

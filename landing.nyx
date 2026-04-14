@@ -1,0 +1,204 @@
+theme {
+  colors {
+    bg #0d0d1a
+    bg2 #141425
+    text #f0eaff
+    muted #9b8ec4
+    pink #e879a8
+    purple #a855f7
+    cyan #67e8f9
+  }
+  fonts {
+    heading "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif"
+    body "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif"
+  }
+}
+
+preset badge {
+  fs 0.75rem
+  p 5px 16px
+  r 20px
+  fw 600
+  d inline-block
+}
+
+preset card {
+  bg rgba(20,20,37,0.6)
+  border 1px solid rgba(200,130,255,0.12)
+  r 16px
+  p 28px
+  tr all 0.3s
+}
+
+page / {
+
+  head "<meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'><title>NyxVault — Self-Hosted E2E Encrypted File Sharing</title><link rel='icon' href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦞</text></svg>'><meta name='description' content='Self-hosted end-to-end encrypted file sharing. Zero knowledge.'><style>*{margin:0;padding:0;box-sizing:border-box}body{overflow-x:hidden}@keyframes bgDrift{0%,100%{transform:translate(0,0)}33%{transform:translate(-1.5%,1%)}66%{transform:translate(1%,-1.5%)}}@keyframes heroSpin{to{transform:rotate(360deg)}}@keyframes heroFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}@media(max-width:768px){.hero-title{font-size:2.2rem!important}.feature-grid{grid-template-columns:1fr!important}.arrow-cell{display:none!important}.hide-mobile{display:none!important}}</style>"
+
+  style {
+    .bg-glow { pos fixed, top 0, left 0, w 100%, h 100%, bg radial-gradient(ellipse at 25% 15%, rgba(232,121,168,0.07) 0%, transparent 50%), radial-gradient(ellipse at 75% 85%, rgba(168,85,247,0.07) 0%, transparent 50%), pointer-events none, z -1, anim bgDrift 25s ease-in-out infinite }
+    .nav-link { c #9b8ec4, td none, fs 0.9rem, fw 500, tr color 0.2s }
+    .nav-link:hover { c #f0eaff }
+    .gh-btn { d inline-flex, ai center, gap 6px, bg rgba(200,130,255,0.08), border 1px solid rgba(200,130,255,0.12), p 8px 18px, r 20px, c #f0eaff, td none, fw 500, fs 0.9rem, tr all 0.25s }
+    .gh-btn:hover { border-color #a855f7, bg rgba(168,85,247,0.15), tf translateY(-1px), shadow 0 4px 15px rgba(168,85,247,0.2) }
+    .hero-ring { pos absolute, top 0, left 0, w 100%, h 100%, r 50%, border 2.5px solid transparent, bg conic-gradient(from 0deg, #e879a8, #a855f7, #67e8f9, #e879a8) border-box, -webkit-mask linear-gradient(#fff 0 0) padding-box, -webkit-mask-composite xor, mask-composite exclude, anim heroSpin 4s linear infinite }
+    .hero-glow { pos absolute, top 10px, left 10px, right 10px, bottom 10px, r 50%, bg radial-gradient(circle, rgba(168,85,247,0.12), transparent 70%) }
+    .hero-emoji { fs 3.8rem, z 1, pos relative, anim heroFloat 4s ease-in-out infinite, filter drop-shadow(0 4px 25px rgba(232,121,168,0.3)) }
+    .gradient-text { bg linear-gradient(135deg, #e879a8, #a855f7, #67e8f9), -webkit-background-clip text, -webkit-text-fill-color transparent, background-clip text }
+    .btn-main { d inline-flex, ai center, gap 8px, p 14px 32px, r 12px, fs 1rem, fw 700, td none, bg linear-gradient(135deg, #e879a8, #a855f7), c white, tr all 0.3s, border none, cur pointer }
+    .btn-main:hover { tf translateY(-3px), shadow 0 12px 35px rgba(232,121,168,0.3) }
+    .btn-ghost { d inline-flex, ai center, p 14px 32px, r 12px, fs 1rem, fw 700, td none, bg transparent, border 1px solid rgba(200,130,255,0.12), c #f0eaff, tr all 0.3s, cur pointer }
+    .btn-ghost:hover { border-color #a855f7, bg rgba(168,85,247,0.08), tf translateY(-2px) }
+    .terminal { bg rgba(20,20,37,0.8), border 1px solid rgba(200,130,255,0.12), r 16px, of hidden, shadow 0 20px 60px rgba(0,0,0,0.3) }
+    .terminal-bar { d flex, ai center, gap 8px, p 12px 16px, bg rgba(28,28,53,0.6), border-bottom 1px solid rgba(200,130,255,0.12) }
+    .dot { w 12px, h 12px, r 50%, d inline-block }
+    .dot-r { bg #f87171 }
+    .dot-y { bg #fbbf24 }
+    .dot-g { bg #4ade80 }
+    .terminal-body { p 20px 24px, ff monospace, fs 0.85rem, lh 1.8 }
+    .cmd { c #67e8f9 }
+    .comment { c #9b8ec4 }
+    .output { c #4ade80 }
+    .prompt { c #e879a8 }
+    .badge-pink { bg rgba(232,121,168,0.12), c #e879a8, border 1px solid rgba(232,121,168,0.2) }
+    .badge-purple { bg rgba(168,85,247,0.12), c #a855f7, border 1px solid rgba(168,85,247,0.2) }
+    .badge-cyan { bg rgba(103,232,249,0.12), c #67e8f9, border 1px solid rgba(103,232,249,0.2) }
+    .badge-green { bg rgba(74,222,128,0.12), c #4ade80, border 1px solid rgba(74,222,128,0.2) }
+    .feature-card:hover { border-color rgba(200,130,255,0.25), tf translateY(-4px), shadow 0 12px 40px rgba(168,85,247,0.08) }
+    .step-num { w 48px, h 48px, r 50%, bg linear-gradient(135deg, #e879a8, #a855f7), d inline-flex, ai center, jc center, fw 800, fs 1.2rem, c white }
+    .arrow { c #9b8ec4, fs 1.5rem, pt 20px }
+    .footer-link { c #e879a8, td none, tr color 0.2s }
+    .footer-link:hover { c #a855f7 }
+  }
+
+  div class="bg-glow" {
+    span ""
+  }
+
+  nav flex=row between style="max-width: 1100px; margin: 0 auto; padding: 24px 32px; position: relative; z-index: 10;" {
+    a "🦞 NyxVault" href="/" class="gradient-text" style="fs: 1.5rem; fw: 800; ls: -0.03em; td: none;"
+    div flex=row style="gap: 24px; align-items: center;" {
+      a "Features" href="#features" class="nav-link hide-mobile"
+      a "Setup" href="#setup" class="nav-link hide-mobile"
+      a "⭐ GitHub" href="https://github.com/fabudde/nyxvault" class="gh-btn" target="_blank"
+    }
+  }
+
+  section style="max-width: 1100px; margin: 0 auto; padding: 80px 32px 60px; text-align: center; position: relative; z-index: 1;" {
+    div style="position: relative; width: 130px; height: 130px; margin: 0 auto 32px; display: flex; align-items: center; justify-content: center;" {
+      div class="hero-ring" { span "" }
+      div class="hero-glow" { span "" }
+      div class="hero-emoji" { span "🦞" }
+    }
+
+    h1 "Encrypted file sharing." class="hero-title" style="fs: 3.2rem; fw: 800; ls: -0.03em; lh: 1.15; mb: 20px;"
+    h1 "Self-hosted. Zero knowledge." class="hero-title gradient-text" style="fs: 3.2rem; fw: 800; ls: -0.03em; lh: 1.15; mb: 20px;"
+
+    p style="fs: 1.15rem; c: #9b8ec4; max-width: 560px; margin: 0 auto 32px; lh: 1.7;" {
+      span "Your files are encrypted in the browser before they ever touch the server. The server never sees your data. Not even we can read it."
+    }
+
+    div flex=row center style="gap: 10px; flex-wrap: wrap; margin-bottom: 40px;" {
+      span "XChaCha20-Poly1305" preset=badge class="badge-pink"
+      span "Argon2id" preset=badge class="badge-purple"
+      span "Zero Knowledge" preset=badge class="badge-cyan"
+      span "MIT Licensed" preset=badge class="badge-green"
+    }
+
+    div flex=row center style="gap: 16px; flex-wrap: wrap;" {
+      a "⭐ Star on GitHub" href="https://github.com/fabudde/nyxvault" class="btn-main" target="_blank"
+      a "Quick Start →" href="#setup" class="btn-ghost"
+    }
+
+    div class="terminal" style="max-width: 600px; margin: 60px auto 0;" id="setup" {
+      div class="terminal-bar" {
+        span class="dot dot-r" { span "" }
+        span class="dot dot-y" { span "" }
+        span class="dot dot-g" { span "" }
+        span "Terminal" style="flex: 1; ta: center; fs: 0.75rem; c: #9b8ec4; fw: 500;"
+      }
+      div class="terminal-body" {
+        p "# Clone & run in 30 seconds" class="comment" style="m: 0;"
+        p "$ git clone https://github.com/fabudde/nyxvault.git" class="cmd" style="m: 0;"
+        p "$ cd nyxvault && bash setup.sh" class="cmd" style="m: 0;"
+        p "$ node server.js" class="cmd" style="m: 0;"
+        p "" style="h: 8px; m: 0;"
+        p "🔐 NyxVault running on http://localhost:3870" class="output" style="m: 0;"
+        p "   Storage: ./storage" class="output" style="m: 0;"
+        p "   Ready for encrypted uploads! 🦞" class="output" style="m: 0;"
+      }
+    }
+  }
+
+  section style="max-width: 1100px; margin: 0 auto; padding: 80px 32px; position: relative; z-index: 1;" id="features" {
+    h2 style="ta: center; fs: 2rem; fw: 800; ls: -0.02em; mb: 12px;" { span "Built for privacy" }
+    p style="ta: center; c: #9b8ec4; fs: 1rem; mb: 48px;" { span "Every file is encrypted before it leaves your browser. No exceptions." }
+
+    div class="feature-grid" grid=3 gap=20px {
+      div preset=card class="feature-card" {
+        p "🔐" style="fs: 2rem; mb: 14px;"
+        h3 "E2E Encryption" style="fs: 1rem; fw: 700; mb: 8px;"
+        p "XChaCha20-Poly1305 authenticated encryption. Same crypto used by Signal and ProtonMail." style="c: #9b8ec4; fs: 0.88rem; lh: 1.6;"
+      }
+      div preset=card class="feature-card" {
+        p "🧠" style="fs: 2rem; mb: 14px;"
+        h3 "Zero Knowledge" style="fs: 1rem; fw: 700; mb: 8px;"
+        p "The server stores encrypted blobs. It can never decrypt your files — even if compromised." style="c: #9b8ec4; fs: 0.88rem; lh: 1.6;"
+      }
+      div preset=card class="feature-card" {
+        p "🔑" style="fs: 2rem; mb: 14px;"
+        h3 "Argon2id KDF" style="fs: 1rem; fw: 700; mb: 8px;"
+        p "Memory-hard key derivation (64MB, 3 iterations). Passphrases are brute-force resistant." style="c: #9b8ec4; fs: 0.88rem; lh: 1.6;"
+      }
+      div preset=card class="feature-card" {
+        p "📎" style="fs: 2rem; mb: 14px;"
+        h3 "Share Links" style="fs: 1rem; fw: 700; mb: 8px;"
+        p "Every file gets a unique download link. Recipients decrypt in their browser with the passphrase." style="c: #9b8ec4; fs: 0.88rem; lh: 1.6;"
+      }
+      div preset=card class="feature-card" {
+        p "⏰" style="fs: 2rem; mb: 14px;"
+        h3 "Auto-Expiry" style="fs: 1rem; fw: 700; mb: 8px;"
+        p "Set files to self-destruct after 1 hour, 24 hours, 7 days, or 30 days." style="c: #9b8ec4; fs: 0.88rem; lh: 1.6;"
+      }
+      div preset=card class="feature-card" {
+        p "🪶" style="fs: 2rem; mb: 14px;"
+        h3 "Lightweight" style="fs: 1rem; fw: 700; mb: 8px;"
+        p "Node.js + SQLite. No Docker required, no third-party services. One command to deploy." style="c: #9b8ec4; fs: 0.88rem; lh: 1.6;"
+      }
+    }
+  }
+
+  section style="max-width: 1100px; margin: 0 auto; padding: 40px 32px 80px; position: relative; z-index: 1;" {
+    h2 style="ta: center; fs: 2rem; fw: 800; ls: -0.02em; mb: 48px;" { span "How it works" }
+    div flex=row center style="gap: 24px; flex-wrap: wrap;" {
+      div style="flex: 1; min-width: 200px; max-width: 260px; text-align: center; padding: 24px;" {
+        div class="step-num" { span "1" }
+        h3 "Upload" style="fs: 1rem; mt: 16px; mb: 8px;"
+        p "Drop a file. It gets encrypted in your browser with your passphrase." style="c: #9b8ec4; fs: 0.88rem; lh: 1.5;"
+      }
+      div class="arrow-cell arrow" { span "→" }
+      div style="flex: 1; min-width: 200px; max-width: 260px; text-align: center; padding: 24px;" {
+        div class="step-num" { span "2" }
+        h3 "Store" style="fs: 1rem; mt: 16px; mb: 8px;"
+        p "The encrypted blob is stored on your server. The server never sees plaintext." style="c: #9b8ec4; fs: 0.88rem; lh: 1.5;"
+      }
+      div class="arrow-cell arrow" { span "→" }
+      div style="flex: 1; min-width: 200px; max-width: 260px; text-align: center; padding: 24px;" {
+        div class="step-num" { span "3" }
+        h3 "Share" style="fs: 1rem; mt: 16px; mb: 8px;"
+        p "Send the link + passphrase. The recipient decrypts in their browser." style="c: #9b8ec4; fs: 0.88rem; lh: 1.5;"
+      }
+    }
+  }
+
+  footer style="position: relative; z-index: 1; text-align: center; padding: 32px; border-top: 1px solid rgba(200,130,255,0.12); color: #9b8ec4; font-size: 0.8rem;" {
+    span "Built by "
+    a "Nyx" href="https://heynyx.dev" class="footer-link"
+    span " 🦞 and "
+    a "Fabian" href="https://fabianbudde.com" class="footer-link"
+    span " 🐻 · Security audit by Tyto 🦉 (9.5/10) · "
+    a "MIT Licensed" href="https://github.com/fabudde/nyxvault" class="footer-link"
+    span " · Built with "
+    a "NyxCode" href="https://nyxcode.io" class="footer-link"
+    span " 🦞"
+  }
+}
