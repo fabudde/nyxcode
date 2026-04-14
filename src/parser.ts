@@ -1475,6 +1475,14 @@ private parseElement(): ElementNode {
           attributes.push({ name, value: this.advance().value });
         } else {
           let val = this.advance().value;
+          // Property access: .field or .field.subfield (e.g., title=.title, author=.author.name)
+          if (val === '.' && this.check(TokenType.Identifier)) {
+            val += this.advance().value;
+            while (this.check(TokenType.Dot) && this.peekAt(1)?.type === TokenType.Identifier) {
+              val += this.advance().value; // .
+              val += this.advance().value; // field
+            }
+          }
           // Responsive shorthand: value@mobileValue (e.g., grid=3@1)
           if (this.check(TokenType.At) && (this.peekAt(1)?.type === TokenType.Identifier || this.peekAt(1)?.type === TokenType.Number)) {
             val += this.advance().value; // @

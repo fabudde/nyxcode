@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.12.4";
+const NYXCODE_VERSION = "0.12.5";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -930,7 +930,7 @@ export class Compiler {
   }
 
   private compileEachBody(each: EachStatement, varName: string): string {
-    const tag = this.mapTag(each.element);
+    // If body has a single component, don't wrap in extra tag
     const children = each.body.map(stmt => {
       if (stmt.type === 'Element') {
         return this.compileElementTemplate(stmt as ElementNode, varName);
@@ -938,39 +938,138 @@ export class Compiler {
       return '';
     }).join('');
 
+    // If the each element is a component, children already contain the full HTML
+    if (each.body.length === 1 && each.body[0].type === 'Element' && this.components.has((each.body[0] as any).tag)) {
+      return children;
+    }
+
+    const tag = this.mapTag(each.element);
     return `<${tag}>${children}</${tag}>`;
   }
 
   private compileElementTemplate(el: ElementNode, varName: string): string {
-    const tag = this.mapTag(el.tag);
-    let content = '';
-
-    if (el.content) {
-      if (typeof el.content === 'string') {
-        content = this.escapeContent(el.content);
-      } else if (el.content.type === 'PropertyAccess') {
-        content = `\${${varName}${(el.content as any).path}}`;
-      } else if (el.content.type === 'StringLiteral') {
-        content = (el.content as any).value;
-      } else if (el.content.type === 'Identifier') {
-        // Direct identifier like "user" — use as variable
-        content = `\${${(el.content as any).name}}`;
-      }
+    // Check if tag is a component — if so, inline it with prop substitution
+    if (this.components.has(el.tag)) {
+      return this.compileComponentTemplate(el, varName);
     }
 
-    const attrs = el.attributes.map(a => {
-      if (typeof a.value === 'string' && a.value !== 'true') {
-        return `${a.name}="${a.value}"`;
-      }
-      return a.name;
-    }).join(' ');
+    const tag = this.mapTag(el.tag);
+    let content = this.resolveTemplateContent(el.content, varName);
 
+    const attrs = this.resolveTemplateAttrs(el.attributes, varName);
     const attrStr = attrs ? ' ' + attrs : '';
 
     // Recurse into children
     const children = el.children.map(c => {
       if (c.type === 'Element') {
         return this.compileElementTemplate(c as ElementNode, varName);
+      }
+      return '';
+    }).join('');
+
+    return `<${tag}${attrStr}>${content}${children}</${tag}>`;
+  }
+
+  private resolveTemplateContent(content: any, varName: string): string {
+    if (!content) return '';
+    if (typeof content === 'string') return this.escapeContent(content);
+    if (content.type === 'PropertyAccess') {
+      return `\${${varName}${content.path}}`;
+    }
+    if (content.type === 'StringLiteral') return content.value;
+    if (content.type === 'Identifier') return `\${${content.name}}`;
+    return '';
+  }
+
+  private resolveTemplateAttrs(attributes: any[], varName: string): string {
+    return attributes.map(a => {
+      if (typeof a.value === 'string' && a.value !== 'true') {
+        // Resolve .field references in attribute values
+        let val = a.value;
+        if (val.startsWith('.')) {
+          val = `\${${varName}${val}}`;
+        }
+        if (a.name === 'preset') return `class="nyx-p_${a.value}"`;
+        if (a.name === 'style') {
+          const expanded = this.expandInlineShorthands(val);
+          return `style="${expanded}"`;
+        }
+        return `${a.name}="${val}"`;
+      }
+      return a.name;
+    }).join(' ');
+  }
+
+  private compileComponentTemplate(el: ElementNode, varName: string): string {
+    const comp = this.components.get(el.tag)!;
+    // Build prop map from attributes
+    const props = new Map<string, string>();
+    for (const attr of el.attributes) {
+      if (typeof attr.value === 'string') {
+        if (attr.value.startsWith('.')) {
+          props.set(attr.name, `\${${varName}${attr.value}}`);
+        } else {
+          props.set(attr.name, attr.value);
+        }
+      }
+    }
+    // Also handle content as slot
+    const slotContent = this.resolveTemplateContent(el.content, varName);
+
+    // Inline component body with prop substitution
+    let html = '';
+    for (const stmt of comp.body) {
+      if (stmt.type === 'Element') {
+        html += this.compileComponentElementTemplate(stmt as ElementNode, props, varName, slotContent);
+      }
+    }
+    return html;
+  }
+
+  private compileComponentElementTemplate(el: ElementNode, props: Map<string, string>, varName: string, slotContent: string): string {
+    const tag = this.mapTag(el.tag);
+    let content = '';
+
+    if (el.content) {
+      if (typeof el.content === 'string') {
+        content = el.content;
+      } else if (el.content.type === 'StringLiteral') {
+        content = (el.content as any).value;
+      } else if (el.content.type === 'Identifier') {
+        const name = (el.content as any).name;
+        content = props.has(name) ? props.get(name)! : name;
+      } else if (el.content.type === 'PropertyAccess') {
+        const propName = (el.content as any).object;
+        const path = (el.content as any).path;
+        if (propName && props.has(propName)) {
+          // If the prop itself is a template var, resolve the path
+          content = props.get(propName)!;
+        } else {
+          content = `\${${varName}${path}}`;
+        }
+      }
+    }
+
+    // Resolve attributes with props
+    const attrs = el.attributes.map(a => {
+      if (typeof a.value === 'string' && a.value !== 'true') {
+        let val = a.value;
+        if (props.has(val)) val = props.get(val)!;
+        if (a.name === 'preset') return `class="nyx-p_${val}"`;
+        if (a.name === 'style') {
+          const expanded = this.expandInlineShorthands(val);
+          return `style="${expanded}"`;
+        }
+        return `${a.name}="${val}"`;
+      }
+      return a.name;
+    }).join(' ');
+
+    const attrStr = attrs ? ' ' + attrs : '';
+
+    const children = el.children.map(c => {
+      if (c.type === 'Element') {
+        return this.compileComponentElementTemplate(c as ElementNode, props, varName, slotContent);
       }
       return '';
     }).join('');
