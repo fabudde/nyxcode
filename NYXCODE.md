@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.11.0)
+# NYXCODE.md — AI Context File (v0.11.5)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -15,7 +15,7 @@ nyxcode parse app.nyx          # Debug AST output
 ## Hero Example: Full-Stack Blog (16 lines)
 ```nyx
 table posts { title text required, body text, created auto }
-security { table users, login email password, token jwt, protect /api/posts }
+security { table users, login email password, token jwt, protect /api/posts write }
 theme { colors { primary #667eea, bg #0a0a12, card #1a1a2e } }
 preset card { bg card, r 12px, p 2rem }
 
@@ -154,7 +154,7 @@ All standard HTML elements are recognized:
 ### Media
 `img`, `video`
 - `img` auto-gets `loading="lazy"` (v0.9.7+)
-- `img "alt text" src="url"` → `<img alt="alt text" src="url" loading="lazy" />` (v0.11.0+)
+- `img "alt text" src="url"` → `<img alt="alt text" src="url" loading="lazy" />` (v0.11.5+)
 
 ### Structure
 `div`, `section`, `header`, `footer`, `nav`, `aside`, `main`, `article`, `figure`, `figcaption`, `container`, `card`, `row`, `col`, `grid`, `stack`, `ul`, `ol`, `li`, `a`, `strong`, `em`, `small`, `sup`, `sub`, `blockquote`, `pre`, `code`, `label`, `details`, `summary`, `table`, `thead`, `tbody`, `tr`, `td`, `th`
@@ -171,7 +171,7 @@ p "Line two"
 | NyxCode | HTML |
 |---------|------|
 | `link` | `<a>` |
-| `a` | `<a>` (native, v0.11.0+) |
+| `a` | `<a>` (native, v0.11.5+) |
 | `text` | `<span>` |
 | `card` | `<div>` |
 | `container` | `<div>` |
@@ -185,7 +185,7 @@ p "Line two"
 h1 "Hello World"                         # Text content
 link "Click me" href="/about"            # Content + attributes
 img src="photo.jpg" alt="A photo"        # Attributes only (void)
-img "A photo" src="photo.jpg"            # Alt text as content (v0.11.0+)
+img "A photo" src="photo.jpg"            # Alt text as content (v0.11.5+)
 div class="hero" id="main" { ... }      # Attributes + children
 button "Submit" style="bg: blue"         # Inline style
 div preset=card { p "Content" }          # Preset class
@@ -268,7 +268,7 @@ page / {
 - `{name}` interpolates state in text content
 - State changes auto-trigger re-render
 
-### Events (v0.11.0+)
+### Events (v0.11.5+)
 ```nyx
 button "Click" on:click -> count = count + 1
 button "Reset" on:click -> count = 0
@@ -506,10 +506,21 @@ security {
   table users
   login email password
   token jwt
-  protect /api/posts
+  protect /api/posts           # write-only (DEFAULT) — GET open, POST/PUT/DELETE need auth
+  protect /api/comments write  # same as above (explicit)
+  protect /api/users all       # ALL methods need auth (including GET)
 }
 ```
-Auto-generates: Register, Login, Me, JWT middleware, bcrypt hashing, rate limiting.
+Auto-generates: Register (`POST /api/auth/register`), Login (`POST /api/auth/login`), Me (`GET /api/auth/me`), JWT middleware, bcrypt hashing, rate limiting.
+
+**Protect modes (v0.11.5+):**
+| Mode | GET | POST/PUT/DELETE | Use case |
+|------|-----|-----------------|----------|
+| `write` (default) | ✅ Open | 🔒 Auth | Blog, public content |
+| `all` | 🔒 Auth | 🔒 Auth | Private data, user profiles |
+| `read` | 🔒 Auth | ✅ Open | Rare, write-only endpoints |
+
+**Token auto-save (v0.11.4+):** Form blocks that receive a JWT token auto-save it to `localStorage`. Subsequent `auth` requests include `Authorization: Bearer` header automatically.
 
 **Security features (v0.9.6+):**
 - Table name validation against SQL injection
@@ -517,6 +528,34 @@ Auto-generates: Register, Login, Me, JWT middleware, bcrypt hashing, rate limiti
 - Rate limiting on auth endpoints (20 req/15min)
 - Rate limiting on write CRUD endpoints (100 req/15min)
 - Path traversal protection on imports
+- Passwords auto-excluded from all API responses (GET, POST, JOIN)
+
+### Form Blocks with Auth
+```nyx
+form /api/auth/register {
+  input name placeholder="Name"
+  input email placeholder="Email"
+  input password placeholder="Password"
+  submit "Register"
+  success -> toast "Welcome!"      # Token auto-saved to localStorage!
+}
+
+form /api/auth/login auth {
+  input email placeholder="Email"
+  input password placeholder="Password"
+  submit "Login"
+  success -> redirect /dashboard   # Token auto-saved!
+}
+
+form /api/posts auth {              # auth → includes Bearer token from localStorage
+  input title placeholder="Title"
+  input body placeholder="Write..."
+  submit "Publish"
+  success -> reload
+}
+```
+`auth` keyword on form → auto-includes `Authorization: Bearer` header from localStorage.
+Success handlers: `reload`, `redirect /path`, `toast "message"`, `clear`.
 
 ### Data Binding (Frontend to Backend)
 ```nyx
@@ -525,7 +564,7 @@ data posts = get /api/posts auth         # Authenticated (sends JWT)
 ```
 Generates `fetch()` calls with optional Bearer token from localStorage.
 
-### Loading/Error/Empty States (v0.11.0+)
+### Loading/Error/Empty States (v0.11.5+)
 ```nyx
 data posts = get /api/posts auth {
   loading -> p "Loading posts..."
@@ -576,7 +615,7 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 | Sibling elements merge | Wrap in `div {}` or put inside page/component block |
 | Inline style commas | Use `;` not `,` in `style="..."` attributes |
 | Theme color not resolving | Must be defined in `theme { colors { name value } }` |
-| `img` shows `value=` instead of `alt=` | Update to v0.11.0+ |
+| `img` shows `value=` instead of `alt=` | Update to v0.11.5+ |
 | `div` absorbed into previous element | Update to v0.9.7+ (div now in ELEMENT_TAGS) |
 
 ## AI Rules
@@ -598,4 +637,4 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 | Full-stack blog | 169 tokens | Next.js+Prisma+NextAuth: 964 | **-82%** |
 
 ## Version
-v0.11.0 — 21 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺 (6 bugs found + fixed).
+v0.11.5 — 21 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺 (6 bugs found + fixed).
