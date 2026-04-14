@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.10.1)
+# NYXCODE.md — AI Context File (v0.10.2)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -154,7 +154,7 @@ All standard HTML elements are recognized:
 ### Media
 `img`, `video`
 - `img` auto-gets `loading="lazy"` (v0.9.7+)
-- `img "alt text" src="url"` → `<img alt="alt text" src="url" loading="lazy" />` (v0.10.1+)
+- `img "alt text" src="url"` → `<img alt="alt text" src="url" loading="lazy" />` (v0.10.2+)
 
 ### Structure
 `div`, `section`, `header`, `footer`, `nav`, `aside`, `main`, `article`, `figure`, `figcaption`, `container`, `card`, `row`, `col`, `grid`, `stack`, `ul`, `ol`, `li`, `a`, `strong`, `em`, `small`, `sup`, `sub`, `blockquote`, `pre`, `code`, `label`, `details`, `summary`, `table`, `thead`, `tbody`, `tr`, `td`, `th`
@@ -171,7 +171,7 @@ p "Line two"
 | NyxCode | HTML |
 |---------|------|
 | `link` | `<a>` |
-| `a` | `<a>` (native, v0.10.1+) |
+| `a` | `<a>` (native, v0.10.2+) |
 | `text` | `<span>` |
 | `card` | `<div>` |
 | `container` | `<div>` |
@@ -185,7 +185,7 @@ p "Line two"
 h1 "Hello World"                         # Text content
 link "Click me" href="/about"            # Content + attributes
 img src="photo.jpg" alt="A photo"        # Attributes only (void)
-img "A photo" src="photo.jpg"            # Alt text as content (v0.10.1+)
+img "A photo" src="photo.jpg"            # Alt text as content (v0.10.2+)
 div class="hero" id="main" { ... }      # Attributes + children
 button "Submit" style="bg: blue"         # Inline style
 div preset=card { p "Content" }          # Preset class
@@ -261,8 +261,20 @@ style {
 page / {
   state count = 0
   button "Count: {count}" on:click -> count = count + 1
+  p "Count is: {count}"
 }
 ```
+- `state name = value` declares reactive state
+- `{name}` interpolates state in text content
+- State changes auto-trigger re-render
+
+### Events (v0.10.2+)
+```nyx
+button "Click" on:click -> count = count + 1
+button "Reset" on:click -> count = 0
+```
+Both `on:click` and `on click` syntax work (colon optional).
+Events work inline on elements AND inside when/else blocks.
 
 ## Components
 ```nyx
@@ -443,7 +455,7 @@ data posts = get /api/posts auth         # Authenticated (sends JWT)
 ```
 Generates `fetch()` calls with optional Bearer token from localStorage.
 
-### Loading/Error/Empty States (v0.10.1+)
+### Loading/Error/Empty States (v0.10.2+)
 ```nyx
 data posts = get /api/posts auth {
   loading -> p "Loading posts..."
@@ -494,7 +506,7 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 | Sibling elements merge | Wrap in `div {}` or put inside page/component block |
 | Inline style commas | Use `;` not `,` in `style="..."` attributes |
 | Theme color not resolving | Must be defined in `theme { colors { name value } }` |
-| `img` shows `value=` instead of `alt=` | Update to v0.10.1+ |
+| `img` shows `value=` instead of `alt=` | Update to v0.10.2+ |
 | `div` absorbed into previous element | Update to v0.9.7+ (div now in ELEMENT_TAGS) |
 
 ## AI Rules
@@ -516,4 +528,4 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 | Full-stack blog | 169 tokens | Next.js+Prisma+NextAuth: 964 | **-82%** |
 
 ## Version
-v0.10.1 — 18 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺 (6 bugs found + fixed).
+v0.10.2 — 19 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺 (6 bugs found + fixed).
