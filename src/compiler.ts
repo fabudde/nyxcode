@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.12.0";
+const NYXCODE_VERSION = "0.12.1";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -1097,11 +1097,15 @@ export class Compiler {
     let fontCSS = '';
     for (const section of theme.sections) {
       if (section.name === 'fonts') {
-        // Auto-apply fonts: heading → h1-h6, body → p,span,li,td,label,input,textarea,select
-        const heading = section.entries['heading'];
-        const body = section.entries['body'];
-        if (heading) fontCSS += 'h1,h2,h3,h4,h5,h6{font-family:' + heading + ';}';
-        if (body) fontCSS += 'body,p,span,li,td,label,input,textarea,select{font-family:' + body + ';}';
+        // Auto-apply fonts + generate CSS custom properties
+        for (const [key, value] of Object.entries(section.entries)) {
+          // Quote multi-word font names and process font stack
+          const fontValue = this.processFontFamily('"' + (value as string) + '"');
+          const fullKey = 'fonts-' + key;
+          this.themeVars.set(fullKey, fontValue);
+          if (key === 'heading') fontCSS += 'h1,h2,h3,h4,h5,h6{font-family:' + fontValue + ';}';
+          if (key === 'body') fontCSS += 'body,p,span,li,td,label,input,textarea,select{font-family:' + fontValue + ';}';
+        }
       } else {
         for (const [key, value] of Object.entries(section.entries)) {
           const fullKey = section.name + '-' + key;

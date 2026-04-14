@@ -247,7 +247,17 @@ export class Parser {
           if (this.check(TokenType.Comma)) this.advance();
           continue;
         }
-        entries[key] = this.collectCSSValue();
+        // For fonts section: collect everything until comma or next known entry
+        if (sectionName === 'fonts') {
+          let parts: string[] = [];
+          while (!this.check(TokenType.RightBrace) && !this.check(TokenType.Comma) && !this.isAtEnd()) {
+            parts.push(this.advance().value);
+          }
+          if (this.check(TokenType.Comma)) this.advance();
+          entries[key] = parts.join(' ');
+        } else {
+          entries[key] = this.collectCSSValue();
+        }
       }
 
       this.consume(TokenType.RightBrace);
@@ -982,6 +992,32 @@ export class Parser {
    * - String literals as complete values
    * Returns when it hits the next property name or closing brace.
    */
+  private isCSSValueKeyword(name: string): boolean {
+    const CSS_VALUES = new Set([
+      'auto', 'none', 'inherit', 'initial', 'unset', 'revert',
+      'normal', 'bold', 'bolder', 'lighter', 'italic', 'oblique',
+      'center', 'left', 'right', 'top', 'bottom', 'start', 'end',
+      'both', 'hidden', 'visible', 'scroll', 'clip',
+      'fixed', 'absolute', 'relative', 'sticky', 'static',
+      'flex', 'grid', 'block', 'inline', 'contents', 'table',
+      'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset',
+      'collapse', 'separate', 'wrap', 'nowrap',
+      'contain', 'cover', 'fill', 'stretch',
+      'row', 'column', 'dense',
+      'space', 'round', 'repeat', 'no',
+      'ease', 'linear', 'step',
+      'transparent', 'currentColor',
+      'serif', 'sans', 'monospace', 'cursive', 'fantasy', 'system',
+      'pointer', 'default', 'text', 'move', 'grab', 'grabbing',
+      'uppercase', 'lowercase', 'capitalize',
+      'underline', 'overline', 'line', 'through',
+      'baseline', 'middle', 'sub', 'super',
+      'break', 'word', 'all', 'avoid',
+      'ellipsis',
+    ]);
+    return CSS_VALUES.has(name);
+  }
+
   private collectCSSValue(): string {
     // String literal = complete value
     if (this.peek().type === TokenType.String) {
@@ -997,11 +1033,24 @@ export class Parser {
       if (next.type === TokenType.Comma) { this.advance(); break; }
       if (next.type === TokenType.Identifier && parts.length > 0) {
         const after = this.tokens[this.pos + 1];
-        if (!after || after.type !== TokenType.LeftParen) break;
+        // If next identifier is followed by (, it's a function call (rgba(), etc) — continue
+        if (after && after.type === TokenType.LeftParen) { /* continue to push */ }
+        // If next identifier looks like a CSS value keyword, keep collecting
+        else if (this.isCSSValueKeyword(next.value)) { /* continue to push */ }
+        // Otherwise it's likely a new property name — break
+        else break;
       }
       parts.push(this.advance().value);
     }
-    return parts.join('');
+    // Smart join: space between word/number tokens, no space around punctuation
+    let result = '';
+    for (let i = 0; i < parts.length; i++) {
+      if (i > 0 && parts[i] !== ')' && parts[i] !== ',' && parts[i-1] !== '(' && parts[i-1] !== '-') {
+        result += ' ';
+      }
+      result += parts[i];
+    }
+    return result.trim();
   }
 
   private parsePreset(): any {
