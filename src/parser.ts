@@ -526,8 +526,8 @@ export class Parser {
     const cssRules: Array<{selector: string, properties: StyleProperty[]}> = [];
 
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-      // CSS selector rule: .class { props } or .class:pseudo { props } or tag { props }
-      if (this.check(TokenType.Dot) || this.isCssSelectorStart()) {
+      // CSS selector rule: .class { }, ::pseudo { }, tag { }
+      if (this.check(TokenType.Dot) || this.isCssSelectorStart() || this.isCssPseudoSelector()) {
         const selector = this.parseCssSelector();
         this.consume(TokenType.LeftBrace);
         const ruleProps: StyleProperty[] = [];
@@ -537,16 +537,39 @@ export class Parser {
         this.consume(TokenType.RightBrace);
         cssRules.push({ selector, properties: ruleProps });
       } else if (this.check(TokenType.At)) {
-        // Responsive block: @mobile { ... }
-        this.advance(); // @
-        const breakpoint = this.consumeIdentifier();
-        this.consume(TokenType.LeftBrace);
-        const props: StyleProperty[] = [];
-        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-          props.push(this.parseStyleProperty());
+        // Check: @keyframes → raw CSS rule
+        if (this.pos + 1 < this.tokens.length && this.tokens[this.pos + 1].value === 'keyframes') {
+          // Collect @keyframes as raw CSS
+          let raw = '';
+          this.advance(); // @
+          raw += '@';
+          // Collect tokens until matching closing brace (nested braces!)
+          let depth = 0;
+          let started = false;
+          while (!this.isAtEnd()) {
+            const tok = this.advance();
+            if (tok.type === TokenType.LeftBrace) { depth++; started = true; raw += ' {\n'; }
+            else if (tok.type === TokenType.RightBrace) { depth--; raw += '}\n'; if (started && depth === 0) break; }
+            else if (tok.type === TokenType.Comma) { raw += ', '; }
+            else if (tok.type === TokenType.Colon) { raw += ': '; }
+            else if (tok.type === TokenType.LeftParen) { raw += '('; }
+            else if (tok.type === TokenType.RightParen) { raw += ')'; }
+            else if (tok.value === '%' || tok.value === ';') { raw += tok.value + ' '; }
+            else { raw += (raw.endsWith('(') || raw.endsWith('\n') || raw.endsWith('@') ? '' : ' ') + tok.value; }
+          }
+          cssRules.push({ selector: '__raw__', properties: [{ name: '__raw__', value: raw.trim() }] });
+        } else {
+          // Responsive block: @mobile { ... }
+          this.advance(); // @
+          const breakpoint = this.consumeIdentifier();
+          this.consume(TokenType.LeftBrace);
+          const props: StyleProperty[] = [];
+          while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            props.push(this.parseStyleProperty());
+          }
+          this.consume(TokenType.RightBrace);
+          responsive.push({ breakpoint, properties: props });
         }
-        this.consume(TokenType.RightBrace);
-        responsive.push({ breakpoint, properties: props });
       } else if (PSEUDO_CLASSES.has(this.peek().value)) {
         // Pseudo-class block: hover { }, focus { }, active { }
         const name = this.advance().value;
@@ -624,12 +647,27 @@ export class Parser {
    * Check if current position looks like a CSS selector start.
    * Detects: tag-name followed by { or :pseudo {, but NOT CSS property names.
    */
+  /**
+   * Check for :: pseudo-element selectors at top of style block (e.g., ::selection { })
+   */
+  private isCssPseudoSelector(): boolean {
+    if (!this.check(TokenType.Colon)) return false;
+    // :: requires two colons
+    if (this.pos + 1 >= this.tokens.length || this.tokens[this.pos + 1].type !== TokenType.Colon) return false;
+    // Then an identifier like 'selection', 'before', 'after', etc.
+    if (this.pos + 2 >= this.tokens.length || this.tokens[this.pos + 2].type !== TokenType.Identifier) return false;
+    // Then eventually a {
+    let i = this.pos + 3;
+    while (i < this.tokens.length && this.tokens[i].type !== TokenType.LeftBrace && this.tokens[i].type !== TokenType.RightBrace) i++;
+    return i < this.tokens.length && this.tokens[i].type === TokenType.LeftBrace;
+  }
+
   private isCssSelectorStart(): boolean {
     // Check: identifier followed by { or identifier:pseudo {
     if (!this.check(TokenType.Identifier)) return false;
     const name = this.peek().value;
     // Known CSS element selectors that might appear in style blocks
-    const CSS_SELECTORS = new Set(['html', 'body', 'main', 'header', 'footer', 'nav', 'section', 'article', 'aside', 'div', 'span', 'p', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'img', 'button', 'input', 'select', 'textarea', 'table', 'form', 'label']);
+    const CSS_SELECTORS = new Set(['html', 'body', 'main', 'header', 'footer', 'nav', 'section', 'article', 'aside', 'div', 'span', 'p', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'img', 'button', 'input', 'select', 'textarea', 'table', 'form', 'label', '*']);
     if (!CSS_SELECTORS.has(name)) return false;
     // Look ahead for { or space+{ pattern
     let i = this.pos + 1;
@@ -657,9 +695,14 @@ export class Parser {
   }
 
   private parseStyleProperty(): StyleProperty {
-    const name = this.consumeIdentifier();
+    let name = this.consumeIdentifier();
     let value = '';
     let parenDepth = 0; // Track parentheses for rgba(), linear-gradient(), etc.
+
+    // Vendor prefix fix: if name is just '-', consume next identifier (e.g., -webkit-...)
+    if (name === '-' && this.check(TokenType.Identifier)) {
+      name = '-' + this.advance().value;
+    }
 
     // Resolve the full property name (might be hyphenated, e.g., "font" + "-" + "family")
     let fullPropName = name;

@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.9.4";
+const NYXCODE_VERSION = "0.9.5";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -749,15 +749,19 @@ export class Compiler {
       }
     }
 
-    // CSS Rules: .class { props }, tag { props }
+    // CSS Rules: .class { props }, tag { props }, @keyframes (raw)
     if (style.cssRules) {
       for (const rule of style.cssRules) {
-        cssBlock += `${rule.selector} {\n`;
-        for (const prop of rule.properties) {
-          const cp = this.mapCSSProperty(prop.name);
-          cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+        if (rule.selector === '__raw__') {
+          cssBlock += rule.properties[0].value + '\n';
+        } else {
+          cssBlock += `${rule.selector} {\n`;
+          for (const prop of rule.properties) {
+            const cp = this.mapCSSProperty(prop.name);
+            cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+          }
+          cssBlock += '}\n';
         }
-        cssBlock += '}\n';
       }
     }
 
@@ -1017,15 +1021,19 @@ export class Compiler {
       }
     }
 
-    // CSS Rules: .class { props }, tag { props }
+    // CSS Rules: .class { props }, tag { props }, @keyframes (raw)
     if (style.cssRules) {
       for (const rule of style.cssRules) {
-        cssBlock += `${rule.selector} {\n`;
-        for (const prop of rule.properties) {
-          const cp = this.mapCSSProperty(prop.name);
-          cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+        if (rule.selector === '__raw__') {
+          cssBlock += rule.properties[0].value + '\n';
+        } else {
+          cssBlock += `${rule.selector} {\n`;
+          for (const prop of rule.properties) {
+            const cp = this.mapCSSProperty(prop.name);
+            cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+          }
+          cssBlock += '}\n';
         }
-        cssBlock += '}\n';
       }
     }
 

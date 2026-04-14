@@ -379,6 +379,7 @@ export class Lexer {
       case '+':
       case '%':
       case ';':
+      case '*':
         this.emit(TokenType.Identifier, ch, startCol); break;
 
       default:

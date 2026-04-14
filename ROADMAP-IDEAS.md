@@ -73,3 +73,10 @@ component MemberCard {
 - From page 3+: NyxCode is cheaper (context paid only once)
 - Each additional page saves ~1,771 tokens
 - **Messaging:** "NyxCode pays for itself after 3 pages"
+
+## 🐺 Kiro Bug #5 — CSS Selector Rules Edge Cases (14.04.2026)
+1. `*` universal selector — Lexer doesn't recognize `*` as valid token
+2. `::selection` pseudo-element — Not tested yet
+3. `-webkit-*` vendor prefixes — Leading hyphen confuses parser
+4. `@keyframes` in style blocks — No support yet (must use head injection)
+Workaround: Put these in head "<style>...</style>" injection.
