@@ -1386,7 +1386,22 @@ private parseElement(): ElementNode {
         const name = this.advance().value;
         this.advance(); // =
         const valToken = this.peek();
-        if (valToken.type === TokenType.String) {
+        if (name === 'style' && valToken.type === TokenType.LeftBrace) {
+          // style={ fs 1rem, c #fff } — unified NyxCode style syntax
+          this.advance(); // consume {
+          const props: string[] = [];
+          while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            const propName = this.advance().value;
+            let propVal = '';
+            while (!this.check(TokenType.Comma) && !this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+              propVal += (propVal ? ' ' : '') + this.advance().value;
+            }
+            if (this.check(TokenType.Comma)) this.advance();
+            if (propName && propVal) props.push(propName + ': ' + propVal);
+          }
+          if (this.check(TokenType.RightBrace)) this.advance();
+          attributes.push({ name: 'style', value: '__nyx__' + props.join('; ') });
+        } else if (valToken.type === TokenType.String) {
           attributes.push({ name, value: this.advance().value });
         } else {
           let val = this.advance().value;
@@ -1396,6 +1411,14 @@ private parseElement(): ElementNode {
             val += this.advance().value; // mobile value
           }
           attributes.push({ name, value: val });
+        }
+      }
+      // $preset shorthand: $name → preset=name
+      else if (next.type === TokenType.Dollar) {
+        this.advance(); // consume $
+        if (this.check(TokenType.Identifier)) {
+          const presetName = this.advance().value;
+          attributes.push({ name: 'preset', value: presetName });
         }
       }
       // Identifier after element: could be content reference, boolean attribute, or layout shorthand

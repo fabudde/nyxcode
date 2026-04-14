@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.11.5";
+const NYXCODE_VERSION = "0.12.0";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -1929,6 +1929,10 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
    * Splits by `;`, expands each property name via mapCSSProperty.
    */
   private expandInlineShorthands(style: string): string {
+    // Handle unified style={ } syntax (prefixed with __nyx__)
+    if (style.startsWith('__nyx__')) {
+      style = style.slice(7); // strip prefix
+    }
     return style.split(';').map(part => {
       const colonIdx = part.indexOf(':');
       if (colonIdx === -1) return part;

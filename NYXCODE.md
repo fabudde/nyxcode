@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.11.5)
+# NYXCODE.md — AI Context File (v0.12.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -154,7 +154,7 @@ All standard HTML elements are recognized:
 ### Media
 `img`, `video`
 - `img` auto-gets `loading="lazy"` (v0.9.7+)
-- `img "alt text" src="url"` → `<img alt="alt text" src="url" loading="lazy" />` (v0.11.5+)
+- `img "alt text" src="url"` → `<img alt="alt text" src="url" loading="lazy" />` (v0.12.0+)
 
 ### Structure
 `div`, `section`, `header`, `footer`, `nav`, `aside`, `main`, `article`, `figure`, `figcaption`, `container`, `card`, `row`, `col`, `grid`, `stack`, `ul`, `ol`, `li`, `a`, `strong`, `em`, `small`, `sup`, `sub`, `blockquote`, `pre`, `code`, `label`, `details`, `summary`, `table`, `thead`, `tbody`, `tr`, `td`, `th`
@@ -171,7 +171,7 @@ p "Line two"
 | NyxCode | HTML |
 |---------|------|
 | `link` | `<a>` |
-| `a` | `<a>` (native, v0.11.5+) |
+| `a` | `<a>` (native, v0.12.0+) |
 | `text` | `<span>` |
 | `card` | `<div>` |
 | `container` | `<div>` |
@@ -185,9 +185,10 @@ p "Line two"
 h1 "Hello World"                         # Text content
 link "Click me" href="/about"            # Content + attributes
 img src="photo.jpg" alt="A photo"        # Attributes only (void)
-img "A photo" src="photo.jpg"            # Alt text as content (v0.11.5+)
+img "A photo" src="photo.jpg"            # Alt text as content (v0.12.0+)
 div class="hero" id="main" { ... }      # Attributes + children
-button "Submit" style="bg: blue"         # Inline style
+button "Submit" style={ bg blue }          # Unified style (v0.12+)
+button "Submit" style="bg: blue"          # CSS-style (still works)
 div preset=card { p "Content" }          # Preset class
 ```
 
@@ -205,6 +206,13 @@ div {
 Elements on the same line merge. Use a wrapping `div {}` or put on separate lines inside a block.
 
 ## Styling (3 Tiers)
+
+### Unified Style Syntax (v0.12+)
+
+ uses NyxCode shorthand syntax (same as presets and style blocks).
+ CSS-syntax still works for backward compatibility.
+
+**\ shorthand:**  instead of  — saves tokens!
 
 ### Tier 1: Inline Style (quick)
 ```nyx
@@ -268,7 +276,7 @@ page / {
 - `{name}` interpolates state in text content
 - State changes auto-trigger re-render
 
-### Events (v0.11.5+)
+### Events (v0.12.0+)
 ```nyx
 button "Click" on:click -> count = count + 1
 button "Reset" on:click -> count = 0
@@ -513,7 +521,7 @@ security {
 ```
 Auto-generates: Register (`POST /api/auth/register`), Login (`POST /api/auth/login`), Me (`GET /api/auth/me`), JWT middleware, bcrypt hashing, rate limiting.
 
-**Protect modes (v0.11.5+):**
+**Protect modes (v0.12.0+):**
 | Mode | GET | POST/PUT/DELETE | Use case |
 |------|-----|-----------------|----------|
 | `write` (default) | ✅ Open | 🔒 Auth | Blog, public content |
@@ -564,7 +572,7 @@ data posts = get /api/posts auth         # Authenticated (sends JWT)
 ```
 Generates `fetch()` calls with optional Bearer token from localStorage.
 
-### Loading/Error/Empty States (v0.11.5+)
+### Loading/Error/Empty States (v0.12.0+)
 ```nyx
 data posts = get /api/posts auth {
   loading -> p "Loading posts..."
@@ -615,7 +623,7 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 | Sibling elements merge | Wrap in `div {}` or put inside page/component block |
 | Inline style commas | Use `;` not `,` in `style="..."` attributes |
 | Theme color not resolving | Must be defined in `theme { colors { name value } }` |
-| `img` shows `value=` instead of `alt=` | Update to v0.11.5+ |
+| `img` shows `value=` instead of `alt=` | Update to v0.12.0+ |
 | `div` absorbed into previous element | Update to v0.9.7+ (div now in ELEMENT_TAGS) |
 
 ## AI Rules
@@ -637,4 +645,4 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 | Full-stack blog | 169 tokens | Next.js+Prisma+NextAuth: 964 | **-82%** |
 
 ## Version
-v0.11.5 — 21 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺 (6 bugs found + fixed).
+v0.12.0 — 21 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺 (6 bugs found + fixed).
