@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.10.2)
+# NYXCODE.md — AI Context File (v0.11.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -154,7 +154,7 @@ All standard HTML elements are recognized:
 ### Media
 `img`, `video`
 - `img` auto-gets `loading="lazy"` (v0.9.7+)
-- `img "alt text" src="url"` → `<img alt="alt text" src="url" loading="lazy" />` (v0.10.2+)
+- `img "alt text" src="url"` → `<img alt="alt text" src="url" loading="lazy" />` (v0.11.0+)
 
 ### Structure
 `div`, `section`, `header`, `footer`, `nav`, `aside`, `main`, `article`, `figure`, `figcaption`, `container`, `card`, `row`, `col`, `grid`, `stack`, `ul`, `ol`, `li`, `a`, `strong`, `em`, `small`, `sup`, `sub`, `blockquote`, `pre`, `code`, `label`, `details`, `summary`, `table`, `thead`, `tbody`, `tr`, `td`, `th`
@@ -171,7 +171,7 @@ p "Line two"
 | NyxCode | HTML |
 |---------|------|
 | `link` | `<a>` |
-| `a` | `<a>` (native, v0.10.2+) |
+| `a` | `<a>` (native, v0.11.0+) |
 | `text` | `<span>` |
 | `card` | `<div>` |
 | `container` | `<div>` |
@@ -185,7 +185,7 @@ p "Line two"
 h1 "Hello World"                         # Text content
 link "Click me" href="/about"            # Content + attributes
 img src="photo.jpg" alt="A photo"        # Attributes only (void)
-img "A photo" src="photo.jpg"            # Alt text as content (v0.10.2+)
+img "A photo" src="photo.jpg"            # Alt text as content (v0.11.0+)
 div class="hero" id="main" { ... }      # Attributes + children
 button "Submit" style="bg: blue"         # Inline style
 div preset=card { p "Content" }          # Preset class
@@ -268,7 +268,7 @@ page / {
 - `{name}` interpolates state in text content
 - State changes auto-trigger re-render
 
-### Events (v0.10.2+)
+### Events (v0.11.0+)
 ```nyx
 button "Click" on:click -> count = count + 1
 button "Reset" on:click -> count = 0
@@ -458,17 +458,44 @@ table users {
   email email unique
   password text required
   role text default="user"
-  avatar text
   created auto
 }
 ```
-**Types:** `text`, `email` → TEXT | `number`, `int` → INTEGER | `float`, `decimal` → REAL | `bool` → INTEGER | `auto` → DATETIME DEFAULT CURRENT_TIMESTAMP | `[tablename]` → FOREIGN KEY
+**Types:** `text`, `email` → TEXT | `number`, `int` → INTEGER | `float`, `decimal` → REAL | `bool` → INTEGER | `auto` → DATETIME | `[tablename]` → FOREIGN KEY
 
 **Constraints:** `required` → NOT NULL | `unique` → UNIQUE | `default="value"` → DEFAULT 'value'
 
-Auto-generates: CREATE TABLE + 5 CRUD endpoints per table:
-- `GET /api/tablename` — list all
-- `GET /api/tablename/:id` — get by id
+Auto-generates: CREATE TABLE + 5 CRUD endpoints per table (GET all, GET :id, POST, PUT, DELETE).
+
+### Table Relations (v0.11+)
+```nyx
+table posts {
+  title text required
+  body text required
+  author [users]       # → INTEGER REFERENCES users(id)
+  created_at auto
+}
+
+table comments {
+  body text required
+  post [posts]
+  author [users]
+  created_at auto
+}
+```
+`[tablename]` creates a foreign key. The compiler auto-generates:
+- **LEFT JOIN** queries → nested JSON responses
+- **Password exclusion** → JOINed user never includes password
+- **Cascade deletes** → delete user → auto-deletes their posts + comments
+
+GET /api/posts returns nested author:
+```json
+[{ "title": "Hello", "author": { "id": 1, "name": "Fabian", "email": "..." } }]
+```
+
+### CRUD Endpoints (per table)
+- `GET /api/tablename` — list all (with JOINs if relations exist)
+- `GET /api/tablename/:id` — get by id (with JOINs)
 - `POST /api/tablename` — create
 - `PUT /api/tablename/:id` — update
 - `DELETE /api/tablename/:id` — delete
@@ -498,7 +525,7 @@ data posts = get /api/posts auth         # Authenticated (sends JWT)
 ```
 Generates `fetch()` calls with optional Bearer token from localStorage.
 
-### Loading/Error/Empty States (v0.10.2+)
+### Loading/Error/Empty States (v0.11.0+)
 ```nyx
 data posts = get /api/posts auth {
   loading -> p "Loading posts..."
@@ -549,7 +576,7 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 | Sibling elements merge | Wrap in `div {}` or put inside page/component block |
 | Inline style commas | Use `;` not `,` in `style="..."` attributes |
 | Theme color not resolving | Must be defined in `theme { colors { name value } }` |
-| `img` shows `value=` instead of `alt=` | Update to v0.10.2+ |
+| `img` shows `value=` instead of `alt=` | Update to v0.11.0+ |
 | `div` absorbed into previous element | Update to v0.9.7+ (div now in ELEMENT_TAGS) |
 
 ## AI Rules
@@ -571,4 +598,4 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 | Full-stack blog | 169 tokens | Next.js+Prisma+NextAuth: 964 | **-82%** |
 
 ## Version
-v0.10.2 — 19 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺 (6 bugs found + fixed).
+v0.11.0 — 21 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺 (6 bugs found + fixed).
