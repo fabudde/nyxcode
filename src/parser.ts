@@ -40,7 +40,7 @@ const ELEMENT_TAGS = new Set([
 
 const CSS_SHORTHANDS = new Set([
   'bg', 'bgc', 'bgi', 'bgs', 'bgp', 'bgr', 'r', 'radius', 'shadow', 'tshadow',
-  'op', 'z', 'pos', 'p', 'pt', 'pr', 'pb', 'pl', 'px', 'py',
+  'op', 'z', 'pos', 't', 'l', 'b', 'p', 'pt', 'pr', 'pb', 'pl', 'px', 'py',
   'm', 'mt', 'mr', 'mb', 'ml', 'mx', 'my', 'gap', 'gg',
   'w', 'h', 'minw', 'maxw', 'minh', 'maxh', 'mw', 'mh', 'miw', 'mih',
   'fs', 'fw', 'ff', 'lh', 'ls', 'ta', 'td', 'tt', 'ws', 'wb', 'c',
