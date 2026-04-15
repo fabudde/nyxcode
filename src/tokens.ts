@@ -42,6 +42,9 @@ export enum TokenType {
   Layout = 'Layout',
   Script = 'Script',
   Preset = 'Preset',
+  Config = 'Config',
+  Before = 'Before',
+  After = 'After',
 
   // Operators & Punctuation
   LeftBrace = 'LeftBrace',       // {
@@ -107,6 +110,9 @@ export const KEYWORDS: Record<string, TokenType> = {
   layout: TokenType.Layout,
   script: TokenType.Script,
   preset: TokenType.Preset,
+  config: TokenType.Config,
+  before: TokenType.Before,
+  after: TokenType.After,
 };
 
 export interface Token {

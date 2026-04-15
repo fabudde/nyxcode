@@ -24,7 +24,7 @@ import {
   LimitStatement, QueryStatement, ResponsiveBlock, SecurityNode, SecurityRule,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
   HeadStatement, AnimateStatement, PseudoElementBlock, LayoutNode,
-  ScriptStatement, FormAction,
+  ScriptStatement, FormAction, ConfigNode, EnvVar, HookNode,
 } from './ast.js';
 
 /** Set of tags that are recognized as built-in elements */
@@ -95,6 +95,9 @@ export class Parser {
       case TokenType.Store: return this.parseStore();
       case TokenType.Theme: return this.parseTheme();
       case TokenType.Security: return this.parseSecurity();
+      case TokenType.Config: return this.parseConfig();
+      case TokenType.Before: return this.parseHook('before');
+      case TokenType.After: return this.parseHook('after');
       case TokenType.Use: return this.parseUse();
       case TokenType.Layout: return this.parseLayout();
       case TokenType.Preset: return this.parsePreset() as any;
@@ -148,6 +151,62 @@ export class Parser {
     this.consume(TokenType.RightBrace);
 
     return { type: 'Api', method, path, body, auth, line: start.line, col: start.col } as any;
+  }
+
+
+
+  private parseHook(timing: 'before' | 'after'): HookNode {
+    const start = this.advance(); // consume before/after
+    const method = this.consumeIdentifier().toUpperCase();
+    const path = this.consumeIdentifier();
+    this.consume(TokenType.LeftBrace);
+    const body = this.parseBody();
+    this.consume(TokenType.RightBrace);
+    return { type: 'Hook', timing, method, path, body, line: start.line, col: start.col };
+  }
+
+  private parseConfig(): ConfigNode {
+    const start = this.consume(TokenType.Config);
+    this.consume(TokenType.LeftBrace);
+    
+    const envVars: EnvVar[] = [];
+    let cors: { origins: string[] } | undefined;
+    
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      const kw = this.consumeIdentifier();
+      
+      if (kw === 'env') {
+        const name = this.consumeIdentifier();
+        let required = false;
+        let defaultValue: string | undefined;
+        
+        // Parse modifiers: required, default=value
+        while (this.check(TokenType.Identifier) && !this.check(TokenType.RightBrace)) {
+          const mod = this.peek().value;
+          if (mod === 'required') {
+            this.advance();
+            required = true;
+          } else if (mod === 'default') {
+            this.advance();
+            if (this.check(TokenType.Equals)) {
+              this.advance();
+              defaultValue = this.advance().value;
+            }
+          } else {
+            break;
+          }
+        }
+        
+        envVars.push({ name, required, defaultValue });
+      } else if (kw === 'cors') {
+        // cors * or cors https://myapp.com
+        const origin = this.consume(TokenType.String).value;
+        cors = { origins: [origin] };
+      }
+    }
+    
+    this.consume(TokenType.RightBrace);
+    return { type: "Config", envVars, cors, line: start.line, col: start.col };
   }
 
   private parseTable(): TableNode {
@@ -1285,7 +1344,7 @@ export class Parser {
         TokenType.Data, TokenType.Each, TokenType.When, TokenType.Style,
         TokenType.Form, TokenType.Auth, TokenType.On, TokenType.Validate, TokenType.Script,
         TokenType.Respond, TokenType.Limit, TokenType.Query, TokenType.Else,
-        TokenType.State, TokenType.Effect, TokenType.Computed,
+        TokenType.State, TokenType.Effect, TokenType.Computed, TokenType.Config, TokenType.Before, TokenType.After,
       ].includes(next.type) && expression.length > 0 && !expression.endsWith('.')) break;
       if (next.type === TokenType.LeftParen) parenDepth++;
       if (next.type === TokenType.RightParen) parenDepth--;
@@ -1711,7 +1770,7 @@ private parseElement(): ElementNode {
       TokenType.Script, TokenType.Use, TokenType.Api, TokenType.Respond,
       TokenType.Query, TokenType.Head, TokenType.Style, TokenType.Store,
       TokenType.Raw, TokenType.Limit, TokenType.Animate, TokenType.Effect,
-      TokenType.Computed,
+      TokenType.Computed, TokenType.Config, TokenType.Before, TokenType.After,
     ]);
     return keywordTypes.has(token.type);
   }

@@ -16,7 +16,7 @@
  *   author [users] → LEFT JOIN + nested JSON response + cascade delete
  */
 
-import { TableNode, ApiNode, ColumnDef, QueryStatement, ValidateStatement, RespondStatement } from './ast.js';
+import { TableNode, ApiNode, ColumnDef, QueryStatement, ValidateStatement, RespondStatement, ConfigNode, HookNode } from './ast.js';
 
 // ── Type & constraint maps ─────────────────────────────────────────────
 
@@ -285,6 +285,47 @@ ${cascadeBlock ? cascadeBlock : `  const info = db.prepare('DELETE FROM ${n} WHE
 
 // ── Custom API routes ──────────────────────────────────────────────────
 
+
+function compileHook(hook: HookNode): string {
+  const method = hook.method.toLowerCase();
+  const timing = hook.timing;
+  
+  // Extract log and query statements from body
+  let code = '';
+  for (const stmt of hook.body) {
+    if (stmt.type === 'Query') {
+      const q = stmt as QueryStatement;
+      const params = [...q.sql.matchAll(/\$(\w+)/g)].map((m: any) => m[1]);
+      const safeSql = q.sql.replace(/\$(\w+)/g, '?');
+      const paramList = params.map(p => `req.body.${p}`).join(', ');
+      code += `    db.prepare(\`${safeSql}\`).run(${paramList});
+`;
+    }
+  }
+  
+  if (timing === 'before') {
+    return `
+// Hook: before ${hook.method} ${hook.path}
+app.use('${hook.path}', (req, res, next) => {
+  if (req.method === '${hook.method.toUpperCase()}') {
+    try {
+${code}    } catch(e) { console.error('Hook error:', e.message); }
+  }
+  next();
+});`;
+  } else {
+    // After hooks use response finish event
+    return `
+// Hook: after ${hook.method} ${hook.path}  
+app.${method}('${hook.path}', (req, res, next) => {
+  res.on('finish', () => {
+    try {
+${code}    } catch(e) { console.error('After hook error:', e.message); }
+  });
+  next();
+});`;
+  }
+}
 function compileApiRoute(api: ApiNode): string {
   const method = api.method.toLowerCase();
   const middleware = (api as any).auth ? 'authMiddleware, ' : '';
@@ -373,14 +414,34 @@ ${handlerBody}  } catch (e) {
 
 // ── Main export ────────────────────────────────────────────────────────
 
-export function compileBackend(tables: TableNode[], apis: ApiNode[] = []): string {
+export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = []): string {
   for (const t of tables) {
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(t.name)) {
       throw new Error(`Invalid table name: "${t.name}" — must be alphanumeric/underscore`);
     }
   }
+    // Generate env validation
+  let configValidation = '';
+  if (config) {
+    const checks: string[] = [];
+    for (const env of config.envVars) {
+      if (env.defaultValue) {
+        checks.push(`const ${env.name} = process.env.${env.name} || '${env.defaultValue}';`);
+      } else if (env.required) {
+        checks.push(`if (!process.env.${env.name}) { console.error('❌ Missing required env: ${env.name}'); process.exit(1); }`);
+        checks.push(`const ${env.name} = process.env.${env.name};`);
+      }
+    }
+    if (config.cors) {
+      checks.push(`const cors = require('cors');`);
+      checks.push(`app.use(cors({ origin: '${config.cors.origins[0]}' }));`);
+    }
+    configValidation = checks.join('\n');
+  }
+
   const createStatements = tables.map(t => `db.exec(\`${createTableSQL(t)}\`);`).join('\n');
   const crudBlocks = tables.map(t => crudForTable(t, tables)).join('\n');
+  const hookBlocks = hooks.map(h => compileHook(h)).join('\n');
   const apiBlocks = apis.map(a => compileApiRoute(a)).join('\n');
 
   return `// ═══════════════════════════════════════════════════════════════
@@ -393,6 +454,8 @@ const Database = require('better-sqlite3');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
+
+${configValidation}
 app.use(express.json());
 
 const writeLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { error: 'Too many requests' } });
@@ -406,6 +469,7 @@ db.pragma('foreign_keys = ON');
 ${createStatements}
 ${crudBlocks}
 ${apiBlocks}
+${hookBlocks}
 
 // ── Error handler ──────────────────────────────────────────────
 

@@ -18,7 +18,7 @@ export interface Program extends BaseNode {
   body: TopLevelNode[];
 }
 
-export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode
+export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode | ConfigNode | HookNode
   | PresetNode;
 
 /** `page /path { ... }` */
@@ -369,6 +369,32 @@ export interface StoreField {
 export interface ThemeSection {
   name: string; // 'colors', 'fonts', 'spacing', etc.
   entries: Record<string, string>;
+}
+
+/** `config { env JWT_SECRET required }` */
+export interface ConfigNode extends BaseNode {
+  type: 'Config';
+  envVars: EnvVar[];
+  cors?: CorsConfig;
+}
+
+export interface EnvVar {
+  name: string;
+  required: boolean;
+  defaultValue?: string;
+}
+
+/** `before|after METHOD /path { ... }` */
+export interface HookNode extends BaseNode {
+  type: 'Hook';
+  timing: 'before' | 'after';
+  method: string;
+  path: string;
+  body: Statement[];
+}
+
+export interface CorsConfig {
+  origins: string[];
 }
 
 export interface SecurityRule {

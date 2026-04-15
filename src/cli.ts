@@ -25,6 +25,7 @@ import { Compiler } from './compiler.js';
 import { Validator, ValidationError } from './validator.js';
 import { Program, ComponentNode, UseStatement } from './ast.js';
 import { DevServer } from './dev-server.js';
+import { ConfigNode, HookNode } from './ast.js';
 import { compileBackend } from './backend-compiler.js';
 import { compileAuth } from './auth-compiler.js';
 import { TableNode, SecurityNode, ApiNode } from './ast.js';
@@ -208,13 +209,15 @@ try {
     const tables = ast.body.filter((n: any) => n.type === 'Table') as TableNode[];
     const apis = ast.body.filter((n: any) => n.type === 'Api') as ApiNode[];
     const security = ast.body.find((n: any) => n.type === 'Security') as SecurityNode | undefined;
+    const config = ast.body.find((n: any) => n.type === 'Config') as ConfigNode | undefined;
+    const hooks = ast.body.filter((n: any) => n.type === 'Hook') as HookNode[];
 
     if (tables.length > 0 || apis.length > 0) {
       // Extract protected paths from security block
       const protectedPaths = security 
         ? security.rules.filter(r => r.name === 'protect').map(r => r.value)
         : [];
-      let serverCode = compileBackend(tables, apis);
+      let serverCode = compileBackend(tables, apis, config, hooks);
       if (security) {
         // Inject auth AFTER express.json() but BEFORE create tables
         const authCode = compileAuth(security, tables);
