@@ -29,6 +29,34 @@ export function compileAuth(security: SecurityNode, tables: TableNode[]): string
     ? table.columns.filter(c => c.type !== 'auto' && c.name !== 'id')
     : [{ name: 'email', type: 'email', constraints: [] }, { name: 'password', type: 'text', constraints: [] }];
 
+  // Generate validation code for register fields
+  const valChecks: string[] = [];
+  for (const col of registerFields) {
+    for (const cn of col.constraints) {
+      if (cn === 'required') {
+        valChecks.push(`  if (!req.body.${col.name} && req.body.${col.name} !== 0) return res.status(400).json({ error: '${col.name} is required' });`);
+      } else if (cn.startsWith('min=')) {
+        const v = cn.split('=')[1];
+        if (['number','int','float'].includes(col.type)) {
+          valChecks.push(`  if (req.body.${col.name} !== undefined && req.body.${col.name} < ${v}) return res.status(400).json({ error: '${col.name} must be at least ${v}' });`);
+        } else {
+          valChecks.push(`  if (req.body.${col.name} && req.body.${col.name}.length < ${v}) return res.status(400).json({ error: '${col.name} must be at least ${v} characters' });`);
+        }
+      } else if (cn.startsWith('max=')) {
+        const v = cn.split('=')[1];
+        if (['number','int','float'].includes(col.type)) {
+          valChecks.push(`  if (req.body.${col.name} !== undefined && req.body.${col.name} > ${v}) return res.status(400).json({ error: '${col.name} must be at most ${v}' });`);
+        } else {
+          valChecks.push(`  if (req.body.${col.name} && req.body.${col.name}.length > ${v}) return res.status(400).json({ error: '${col.name} must be at most ${v} characters' });`);
+        }
+      } else if (cn.startsWith('format=')) {
+        const fmt = cn.split('=')[1];
+        if (fmt === 'email') valChecks.push(`  if (req.body.${col.name} && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(req.body.${col.name})) return res.status(400).json({ error: '${col.name} must be a valid email' });`);
+      }
+    }
+  }
+  const registerValidation = valChecks.length ? valChecks.join('\n') + '\n' : '';
+
   const nonPasswordFields = registerFields.filter(c => c.name !== passwordField);
   const allFieldNames = registerFields.map(c => c.name);
   const insertCols = allFieldNames.join(', ');
@@ -52,7 +80,7 @@ if (!process.env.JWT_SECRET && process.env.NODE_ENV !== 'production') console.wa
 app.post('/api/auth/register', (req, res) => {
   const { ${allFieldNames.join(', ')} } = req.body;
   if (!${identityField} || !${passwordField}) return res.status(400).json({ error: '${identityField} and ${passwordField} required' });
-  const hash = bcrypt.hashSync(${passwordField}, 10);
+${registerValidation}  const hash = bcrypt.hashSync(${passwordField}, 10);
   try {
     const result = db.prepare('INSERT INTO ${userTable} (${insertCols}) VALUES (${insertPlaceholders})').run(${insertValues});
     const token = jwt.sign({ id: result.lastInsertRowid, ${identityField} }, JWT_SECRET, { expiresIn: '7d' });
