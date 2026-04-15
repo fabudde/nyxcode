@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode, StoreNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.16.1";
+const NYXCODE_VERSION = "0.16.2";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -939,6 +939,56 @@ export class Compiler {
 
   // --- Data compilation ---
 
+  private compileErrorHandlers(handlers?: { status: number | '*'; action: string }[]): string {
+    if (!handlers || handlers.length === 0) return '';
+    const cases: string[] = [];
+    let defaultCase = '';
+    for (const h of handlers) {
+      const action = this.errorActionToJS(h.action);
+      if (h.status === '*') {
+        defaultCase = action;
+      } else {
+        cases.push(`if(e.status===${h.status}){${action}}`);
+      }
+    }
+    let code = cases.join(' else ');
+    if (defaultCase) {
+      code += (code ? ' else ' : '') + `{${defaultCase}}`;
+    }
+    return code;
+  }
+
+  private compileFormErrorHandlers(form: FormStatement): string {
+    if (!form.errorHandlers || form.errorHandlers.length === 0) return '';
+    const cases: string[] = [];
+    let defaultCase = '';
+    for (const h of form.errorHandlers) {
+      const action = this.errorActionToJS(h.action);
+      if (h.status === '*') {
+        defaultCase = `{${action};return}`;
+      } else {
+        cases.push(`if(r.status===${h.status}){${action};return}`);
+      }
+    }
+    let code = cases.join(' else ');
+    if (defaultCase) code += (code ? ' else ' : '') + defaultCase;
+    return code;
+  }
+
+  private errorActionToJS(action: string): string {
+    if (action.startsWith('redirect ')) {
+      const url = action.slice(9).replace(/"/g, '');
+      return `window.location.href='${url}'`;
+    } else if (action.startsWith('toast ')) {
+      const msg = action.slice(6).replace(/"/g, '');
+      return `alert('${msg}')`;
+    } else if (action.startsWith('show ')) {
+      return `console.error(${action.slice(5)})`;
+    } else {
+      return action; // raw JS
+    }
+  }
+
   private compileData(data: DataStatement): string {
     const { name, source } = data;
     const hasStates = data.loadingBlock || data.errorBlock || data.emptyBlock;
@@ -962,7 +1012,7 @@ export class Compiler {
       const headers = {};
       ${source.auth ? "const tk=localStorage.getItem('token');if(tk)headers['Authorization']='Bearer '+tk;" : ''}
       const res = await fetch('${url}', { headers });
-      if(!res.ok) throw new Error('HTTP '+res.status);
+      if(!res.ok){var _e=new Error('HTTP '+res.status);_e.status=res.status;throw _e;}
       ${name} = await res.json();
       ${name}__loading = false;
       ${hasStates ? `if(document.getElementById('${loadingId}'))document.getElementById('${loadingId}').style.display='none';` : ''}
@@ -974,6 +1024,7 @@ export class Compiler {
       console.error('Failed to load ${name}:', e);
       ${hasStates ? `if(document.getElementById('${loadingId}'))document.getElementById('${loadingId}').style.display='none';` : ''}
       ${hasStates ? `if(document.getElementById('${errorId}'))document.getElementById('${errorId}').style.display='';` : ''}
+      ${this.compileErrorHandlers(data.errorHandlers)}
     }
   }
   load_${name}();`);
@@ -1455,7 +1506,7 @@ export class Compiler {
         `var h={'Content-Type':'application/json'};${authHeader}` +
         `var msg=document.getElementById('${formId}-msg');` +
         `try{var r=await fetch('${form.action}',{method:'POST',headers:h,body:JSON.stringify({${bodyParts}})});` +
-        `var d=await r.json();if(r.ok){if(d.token)localStorage.setItem('token',d.token);${successCode}}else{msg.textContent=d.error||'Error';msg.style.color='#f06'}}` +
+        `var d=await r.json();if(r.ok){if(d.token)localStorage.setItem('token',d.token);${successCode}}else{${this.compileFormErrorHandlers(form)}msg.textContent=d.error||'Error';msg.style.color='#f06'}}` +
         `catch(err){${errorCode}}}`
       );
       

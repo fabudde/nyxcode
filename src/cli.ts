@@ -217,7 +217,8 @@ try {
       const protectedPaths = security 
         ? security.rules.filter(r => r.name === 'protect').map(r => r.value)
         : [];
-      let serverCode = compileBackend(tables, apis, config, hooks);
+      const middlewares = ast.body.filter((n: any) => n.type === 'Middleware') as any[];
+      let serverCode = compileBackend(tables, apis, config, hooks, [], middlewares);
       if (security) {
         // Inject auth AFTER express.json() but BEFORE create tables
         const authCode = compileAuth(security, tables, config);

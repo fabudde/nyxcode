@@ -18,7 +18,7 @@ export interface Program extends BaseNode {
   body: TopLevelNode[];
 }
 
-export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode | ConfigNode | HookNode
+export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode | ConfigNode | HookNode | MiddlewareNode
   | PresetNode;
 
 /** `page /path { ... }` */
@@ -44,6 +44,14 @@ export interface ApiNode extends BaseNode {
   body: Statement[];
   auth?: boolean;
   guard?: string; // role name
+  middleware?: string[]; // named middleware
+}
+
+/** `middleware name { before/after hooks }` */
+export interface MiddlewareNode extends BaseNode {
+  type: 'Middleware';
+  name: string;
+  body: string; // raw JS for Express middleware
 }
 
 /** `table name { ... }` */
@@ -130,6 +138,7 @@ export interface DataStatement extends BaseNode {
   loadingBlock?: Statement[];
   errorBlock?: Statement[];
   emptyBlock?: Statement[];
+  errorHandlers?: { status: number | '*'; action: string }[];
 }
 
 export interface DataSource {
@@ -198,6 +207,7 @@ export interface FormStatement extends BaseNode {
   body: Statement[];
   onSuccess?: FormAction;
   onError?: FormAction;
+  errorHandlers?: { status: number | '*'; action: string }[];
 }
 
 export interface FormAction {

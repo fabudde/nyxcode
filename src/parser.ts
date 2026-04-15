@@ -24,7 +24,7 @@ import {
   LimitStatement, QueryStatement, ResponsiveBlock, SecurityNode, SecurityRule,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
   HeadStatement, AnimateStatement, PseudoElementBlock, LayoutNode,
-  ScriptStatement, FormAction, ConfigNode, EnvVar, HookNode,
+  ScriptStatement, FormAction, ConfigNode, EnvVar, HookNode, MiddlewareNode,
 } from './ast.js';
 
 /** Set of tags that are recognized as built-in elements */
@@ -102,9 +102,12 @@ export class Parser {
       case TokenType.Use: return this.parseUse();
       case TokenType.Layout: return this.parseLayout();
       case TokenType.Preset: return this.parsePreset() as any;
+      case TokenType.Identifier:
+        if (token.value === 'middleware') return this.parseMiddleware();
+        throw this.error(`Unexpected identifier '${token.value}' at top level.`);
       case TokenType.EOF: return null;
       default:
-        throw this.error(`Unexpected token '${token.value}' at top level. Expected: page, component, api, table, store, theme, security, layout, or preset.`);
+        throw this.error(`Unexpected token '${token.value}' at top level. Expected: page, component, api, table, store, theme, security, layout, middleware, or preset.`);
     }
   }
 
@@ -144,8 +147,16 @@ export class Parser {
     let auth = false;
     let guard: string | undefined;
     
+    let middlewareNames: string[] = [];
     while (!this.check(TokenType.LeftBrace) && !this.isAtEnd()) {
-      if (this.check(TokenType.Auth)) {
+      if (this.check(TokenType.LeftBracket)) {
+        this.advance(); // [
+        while (!this.check(TokenType.RightBracket) && !this.isAtEnd()) {
+          middlewareNames.push(this.consumeIdentifier());
+          if (this.check(TokenType.Comma)) this.advance();
+        }
+        if (this.check(TokenType.RightBracket)) this.advance(); // ]
+      } else if (this.check(TokenType.Auth)) {
         this.advance();
         auth = true;
       } else if (this.check(TokenType.Identifier) && this.peek().value === 'guard') {
@@ -164,7 +175,7 @@ export class Parser {
     const body = this.parseBody();
     this.consume(TokenType.RightBrace);
 
-    return { type: 'Api', method, path, body, auth, guard, line: start.line, col: start.col } as any;
+    return { type: 'Api', method, path, body, auth, guard, middleware: middlewareNames.length > 0 ? middlewareNames : undefined, line: start.line, col: start.col } as any;
   }
 
 
@@ -177,6 +188,27 @@ export class Parser {
     const body = this.parseBody();
     this.consume(TokenType.RightBrace);
     return { type: 'Hook', timing, method, path, body, line: start.line, col: start.col };
+  }
+
+  private parseMiddleware(): MiddlewareNode {
+    const start = this.advance(); // consume 'middleware'
+    const name = this.consumeIdentifier();
+    // Capture raw block content (like script blocks)
+    this.consume(TokenType.LeftBrace);
+    let depth = 1;
+    let body = '';
+    while (depth > 0 && !this.isAtEnd()) {
+      const t = this.advance();
+      if (t.type === TokenType.LeftBrace) { depth++; body += '{ '; }
+      else if (t.type === TokenType.RightBrace) {
+        depth--;
+        if (depth === 0) break;
+        body += '} ';
+      }
+      else if (t.type === TokenType.String) { body += '"' + t.value + '" '; }
+      else { body += t.value + ' '; }
+    }
+    return { type: 'Middleware', name, body: body.trim(), line: start.line, col: start.col };
   }
 
   private parseConfig(): ConfigNode {
@@ -638,7 +670,45 @@ export class Parser {
       this.consume(TokenType.RightBrace);
     }
 
-    return { type: 'Data', name, typeAnnotation, source, loadingBlock, errorBlock, emptyBlock, line: start.line, col: start.col };
+    // Parse optional catch handlers: catch 401 -> redirect "/login"
+    const errorHandlers: { status: number | '*'; action: string }[] = [];
+    while (this.check(TokenType.Identifier) && this.peek().value === 'catch') {
+      this.advance(); // consume 'catch'
+      let status: number | '*';
+      if (this.check(TokenType.Number)) {
+        status = parseInt(this.advance().value);
+      } else if (this.check(TokenType.Identifier) && this.peek().value === '*') {
+        this.advance();
+        status = '*';
+      } else if (this.peek().value === '*') {
+        this.advance();
+        status = '*';
+      } else {
+        status = '*';
+      }
+      if (this.check(TokenType.Arrow)) this.advance(); // ->
+      let action = '';
+      // Consume action tokens until next catch, closing brace, or next top-level statement
+      // We must NOT use isStatementStart() here because action keywords like 'toast' are in ELEMENT_TAGS
+      while (!this.isAtEnd()) {
+        if (this.peek().type === TokenType.RightBrace) break;
+        if (this.check(TokenType.Identifier) && this.peek().value === 'catch') break;
+        // Stop at known statement-starting KEYWORDS (not identifiers)
+        const pt = this.peek().type;
+        if (pt === TokenType.Data || pt === TokenType.Each || pt === TokenType.When ||
+            pt === TokenType.Form || pt === TokenType.State || pt === TokenType.Style) break;
+        // Stop at elements that are NOT catch-action keywords
+        if (this.check(TokenType.Identifier) && ELEMENT_TAGS.has(this.peek().value) &&
+            !['redirect', 'toast', 'show', 'reload', 'clear'].includes(this.peek().value) &&
+            action.length > 0) break;
+        const tok = this.advance();
+        if (tok.type === TokenType.String) action += '"' + tok.value + '" ';
+        else action += tok.value + ' ';
+      }
+      errorHandlers.push({ status, action: action.trim() });
+    }
+
+    return { type: 'Data', name, typeAnnotation, source, loadingBlock, errorBlock, emptyBlock, errorHandlers: errorHandlers.length > 0 ? errorHandlers : undefined, line: start.line, col: start.col };
   }
 
   private parseDataSource(): DataSource {
@@ -1138,7 +1208,36 @@ export class Parser {
     
     this.consume(TokenType.RightBrace);
 
-    return { type: 'Form', name, action, auth, body, onSuccess, onError, line: start.line, col: start.col };
+    // Parse optional catch handlers after form closing brace
+    const errorHandlers: { status: number | '*'; action: string }[] = [];
+    while (this.check(TokenType.Identifier) && this.peek().value === 'catch') {
+      this.advance(); // consume 'catch'
+      let status: number | '*';
+      if (this.check(TokenType.Number)) {
+        status = parseInt(this.advance().value);
+      } else {
+        if (this.peek().value === '*') this.advance();
+        status = '*';
+      }
+      if (this.check(TokenType.Arrow)) this.advance(); // ->
+      let catchAction = '';
+      while (!this.isAtEnd()) {
+        if (this.peek().type === TokenType.RightBrace) break;
+        if (this.check(TokenType.Identifier) && this.peek().value === 'catch') break;
+        const pt = this.peek().type;
+        if (pt === TokenType.Data || pt === TokenType.Each || pt === TokenType.When ||
+            pt === TokenType.Form || pt === TokenType.State || pt === TokenType.Style) break;
+        if (this.check(TokenType.Identifier) && ELEMENT_TAGS.has(this.peek().value) &&
+            !['redirect', 'toast', 'show', 'reload', 'clear'].includes(this.peek().value) &&
+            catchAction.length > 0) break;
+        const tok = this.advance();
+        if (tok.type === TokenType.String) catchAction += '"' + tok.value + '" ';
+        else catchAction += tok.value + ' ';
+      }
+      errorHandlers.push({ status, action: catchAction.trim() });
+    }
+
+    return { type: 'Form', name, action, auth, body, onSuccess, onError, errorHandlers: errorHandlers.length > 0 ? errorHandlers : undefined, line: start.line, col: start.col };
   }
 
 

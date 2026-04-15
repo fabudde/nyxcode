@@ -1,0 +1,59 @@
+# Middleware + Error Handling Example (v0.16.2)
+
+table posts {
+  title text
+  content text
+}
+
+security {
+  auth users email password
+  protect /api/posts write
+}
+
+middleware logger {
+  console.log(new Date().toISOString(), req.method, req.url)
+}
+
+middleware rateLimit {
+  const key = req.ip
+  if (!global._rl) global._rl = {}
+  const now = Date.now()
+  if (global._rl[key] && now - global._rl[key] < 1000) {
+    return res.status(429).json({ error: "Too fast" })
+  }
+  global._rl[key] = now
+}
+
+api GET /api/health [logger] {
+  respond 200 "ok"
+}
+
+api GET /api/stats [logger, rateLimit] auth {
+  respond 200 "ok"
+}
+
+page / {
+  h1 "Blog"
+  
+  data posts = get /api/posts auth
+  catch 401 -> redirect "/login"
+  catch 403 -> toast "Access denied"
+  catch * -> show "Failed to load"
+  
+  each posts -> div {
+    h3 .title
+    p .content
+  }
+}
+
+page /login {
+  h1 "Login"
+  form /api/auth/login {
+    input email placeholder="Email"
+    input password placeholder="Password"
+    submit "Login"
+    success -> redirect "/"
+  }
+  catch 401 -> toast "Wrong credentials"
+  catch 429 -> toast "Slow down!"
+}

@@ -16,7 +16,7 @@
  *   author [users] → LEFT JOIN + nested JSON response + cascade delete
  */
 
-import { TableNode, ApiNode, ColumnDef, QueryStatement, ValidateStatement, RespondStatement, ConfigNode, HookNode } from './ast.js';
+import { TableNode, ApiNode, ColumnDef, QueryStatement, ValidateStatement, RespondStatement, ConfigNode, HookNode, MiddlewareNode } from './ast.js';
 
 // ── Type & constraint maps ─────────────────────────────────────────────
 
@@ -421,7 +421,7 @@ function compileApiRoute(api: ApiNode): string {
   }
   
   return `
-app.${method}('${api.path}', ${middleware}(req, res) => {
+app.${method}('${api.path}', ${middleware}${(api.middleware || []).map(m => 'mw_' + m + ', ').join('')}(req, res) => {
   try {
 ${handlerBody}  } catch (e) {
     res.status(500).json({ error: e.message });
@@ -431,7 +431,7 @@ ${handlerBody}  } catch (e) {
 
 // ── Main export ────────────────────────────────────────────────────────
 
-export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = [], pagePaths: string[] = []): string {
+export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = [], pagePaths: string[] = [], middlewares: MiddlewareNode[] = []): string {
   const hasUploads = tables.some(t => t.columns.some(c => c.type === 'upload'));
   const realtimeTables = tables.filter(t => t.columns.some(c => c.constraints.includes('realtime')));
   const hasRealtime = realtimeTables.length > 0;
@@ -524,6 +524,9 @@ function roleGuard(role) {
     next();
   };
 }
+
+// ── Named Middleware ──────────────────────────────────────────
+${middlewares.map(m => `function mw_${m.name}(req, res, next) { ${m.body}; next(); }`).join('\n')}
 
 // ── Error handler ──────────────────────────────────────────────
 
