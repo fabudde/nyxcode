@@ -431,7 +431,7 @@ ${handlerBody}  } catch (e) {
 
 // ── Main export ────────────────────────────────────────────────────────
 
-export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = []): string {
+export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = [], pagePaths: string[] = []): string {
   const hasUploads = tables.some(t => t.columns.some(c => c.type === 'upload'));
   const realtimeTables = tables.filter(t => t.columns.some(c => c.constraints.includes('realtime')));
   const hasRealtime = realtimeTables.length > 0;
@@ -472,6 +472,7 @@ export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config
 // ═══════════════════════════════════════════════════════════════
 
 const express = require('express');
+const path = require('path');
 const Database = require('better-sqlite3');
 const rateLimit = require('express-rate-limit');
 
@@ -530,6 +531,12 @@ app.use((err, req, res, next) => {
   console.error('Error:', err.message);
   res.status(500).json({ error: err.message });
 });
+
+
+
+// ── Static File Serving ─────────────────────────────────────────
+const distDir = path.join(__dirname, '.');
+app.use(express.static(distDir));
 
 // ── Start ──────────────────────────────────────────────────────
 
