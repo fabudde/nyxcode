@@ -1539,6 +1539,12 @@ private parseElement(): ElementNode {
           this.advance(); // consume 'on'
           if (this.check(TokenType.Colon)) this.advance(); // skip optional colon
           const eventName = this.consumeIdentifier();
+          // Parse modifiers: on:click.prevent, on:keydown.ctrl.z, on:keydown.escape
+          const modifiers: string[] = [];
+          while (this.check(TokenType.Dot) && this.peekAt(1)?.type === TokenType.Identifier) {
+            this.advance(); // .
+            modifiers.push(this.consumeIdentifier());
+          }
           if (this.check(TokenType.Arrow)) this.advance(); // ->
           let action = '';
           while (!this.isAtEnd() && !this.isStatementStart()) {
@@ -1561,7 +1567,9 @@ private parseElement(): ElementNode {
               else action += (action ? ' ' : '') + tok.value;
             }
           }
-          attributes.push({ name: 'on' + eventName.charAt(0).toUpperCase() + eventName.slice(1), value: action.trim() });
+          const attrName = 'on' + eventName.charAt(0).toUpperCase() + eventName.slice(1);
+          const attrValue = modifiers.length > 0 ? '__mods:' + modifiers.join(',') + ':' + action.trim() : action.trim();
+          attributes.push({ name: attrName, value: attrValue });
           continue;
         } else {
           break;

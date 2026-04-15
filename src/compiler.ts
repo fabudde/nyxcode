@@ -842,10 +842,61 @@ export class Compiler {
 
     const parts: string[] = [];
     for (const attr of attrs) {
-      if (attr.name === 'onClick') {
-        // Convert NyxCode action to JS
-        const jsAction = this.actionToJS(attr.value as string);
-        parts.push(`onclick="${jsAction}"`);
+      if (attr.name.startsWith('on') && attr.name[2] >= 'A' && attr.name[2] <= 'Z') {
+        // Event handler: onClick, onKeydown, onSubmit, etc.
+        const eventType = attr.name.slice(2).toLowerCase(); // onClick -> click
+        const rawValue = attr.value as string;
+        
+        // Parse modifiers: __mods:prevent,ctrl,z:action
+        let modifiers: string[] = [];
+        let actionStr = rawValue;
+        if (rawValue.startsWith('__mods:')) {
+          const parts2 = rawValue.slice(7).split(':');
+          modifiers = parts2[0].split(',');
+          actionStr = parts2.slice(1).join(':');
+        }
+        
+        const jsAction = this.actionToJS(actionStr);
+        
+        // Build event handler with modifiers
+        const KEY_MODIFIERS = new Set(['ctrl', 'alt', 'shift', 'meta']);
+        const PREVENT_MODIFIERS = new Set(['prevent', 'stop', 'self', 'once']);
+        
+        let handler = '';
+        const conditions: string[] = [];
+        let wrappers: string[] = [];
+        
+        for (const mod of modifiers) {
+          if (mod === 'prevent') wrappers.push('event.preventDefault()');
+          else if (mod === 'stop') wrappers.push('event.stopPropagation()');
+          else if (KEY_MODIFIERS.has(mod)) conditions.push(`event.${mod}Key`);
+          else if (mod === 'enter') conditions.push(`event.key==='Enter'`);
+          else if (mod === 'escape' || mod === 'esc') conditions.push(`event.key==='Escape'`);
+          else if (mod === 'tab') conditions.push(`event.key==='Tab'`);
+          else if (mod === 'space') conditions.push(`event.key===' '`);
+          else if (mod === 'up') conditions.push(`event.key==='ArrowUp'`);
+          else if (mod === 'down') conditions.push(`event.key==='ArrowDown'`);
+          else if (mod === 'left') conditions.push(`event.key==='ArrowLeft'`);
+          else if (mod === 'right') conditions.push(`event.key==='ArrowRight'`);
+          else if (mod === 'delete') conditions.push(`event.key==='Delete'`);
+          else if (mod === 'backspace') conditions.push(`event.key==='Backspace'`);
+          else if (/^[a-z]$/.test(mod)) conditions.push(`event.key==='${mod}'`); // single letter
+        }
+        
+        if (wrappers.length > 0 || conditions.length > 0) {
+          handler = wrappers.join(';');
+          if (conditions.length > 0) {
+            handler += (handler ? ';' : '') + `if(${conditions.join('&&')}){${jsAction}}`;
+          } else {
+            handler += (handler ? ';' : '') + jsAction;
+          }
+        } else {
+          handler = jsAction;
+        }
+        
+        // Escape for HTML attribute
+        handler = handler.replace(/"/g, "'");
+        parts.push(`on${eventType}="${handler}"`);
       } else if (attr.name === 'bind') {
         // Two-way binding: bind="stateName"
         const stateName = typeof attr.value === 'string' ? attr.value : '';

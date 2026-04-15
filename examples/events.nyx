@@ -1,0 +1,22 @@
+# Event Modifiers example (v0.16.0+)
+
+page / {
+  h1 "Event Modifiers Demo"
+  
+  state count = 0
+  p "Count: "
+  
+  # Basic click
+  button on:click -> count = count + 1 { text "+1" }
+  
+  # preventDefault
+  a "Won't Navigate" href="/nope" on:click.prevent -> count = count + 1
+  
+  # Keyboard shortcuts
+  input placeholder="Ctrl+Z to reset" on:keydown.ctrl.z -> count = 0
+  input placeholder="Escape to reset" on:keydown.escape -> count = 0
+  input placeholder="Enter for +10" on:keydown.enter -> count = count + 10
+  
+  # Multiple modifiers
+  button on:click.prevent.stop -> count = 99 { text "Prevent + Stop" }
+}
