@@ -19,12 +19,32 @@ button "Click" on:click -> count = count + 1
 div flex=col center gap=2rem { }        # Layout wrapper
 ```
 
+## HTML Tables
+```nyx
+table style={ w 100%, bc #333 } {
+  thead { tr { th "Name"  th "Role" } }
+  tbody {
+    tr { td "Nyx"  td "Developer" }
+    tr { td "Kiro" td "QA Lead" }
+  }
+}
+```
+
+## Select Dropdowns
+```nyx
+select name="role" {
+  option "Pick one" value=""
+  option "Admin" value="admin"
+  option "User" value="user"
+}
+```
+
 ## Styling
 ```nyx
 # Inline (simple)
 h1 "Hi" style={ fs 2rem, fw 700, c primary }
 
-# Multi-line (complex — v0.15.1+)
+# Multi-line (complex)
 div style={
   mw 1200px
   mx auto
@@ -79,7 +99,7 @@ component Card {
   div $card {
     h2 .title style={ c .color }
     p .subtitle
-    slot   # children go here
+    slot   # ← children go here
   }
 }
 
@@ -144,7 +164,7 @@ table users {
 table posts {
   title text required
   body text required
-  author [users]                   # relation -> auto JOIN
+  author [users]                   # relation → auto JOIN
   created auto
 }
 
