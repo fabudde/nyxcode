@@ -220,7 +220,7 @@ try {
       let serverCode = compileBackend(tables, apis, config, hooks);
       if (security) {
         // Inject auth AFTER express.json() but BEFORE create tables
-        const authCode = compileAuth(security, tables);
+        const authCode = compileAuth(security, tables, config);
         // Inject protect middleware AFTER auth definition but BEFORE CRUD  
         const protectLines = protectedPaths.map(p => {
           // Parse "path [write|read|all]" — default is "write" (GET stays open)

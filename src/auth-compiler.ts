@@ -7,7 +7,8 @@
 
 import { SecurityNode, TableNode, ColumnDef } from './ast.js';
 
-export function compileAuth(security: SecurityNode, tables: TableNode[]): string {
+export function compileAuth(security: SecurityNode, tables: TableNode[], config?: any): string {
+  const configHasJwtDefault = config?.envVars?.some((e: any) => e.name === 'JWT_SECRET' && e.defaultValue) || false;
   // Extract rules
   const rules: Record<string, string> = {};
   for (const rule of security.rules) {
@@ -73,8 +74,9 @@ const jwt = require('jsonwebtoken');
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: 'Too many attempts, try again later' } });
 app.use('/api/auth', authLimiter);
 
-const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { console.error('❌ FATAL: JWT_SECRET not set in production!'); process.exit(1); })() : 'nyx-dev-' + require('crypto').randomBytes(8).toString('hex'));
-if (!process.env.JWT_SECRET && process.env.NODE_ENV !== 'production') console.warn('⚠️  No JWT_SECRET set — using random dev secret (tokens expire on restart)');
+${configHasJwtDefault ? `const JWT_SECRET = process.env.JWT_SECRET;` : `const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { console.error('\u274c FATAL: JWT_SECRET not set in production!'); process.exit(1); })() : 'nyx-dev-' + require('crypto').randomBytes(8).toString('hex'));
+if (!process.env.JWT_SECRET && process.env.NODE_ENV !== 'production') console.warn('\u26a0\ufe0f  No JWT_SECRET set \u2014 using random dev secret (tokens expire on restart)');`}
+
 
 // Register
 app.post('/api/auth/register', (req, res) => {

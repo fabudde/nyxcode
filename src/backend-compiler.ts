@@ -435,6 +435,8 @@ export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config
   const hasUploads = tables.some(t => t.columns.some(c => c.type === 'upload'));
   const realtimeTables = tables.filter(t => t.columns.some(c => c.constraints.includes('realtime')));
   const hasRealtime = realtimeTables.length > 0;
+  const configPortDefault = config?.envVars?.find((e: any) => e.name === 'PORT')?.defaultValue;
+  const defaultPort = configPortDefault || '3000';
   for (const t of tables) {
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(t.name)) {
       throw new Error(`Invalid table name: "${t.name}" — must be alphanumeric/underscore`);
@@ -531,7 +533,7 @@ app.use((err, req, res, next) => {
 
 // ── Start ──────────────────────────────────────────────────────
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || ${defaultPort};
 const server = app.listen(PORT, () => console.log(\`NyxCode server listening on :\${PORT}\`));
 ${hasRealtime ? `
 // WebSocket server for realtime tables
