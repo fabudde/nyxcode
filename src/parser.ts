@@ -63,6 +63,7 @@ const CSS_SHORTHANDS = new Set([
 export class Parser {
   private tokens: Token[];
   private pos: number = 0;
+  private braceStack: { line: number; col: number; context: string }[] = [];
 
   constructor(tokens: Token[]) {
     this.tokens = tokens;
@@ -1561,12 +1562,18 @@ private parseElement(): ElementNode {
         const valToken = this.peek();
         if (name === 'style' && valToken.type === TokenType.LeftBrace) {
           // style={ fs 1rem, c #fff } — unified NyxCode style syntax
+          // Also supports multi-line: newlines act as separators (commas optional)
           this.advance(); // consume {
           const props: string[] = [];
           while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
             const propName = this.advance().value;
             let propVal = '';
             while (!this.check(TokenType.Comma) && !this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+              // If we already have a value and the next token is a CSS shorthand, stop — it's a new property
+              const nextTok = this.peek();
+              if (propVal && nextTok.type === TokenType.Identifier && CSS_SHORTHANDS.has(nextTok.value)) {
+                break;
+              }
               propVal += (propVal ? ' ' : '') + this.advance().value;
             }
             if (this.check(TokenType.Comma)) this.advance();
@@ -1818,7 +1825,30 @@ private parseElement(): ElementNode {
   private consume(type: TokenType): Token {
     const token = this.peek();
     if (token.type !== type) {
+      if (type === TokenType.RightBrace && token.type === TokenType.EOF) {
+        // Scan backwards to find the most likely unclosed { 
+        let depth = 0;
+        for (let i = this.pos - 1; i >= 0; i--) {
+          const t = this.tokens[i];
+          if (t.type === TokenType.RightBrace) depth++;
+          else if (t.type === TokenType.LeftBrace) {
+            if (depth === 0) {
+              const ctx = i > 0 ? this.tokens[i - 1].value : 'block';
+              throw new Error(`[NyxCode Parser Error] Unclosed block: opened at line ${t.line}:${t.col} (${ctx}) — expected } before EOF`);
+            }
+            depth--;
+          }
+        }
+      }
       throw this.error(`Expected ${type}, got '${token.value}' (${token.type})`);
+    }
+    // Track brace stack for better errors
+    if (type === TokenType.LeftBrace) {
+      const prev = this.tokens[this.pos - 1]; // token before { (the name/keyword)
+      const ctx = prev ? prev.value : 'block';
+      this.braceStack.push({ line: token.line, col: token.col, context: ctx });
+    } else if (type === TokenType.RightBrace && this.braceStack.length > 0) {
+      this.braceStack.pop();
     }
     return this.advance();
   }

@@ -268,12 +268,54 @@ export class Lexer {
                 }
                 continue;
               }
+              // Template literal ${...} — skip the expression (may contain braces)
+              if (quote === '`' && this.source[this.pos] === '$' && this.pos + 1 < this.source.length && this.source[this.pos + 1] === '{') {
+                raw += this.source[this.pos]; // $
+                this.pos++;
+                raw += this.source[this.pos]; // {
+                this.pos++;
+                let tmplDepth = 1;
+                while (this.pos < this.source.length && tmplDepth > 0) {
+                  if (this.source[this.pos] === '{') tmplDepth++;
+                  else if (this.source[this.pos] === '}') tmplDepth--;
+                  if (tmplDepth > 0) {
+                    if (this.source[this.pos] === '\n') this.line++;
+                    raw += this.source[this.pos];
+                    this.pos++;
+                  }
+                }
+                if (this.pos < this.source.length) {
+                  raw += this.source[this.pos]; // closing }
+                  this.pos++;
+                }
+                continue;
+              }
               if (this.source[this.pos] === '\n') this.line++;
               raw += this.source[this.pos];
               this.pos++;
             }
             if (this.pos < this.source.length) {
               raw += this.source[this.pos]; // closing quote
+              this.pos++;
+            }
+            continue;
+          }
+          // Skip multi-line comments /* ... */
+          if (ch === '/' && this.pos + 1 < this.source.length && this.source[this.pos + 1] === '*') {
+            raw += ch;
+            this.pos++;
+            raw += this.source[this.pos]; // *
+            this.pos++;
+            while (this.pos < this.source.length) {
+              if (this.source[this.pos] === '*' && this.pos + 1 < this.source.length && this.source[this.pos + 1] === '/') {
+                raw += this.source[this.pos];
+                this.pos++;
+                raw += this.source[this.pos];
+                this.pos++;
+                break;
+              }
+              if (this.source[this.pos] === '\n') this.line++;
+              raw += this.source[this.pos];
               this.pos++;
             }
             continue;
