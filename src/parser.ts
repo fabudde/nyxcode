@@ -926,6 +926,7 @@ export class Parser {
 
   /** Known CSS shorthand property names in NyxCode */
   private static CSS_PROPERTIES = new Set([
+    // Full CSS property names
     'bg', 'background', 'color', 'text', 'padding', 'margin', 'border',
     'border-radius', 'radius', 'shadow', 'box-shadow', 'flex', 'grid',
     'display', 'position', 'top', 'left', 'right', 'bottom',
@@ -946,7 +947,21 @@ export class Parser {
     'text-shadow', 'box-sizing', 'vertical-align', 'user-select',
     'pointer-events', 'backdrop-filter', 'filter',
     'grid-gap', 'grid-template-rows', 'grid-column', 'grid-row',
-    'place-items', 'place-content', 'align-content',
+    'place-items', 'place-content', 'align-content', 'content',
+    // NyxCode shorthands (must be here so style parser detects property boundaries)
+    'bgc', 'bgi', 'bgs', 'bgp', 'bgr', 'tshadow',
+    'op', 'z', 'pos', 'p', 'pt', 'pr', 'pb', 'pl', 'px', 'py',
+    'm', 'mt', 'mr', 'mb', 'ml', 'mx', 'my', 'gg',
+    'w', 'h', 'minw', 'maxw', 'minh', 'maxh', 'mw', 'mh', 'miw', 'mih',
+    'fs', 'fw', 'ff', 'lh', 'ls', 'ta', 'td', 'tt', 'ws', 'wb', 'c',
+    'bt', 'bb', 'bl', 'bc', 'bw', 'bs', 'r',
+    'ai', 'jc', 'ac', 'as', 'fd', 'fg', 'fb', 'fsk', 'fxw', 'fxs',
+    'gc', 'gr', 'gtc', 'gtr', 'ga',
+    'd', 'of', 'ox', 'oy', 'v', 'cur',
+    'tf', 'tr', 'anim', 'fi',
+    'pe', 'us', 'ap', 'rs', 'ol', 'wc', 'ct', 'iso',
+    'obf', 'obp', 'bf', 'fil', 'mix', 'si', 'sa',
+    'ji', 'js', 'oc', 'ow', 'o', 't', 'l', 'b',
   ]);
 
   /**
@@ -1076,7 +1091,13 @@ export class Parser {
         if (next.type === TokenType.Comma) {
           value += this.advance().value + ' '; // comma + space inside parens
         } else {
-          value += this.advance().value;
+          const tok = this.advance();
+          // Add spaces around +/- operators in calc() expressions
+          if ((tok.value === '-' || tok.value === '+') && value.length > 0 && !value.endsWith('(')) {
+            value += ' ' + tok.value + ' ';
+          } else {
+            value += tok.value;
+          }
         }
         continue;
       }

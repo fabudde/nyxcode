@@ -1,0 +1,10 @@
+page / {
+  div {
+    style {
+      w calc(100% - 2rem)
+      fs clamp(1rem, 2vw, 2rem)
+      h min(100vh, 800px)
+    }
+    p "CSS Functions Test"
+  }
+}
