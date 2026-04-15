@@ -1522,7 +1522,13 @@ export class Parser {
       ].includes(next.type) && expression.length > 0 && !expression.endsWith('.')) break;
       if (next.type === TokenType.LeftParen) parenDepth++;
       if (next.type === TokenType.RightParen) parenDepth--;
-      expression += this.advance().value;
+      const tok = this.advance();
+      // Preserve string quotes in expressions (ternary, concatenation, etc.)
+      if (tok.type === TokenType.String) {
+        expression += '"' + tok.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+      } else {
+        expression += tok.value;
+      }
     }
 
     return { type: 'Computed', name, expression: expression.trim(), line: start.line, col: start.col };

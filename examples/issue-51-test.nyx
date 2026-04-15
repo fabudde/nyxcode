@@ -1,0 +1,15 @@
+page / {
+  state count = 0
+  computed label = count > 0 ? "positive" : "zero"
+  computed moodFace = count > 3 ? "Ecstatic" : count > 0 ? "Content" : "Neutral"
+
+  section {
+    div {
+      p "Count: {count}"
+      p "Label: {label}"
+      p "Mood: {moodFace}"
+      p count
+      button "+1" on:click -> count = count + 1
+    }
+  }
+}

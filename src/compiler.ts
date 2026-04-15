@@ -730,6 +730,14 @@ export class Compiler {
       return `${this.ind()}<${tag}${attrs} data-nyx-bind="${bindExpr}"></${tag}>\n`;
     }
 
+    // Handle template bindings: content with __NYX_TPL: (mixed text + reactive vars)
+    if (content.startsWith('__NYX_TPL:')) {
+      const tpl = content.replace('__NYX_TPL:', '');
+      // Escape for HTML attribute (double-encode the template markers)
+      const attrSafe = tpl.replace(/"/g, '&quot;');
+      return `${this.ind()}<${tag}${attrs} data-nyx-tpl="${attrSafe}"></${tag}>\n`;
+    }
+
     if (this.isVoidElement(tag)) {
       const contentAttr = tag === 'img' ? 'alt' : 'value';
       return `${this.ind()}<${tag}${attrs}${content ? ` ${contentAttr}="${this.escapeHtml(content)}"` : ''} />\n`;
@@ -821,8 +829,33 @@ export class Compiler {
     if (typeof content === 'string') return this.escapeContent(content);
 
     switch (content.type) {
-      case 'StringLiteral':
+      case 'StringLiteral': {
+        // Check for {varName} interpolation patterns referencing state/computed/store vars
+        const interpolationPattern = /\{(\w+(?:\.\w+)?)\}/g;
+        let match: RegExpExecArray | null;
+        const bindings: Array<{full: string, expr: string}> = [];
+        while ((match = interpolationPattern.exec(content.value)) !== null) {
+          const varRef = match[1];
+          const dotParts = varRef.split('.');
+          if (dotParts.length === 2 && this.stores.has(dotParts[0])) {
+            bindings.push({ full: match[0], expr: `state.${dotParts[0]}.${dotParts[1]}` });
+          } else if (this.stateVars.has(varRef)) {
+            bindings.push({ full: match[0], expr: `state.${varRef}` });
+          } else if (this.computedVars.has(varRef)) {
+            bindings.push({ full: match[0], expr: `computed.${varRef}` });
+          }
+        }
+        if (bindings.length > 0) {
+          this.hasReactivity = true;
+          // Build template: "Count: {count}" -> __NYX_TPL:Count: {{state.count}}
+          let tpl = this.escapeContent(content.value);
+          for (const b of bindings) {
+            tpl = tpl.replace(b.full, `{{${b.expr}}}`);
+          }
+          return `__NYX_TPL:${tpl}`;
+        }
         return this.escapeContent(content.value);
+      }
       case 'PropertyAccess':
         return `\${${this.propertyToJS(content.path)}}`;
       case 'NumberLiteral':
@@ -1951,9 +1984,13 @@ export class Compiler {
       runtime += `  window.__nyx_store_${storeName} = ${storeName};\n`;
     }
 
-    // Computed values
+    // Computed values — resolve state var references to __nyx.state.X
     for (const [name, expr] of this.computedVars) {
-      runtime += `  __nyx.defineComputed('${name}', () => ${expr});\n`;
+      let resolvedExpr = expr;
+      for (const [stateName] of this.stateVars) {
+        resolvedExpr = resolvedExpr.replace(new RegExp(`\\b${stateName}\\b`, 'g'), `__nyx.state.${stateName}`);
+      }
+      runtime += `  __nyx.defineComputed('${name}', () => ${resolvedExpr});\n`;
     }
 
     // Effects
@@ -1998,6 +2035,34 @@ export class Compiler {
       for (const [name] of __nyx.subscribers) {
         if (expr.includes('state.' + name) || expr.includes(name)) {
           __nyx.subscribe(name, update);
+        }
+      }
+      update(); // Initial render
+    });
+
+    // Bind template elements with data-nyx-tpl (mixed text + reactive vars)
+    document.querySelectorAll('[data-nyx-tpl]').forEach(el => {
+      const tpl = el.getAttribute('data-nyx-tpl');
+      const update = () => {
+        try {
+          el.textContent = tpl.replace(/\{\{(\\w+(?:\\.\\w+)*)\}\}/g, (_, expr) => {
+            const parts = expr.split('.');
+            if (parts[0] === 'state' && parts.length === 2) return __nyx.state[parts[1]] ?? '';
+            if (parts[0] === 'state' && parts.length === 3) return __nyx.state[parts[1]+'.'+parts[2]] ?? '';
+            if (parts[0] === 'computed' && parts.length === 2) return __nyx.computed[parts[1]] ?? '';
+            return '';
+          });
+        } catch(e) {}
+      };
+      // Subscribe to all state/computed vars in template
+      for (const [name] of __nyx.subscribers) {
+        if (tpl.includes('state.' + name) || tpl.includes(name)) {
+          __nyx.subscribe(name, update);
+        }
+      }
+      for (const name of Object.keys(__nyx.computedDefs)) {
+        if (tpl.includes('computed.' + name)) {
+          __nyx.subscribe('__computed_' + name, update);
         }
       }
       update(); // Initial render
