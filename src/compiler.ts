@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode, StoreNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.16.0";
+const NYXCODE_VERSION = "0.16.1";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -48,6 +48,7 @@ export class Compiler {
   private pageClass: string = '';
   private stateVars: Map<string, string> = new Map(); // name -> initial value
   private computedVars: Map<string, string> = new Map(); // name -> expression
+  private refNames: string[] = [];
   private stores: Map<string, { fields: Array<{name: string, value?: string, isAction: boolean, actionBody?: string}>, computed: Array<{name: string, expression: string}> }> = new Map();
   private effects: string[] = [];
   private hasReactivity: boolean = false;
@@ -478,7 +479,7 @@ export class Compiler {
     ${renderCalls}
   }` : '') + `
 ` + reactiveRuntime + `
-  </script>` : '') + (this.scripts.length > 0 ? `\n<script>${this.scripts.join(';')}</script>` : '') + `
+  </script>` : '') + (this.scripts.length > 0 ? `\n<script>${this.refNames.length > 0 ? 'const refs=new Proxy({},{get:(_,n)=>document.getElementById("__nyx_ref_"+n)});' : ''}${this.scripts.join(';')}</script>` : '') + `
 </body>
 </html>`;
   }
@@ -549,7 +550,17 @@ export class Compiler {
       case 'When': return this.compileWhen(stmt);
       case 'Style': return this.compileStyle(stmt);
       case 'Form': return this.compileForm(stmt);
-      case 'Script': this.scripts.push((stmt as ScriptStatement).content); return '';
+      case 'Script': {
+        const sc = (stmt as ScriptStatement).content;
+        if (sc.startsWith('__nyx_onMount:')) {
+          this.scripts.push(`document.addEventListener('DOMContentLoaded',()=>{${sc.slice(14)}})`);
+        } else if (sc.startsWith('__nyx_onDestroy:')) {
+          this.scripts.push(`window.addEventListener('beforeunload',()=>{${sc.slice(16)}})`);
+        } else {
+          this.scripts.push(sc);
+        }
+        return '';
+      }
       case 'Preset': this.compilePreset(stmt as any); return '';
       case 'Auth': return ''; // Auth is handled at build level
       case 'On': return ''; // Events compiled with their parent element
@@ -897,6 +908,12 @@ export class Compiler {
         // Escape for HTML attribute
         handler = handler.replace(/"/g, "'");
         parts.push(`on${eventType}="${handler}"`);
+      } else if (attr.name === 'ref') {
+        // Element ref: ref=myDiv -> id="__nyx_ref_myDiv"
+        const refName = typeof attr.value === 'string' ? attr.value : '';
+        parts.push(`id="__nyx_ref_${refName}"`);
+        if (!this.refNames) this.refNames = [];
+        this.refNames.push(refName);
       } else if (attr.name === 'bind') {
         // Two-way binding: bind="stateName"
         const stateName = typeof attr.value === 'string' ? attr.value : '';
@@ -2018,7 +2035,7 @@ ${js}${renderCalls ? `
   }` : ''}
 ${reactiveRuntime}
   </script>` : ''}
-${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : ''}
+${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs=new Proxy({},{get:(_,n)=>document.getElementById("__nyx_ref_"+n)});' : '') + this.scripts.join(';') + '</script>' : ''}
 </body>
 </html>`;
   }

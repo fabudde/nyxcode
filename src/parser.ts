@@ -548,6 +548,30 @@ export class Parser {
       case TokenType.Head: return this.parseHead();
       case TokenType.Animate: return this.parseAnimate();
       case TokenType.Identifier:
+        // Lifecycle hooks: onMount { }, onDestroy { }
+        if ((this.peek().value === 'onMount' || this.peek().value === 'onDestroy') && this.peekAt(1)?.type === TokenType.LeftBrace) {
+          const hookName = this.advance().value;
+          // Find the Script token that the lexer captured for this block
+          if (this.peek().type === TokenType.LeftBrace) {
+            // Use consumeBlock but preserve string quotes
+            this.advance(); // {
+            let depth = 1;
+            let body = '';
+            while (depth > 0 && !this.isAtEnd()) {
+              const t = this.advance();
+              if (t.type === TokenType.LeftBrace) { depth++; body += '{ '; }
+              else if (t.type === TokenType.RightBrace) {
+                depth--;
+                if (depth === 0) break;
+                body += '} ';
+              }
+              else if (t.type === TokenType.String) { body += '"' + t.value + '" '; }
+              else { body += t.value + ' '; }
+            }
+            return { type: 'Script', content: `__nyx_${hookName}:${body.trim()}`, line: this.tokens[this.pos - 1].line, col: this.tokens[this.pos - 1].col } as ScriptStatement;
+          }
+          return this.parseElement();
+        }
         return this.parseElement();
       case TokenType.Else: return null; // handled by parseWhen
       default:
