@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.12.0)
+# NYXCODE.md — AI Context File (v0.16.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -297,6 +297,50 @@ button "Reset" on:click -> count = 0
 ```
 Both `on:click` and `on click` syntax work (colon optional).
 Events work inline on elements AND inside when/else blocks.
+
+### Store — Global State (v0.16.0+)
+```nyx
+store user {
+  name = "Guest"
+  role = "viewer"
+  computed isAdmin = role == "admin"
+}
+
+store cart {
+  items = 0
+  price = 9.99
+  computed total = items * price
+}
+
+page / {
+  p user.name                     # Reactive binding to store
+  p cart.items
+  button on:click -> user.name = "Nyx" { text "Login" }
+  button on:click -> cart.items = cart.items + 1 { text "Add" }
+}
+```
+- `store name { }` declares global state (shared across ALL pages)
+- Fields: `name = value` (strings, numbers, booleans, arrays)
+- Computed: `computed total = items * price` (derived, auto-resolves own fields)
+- Access: `storeName.field` in content, events, and `when` blocks
+- Mutations: `on:click -> store.field = value`
+- **Store state persists across pages** in multi-file apps
+- Page-level `state` is local; `store` is global
+
+### Computed Properties (v0.16.0+)
+```nyx
+page / {
+  state count = 0
+  computed doubled = count * 2
+  computed label = count == 0 ? "empty" : "has items"
+  p doubled
+  button on:click -> count = count + 1 { text "+1" }
+}
+```
+- `computed name = expression` — derived from state, auto-updates
+- Works in both `page` blocks and `store` blocks
+
+
 
 ## Form Blocks (v0.6+)
 Native forms with zero JS. Compiler generates `<form>` + `fetch()` + auth + error handling.
