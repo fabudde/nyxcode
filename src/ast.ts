@@ -36,12 +36,13 @@ export interface ComponentNode extends BaseNode {
   body: Statement[];
 }
 
-/** `api METHOD /path { ... }` */
+/** `api METHOD /path [auth] { ... }` */
 export interface ApiNode extends BaseNode {
   type: 'Api';
   method: string;
   path: string;
   body: Statement[];
+  auth?: boolean;
 }
 
 /** `table name { ... }` */

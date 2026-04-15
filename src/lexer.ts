@@ -219,7 +219,7 @@ export class Lexer {
     // Consume path segments: /foo/bar/:id
     while (!this.isAtEnd()) {
       const ch = this.peek();
-      if (ch === '/' || this.isAlphaNumeric(ch) || ch === ':' || ch === '*' || ch === '_') {
+      if (ch === '/' || this.isAlphaNumeric(ch) || ch === ':' || ch === '*' || ch === '_' || ch === '-' || ch === '.') {
         value += this.advance();
       } else {
         break;

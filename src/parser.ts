@@ -134,12 +134,20 @@ export class Parser {
   private parseApi(): ApiNode {
     const start = this.consume(TokenType.Api);
     const method = this.consumeIdentifier().toUpperCase(); // GET, POST, etc.
-    const path = this.consumeIdentifier(); // /users/:id
+    const path = this.consumeIdentifier(); // /api/stats
+    
+    // Check for optional 'auth' keyword before {
+    let auth = false;
+    if (this.check(TokenType.Auth)) {
+      this.advance();
+      auth = true;
+    }
+    
     this.consume(TokenType.LeftBrace);
     const body = this.parseBody();
     this.consume(TokenType.RightBrace);
 
-    return { type: 'Api', method, path, body, line: start.line, col: start.col };
+    return { type: 'Api', method, path, body, auth, line: start.line, col: start.col } as any;
   }
 
   private parseTable(): TableNode {
@@ -1154,7 +1162,15 @@ export class Parser {
       while (!this.check(TokenType.RightBrace) && !this.check(TokenType.Comma) && !this.isAtEnd()) {
         const next = this.peek();
         if (next.type === TokenType.Identifier) {
-          rules.push(this.advance().value);
+          const kw = this.advance().value;
+          // Handle key=value: format=email, min=10
+          if (this.check(TokenType.Equals)) {
+            this.advance(); // =
+            const val = this.advance().value;
+            rules.push(kw + '=' + val);
+          } else {
+            rules.push(kw);
+          }
         } else {
           break;
         }

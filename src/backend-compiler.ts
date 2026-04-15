@@ -16,7 +16,7 @@
  *   author [users] → LEFT JOIN + nested JSON response + cascade delete
  */
 
-import { TableNode, ApiNode, ColumnDef } from './ast.js';
+import { TableNode, ApiNode, ColumnDef, QueryStatement, ValidateStatement, RespondStatement } from './ast.js';
 
 // ── Type & constraint maps ─────────────────────────────────────────────
 
@@ -287,9 +287,87 @@ ${cascadeBlock ? cascadeBlock : `  const info = db.prepare('DELETE FROM ${n} WHE
 
 function compileApiRoute(api: ApiNode): string {
   const method = api.method.toLowerCase();
+  const middleware = (api as any).auth ? 'authMiddleware, ' : '';
+  
+  // Extract query statements, validate statements, respond statements from body
+  const queries: QueryStatement[] = [];
+  const validates: ValidateStatement[] = [];
+  const responds: RespondStatement[] = [];
+  
+  for (const stmt of api.body) {
+    if (stmt.type === 'Query') queries.push(stmt as QueryStatement);
+    if (stmt.type === 'Validate') validates.push(stmt as ValidateStatement);
+    if (stmt.type === 'Respond') responds.push(stmt as RespondStatement);
+  }
+  
+  let handlerBody = '';
+  
+  // Generate validation code
+  for (const v of validates) {
+    for (const field of v.fields) {
+      for (const rule of field.rules) {
+        if (rule === 'required') {
+          handlerBody += `    if (!req.body.${field.name} && req.body.${field.name} !== 0) return res.status(400).json({ error: '${field.name} is required' });\n`;
+        } else if (rule.startsWith('min=')) {
+          const val = rule.split('=')[1];
+          handlerBody += `    if (req.body.${field.name} && req.body.${field.name}.length < ${val}) return res.status(400).json({ error: '${field.name} must be at least ${val} characters' });\n`;
+        } else if (rule.startsWith('max=')) {
+          const val = rule.split('=')[1];
+          handlerBody += `    if (req.body.${field.name} && req.body.${field.name}.length > ${val}) return res.status(400).json({ error: '${field.name} must be at most ${val} characters' });\n`;
+        } else if (rule.startsWith('format=')) {
+          const fmt = rule.split('=')[1];
+          if (fmt === 'email') handlerBody += `    if (req.body.${field.name} && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(req.body.${field.name})) return res.status(400).json({ error: '${field.name} must be a valid email' });\n`;
+        }
+      }
+    }
+  }
+  
+  // Generate query execution
+  if (queries.length > 0) {
+    const q = queries[0];
+    const sql = q.sql;
+    // Extract $param references from SQL
+    const params = [...sql.matchAll(/\$(\w+)/g)].map(m => m[1]);
+    const pathParams = [...api.path.matchAll(/:(\w+)/g)].map((m: any) => m[1]);
+    const paramSrc = (p: string) => pathParams.includes(p) ? 'req.params' : (method === 'get' ? 'req.query' : 'req.body');
+    const paramList = params.map(p => `${paramSrc(p)}.${p}`).join(', ');
+    const safeSql = sql.replace(/\$(\w+)/g, '?');
+    
+    if (method === 'get') {
+      // SELECT → return all rows or single row
+      const sqlLower = safeSql.toLowerCase();
+      const isSingleRow = /\blimit\s+1\b/.test(sqlLower) || /\b(count|sum|avg|min|max)\s*\(/.test(sqlLower);
+      if (isSingleRow) {
+        handlerBody += `    const row = db.prepare(\`${safeSql}\`).get(${paramList});\n`;
+        handlerBody += `    if (!row) return res.status(404).json({ error: 'Not found' });\n`;
+        handlerBody += `    res.json(row);\n`;
+      } else {
+        handlerBody += `    const rows = db.prepare(\`${safeSql}\`).all(${paramList});\n`;
+        handlerBody += `    res.json(rows);\n`;
+      }
+    } else {
+      // INSERT/UPDATE/DELETE → run and return result
+      if (safeSql.toLowerCase().startsWith('insert')) {
+        handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${paramList});\n`;
+        handlerBody += `    res.status(201).json({ id: info.lastInsertRowid, ...req.body });\n`;
+      } else {
+        handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${paramList});\n`;
+        handlerBody += `    res.json({ changes: info.changes });\n`;
+      }
+    }
+  } else if (responds.length > 0) {
+    const r = responds[0];
+    handlerBody += `    res.status(${r.status || 200}).json(${JSON.stringify(r.body || { ok: true })});\n`;
+  } else {
+    handlerBody += `    res.json({ ok: true });\n`;
+  }
+  
   return `
-app.${method}('${api.path}', (req, res) => {
-  res.json({ status: 'ok' });
+app.${method}('${api.path}', ${middleware}(req, res) => {
+  try {
+${handlerBody}  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });`;
 }
 

@@ -475,7 +475,7 @@ table users {
 
 Auto-generates: CREATE TABLE + 5 CRUD endpoints per table (GET all, GET :id, POST, PUT, DELETE).
 
-### Validation (v0.12.9+)
+### Validation (v0.13.0+)
 ```nyx
 table users {
   name text required min=2 max=50
@@ -487,8 +487,30 @@ table users {
 **Keywords:** `required`, `min=N`, `max=N`, `format=email|url`, `pattern="regex"`, `unique`.
 - Text: min/max = character length. Number: min/max = value range.
 - `format=email` → regex validation. `format=url` → https check.
-- Auto-generates server-side validation on POST and auth register (v0.12.9+).
+- Auto-generates server-side validation on POST and auth register (v0.13.0+).
 - Error: `{ "error": "name must be at least 2 characters" }`
+
+### Custom API Routes (v0.13.0+)
+```nyx
+api GET /api/stats {
+  query "SELECT COUNT(*) as total FROM posts"
+}
+
+api POST /api/contact {
+  validate { email required format=email, message required min=10 }
+  query "INSERT INTO contacts (email, message) VALUES ($email, $message)"
+}
+
+api GET /api/posts/:id/views auth {
+  query "SELECT views FROM posts WHERE id = $id LIMIT 1"
+}
+```
+- `api METHOD /path [auth] { }` — custom Express endpoints.
+- `query "SQL"` — raw SQL. `$field` → parameterized (no injection).
+- `validate { field rules }` — same rules as tables (`required`, `min`, `max`, `format`).
+- `auth` → requires JWT token (uses `authMiddleware`).
+- Path params (`:id`) auto-map to `req.params`. Body params to `req.body`.
+- Smart return: aggregates (`COUNT`/`SUM`) → single object. `LIMIT 1` → single. Else → array.
 
 ### Table Relations (v0.11+)
 ```nyx
