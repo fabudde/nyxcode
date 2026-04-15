@@ -475,7 +475,51 @@ table users {
 
 Auto-generates: CREATE TABLE + 5 CRUD endpoints per table (GET all, GET :id, POST, PUT, DELETE).
 
-### Config Block (v0.14.0+)
+### File Upload (v0.15.0+)
+```nyx
+table posts {
+  title text required
+  image upload
+}
+```
+- `upload` column type → multer middleware, files stored in `./uploads/`.
+- POST uses `multipart/form-data` automatically.
+- Static serving: `/uploads/filename.jpg`.
+- Deps: `multer`.
+
+### WebSocket / Realtime (v0.15.0+)
+```nyx
+table messages {
+  text text required realtime
+  author [users]
+}
+
+page / {
+  data msgs = live /api/messages auth
+  each msgs -> m { p .text }
+}
+```
+- `realtime` constraint → WebSocket broadcast on INSERT.
+- `data x = live /path` → client auto-subscribes via WebSocket.
+- Auto-reconnects, handles insert/update/delete events.
+- Deps: `ws`.
+
+### Role-Based Access Control (v0.15.0+)
+```nyx
+security {
+  auth jwt
+  protect /api/admin all role=admin
+}
+
+api GET /api/admin/users guard=admin {
+  query "SELECT id, email, role FROM users"
+}
+```
+- `guard=admin` on api blocks → auth + role check middleware.
+- `protect /path all role=X` → role-restricted routes.
+- `roleGuard()` queries user's `role` column from DB.
+
+### Config Block (v0.15.0+)
 ```nyx
 config {
   env JWT_SECRET required
@@ -489,7 +533,7 @@ config {
 - `cors "origin"` → auto-generates CORS middleware.
 - Generates startup validation + clear error messages.
 
-### Before/After Hooks (v0.14.0+)
+### Before/After Hooks (v0.15.0+)
 ```nyx
 before POST /api/posts {
   query "UPDATE counters SET value = value + 1 WHERE name = 'posts'"
@@ -499,7 +543,7 @@ before POST /api/posts {
 - `after METHOD /path { }` → runs AFTER response is sent.
 - Can contain `query` statements for side effects.
 
-### Validation (v0.14.0+)
+### Validation (v0.15.0+)
 ```nyx
 table users {
   name text required min=2 max=50
@@ -511,10 +555,10 @@ table users {
 **Keywords:** `required`, `min=N`, `max=N`, `format=email|url`, `pattern="regex"`, `unique`.
 - Text: min/max = character length. Number: min/max = value range.
 - `format=email` → regex validation. `format=url` → https check.
-- Auto-generates server-side validation on POST and auth register (v0.14.0+).
+- Auto-generates server-side validation on POST and auth register (v0.15.0+).
 - Error: `{ "error": "name must be at least 2 characters" }`
 
-### Custom API Routes (v0.14.0+)
+### Custom API Routes (v0.15.0+)
 ```nyx
 api GET /api/stats {
   query "SELECT COUNT(*) as total FROM posts"

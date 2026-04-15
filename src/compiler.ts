@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.14.0";
+const NYXCODE_VERSION = "0.15.0";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -891,6 +891,42 @@ export class Compiler {
     }
   }
   load_${name}();`);
+    }
+
+    if (source.kind === 'live') {
+      const url = source.value;
+      // Extract table name from URL: /api/messages -> messages
+      const tableName = url.split('/').pop() || name;
+      this.js.push(`
+  // Live Data: ${name} (WebSocket)
+  let ${name} = [];
+  let ${name}__loading = true;
+  let ${name}__error = null;
+  async function load_${name}() {
+    ${name}__loading = true;
+    try {
+      const headers = {};
+      ${source.auth ? "const tk=localStorage.getItem('token');if(tk)headers['Authorization']='Bearer '+tk;" : ''}
+      const res = await fetch('${url}', { headers });
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      ${name} = await res.json();
+      ${name}__loading = false;
+      render();
+    } catch(e) {
+      ${name}__error = e.message;
+      ${name}__loading = false;
+    }
+  }
+  load_${name}();
+  // WebSocket live updates
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws_${name} = new WebSocket(wsProto + '//' + location.host + '?table=${tableName}');
+  ws_${name}.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.event === 'insert') { ${name}.push(msg.row); render(); }
+    else if (msg.event === 'delete') { ${name} = ${name}.filter(r => r.id !== msg.id); render(); }
+    else if (msg.event === 'update') { ${name} = ${name}.map(r => r.id === msg.row.id ? msg.row : r); render(); }
+  };`);
     }
 
     // Generate loading/error/empty HTML blocks

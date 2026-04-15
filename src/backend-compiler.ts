@@ -29,6 +29,7 @@ const SQL_TYPE: Record<string, string> = {
   decimal: 'REAL',
   bool: 'INTEGER',
   auto: 'DATETIME',
+  upload: 'TEXT', // stores file path
 };
 
 function sqlType(col: ColumnDef): string {
@@ -180,12 +181,17 @@ function crudForTable(table: TableNode, allTables: TableNode[]): string {
   const colNames = insertCols.map(c => c.name);
   // Separate user FK columns (auto-set from JWT) from body columns
   const userFkCols = insertCols.filter(c => c.type === '[users]');
-  const bodyCols = insertCols.filter(c => c.type !== '[users]');
+  const bodyCols = insertCols.filter(c => c.type !== '[users]' && c.type !== 'upload');
   const bodyColList = bodyCols.map(c => c.name).join(', ');
   const autoUserCols = userFkCols.map(c => 
     `const ${c.name} = req.user ? req.user.id : req.body.${c.name};\n    `
   ).join('');
   const hasPassword = table.columns.some(c => c.name === 'password' || c.type === 'password');
+  const isRealtime = table.columns.some(c => c.constraints.includes('realtime'));
+  const uploadCols = insertCols.filter(c => c.type === 'upload');
+  const hasUploadCols = uploadCols.length > 0;
+  const uploadFields = uploadCols.map(c => `{ name: '${c.name}', maxCount: 1 }`).join(', ');
+  const uploadMiddleware = hasUploadCols ? `upload.fields([${uploadFields}]), ` : '';
   const validationCode = generateValidation(insertCols);
   const stripPassword = hasPassword ? '.map(({ password: _, ...r }) => r)' : '';
   const placeholders = colNames.map(() => '?').join(', ');
@@ -213,7 +219,11 @@ function crudForTable(table: TableNode, allTables: TableNode[]): string {
   if (row.password) { const { password: _, ...safe } = row; return res.json(safe); }
   res.json(row);`;
 
-  let postResponse = `res.status(201).json(db.prepare('SELECT * FROM ${n} WHERE id = ?').get(info.lastInsertRowid));`;
+  let postResponse = isRealtime
+    ? `const newRow = db.prepare('SELECT * FROM ${n} WHERE id = ?').get(info.lastInsertRowid);
+    broadcast('${n}', { event: 'insert', row: newRow });
+    res.status(201).json(newRow);`
+    : `res.status(201).json(db.prepare('SELECT * FROM ${n} WHERE id = ?').get(info.lastInsertRowid));`;
 
   if (joinCode) {
     mapperBlock = '\n' + joinCode.mapperFn;
@@ -221,6 +231,7 @@ function crudForTable(table: TableNode, allTables: TableNode[]): string {
     getOneExpr = joinCode.getOneExpr;
     getOneResponse = `\n  res.json(mapRow_${n}(row));`;
     postResponse = `const created = ${joinCode.getOneExpr.replace('req.params.id', 'info.lastInsertRowid')};
+    ${isRealtime ? `broadcast('${n}', { event: 'insert', row: mapRow_${n}(created) });` : ''}
     res.status(201).json(mapRow_${n}(created));`;
   }
 
@@ -257,9 +268,10 @@ app.get('/api/${n}/:id', (req, res) => {
   if (!row) return res.status(404).json({ error: 'Not found' });${getOneResponse}
 });
 
-app.post('/api/${n}', writeLimiter, (req, res) => {
+app.post('/api/${n}', ${uploadMiddleware}writeLimiter, (req, res) => {
   try {
 ${validationCode}    const { ${bodyColList} } = req.body;
+${hasUploadCols ? uploadCols.map(uc => `    const ${uc.name} = req.files?.['${uc.name}']?.[0]?.filename || null;`).join('\n') : ''}
     ${autoUserCols}const info = db.prepare(
       'INSERT INTO ${n} (${colList}) VALUES (${placeholders})'
     ).run(${colNames.join(', ')});
@@ -328,7 +340,12 @@ ${code}    } catch(e) { console.error('After hook error:', e.message); }
 }
 function compileApiRoute(api: ApiNode): string {
   const method = api.method.toLowerCase();
-  const middleware = (api as any).auth ? 'authMiddleware, ' : '';
+  let middleware = '';
+  if ((api as any).guard) {
+    middleware = `authMiddleware, roleGuard('${(api as any).guard}'), `;
+  } else if ((api as any).auth) {
+    middleware = 'authMiddleware, ';
+  }
   
   // Extract query statements, validate statements, respond statements from body
   const queries: QueryStatement[] = [];
@@ -415,6 +432,9 @@ ${handlerBody}  } catch (e) {
 // ── Main export ────────────────────────────────────────────────────────
 
 export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = []): string {
+  const hasUploads = tables.some(t => t.columns.some(c => c.type === 'upload'));
+  const realtimeTables = tables.filter(t => t.columns.some(c => c.constraints.includes('realtime')));
+  const hasRealtime = realtimeTables.length > 0;
   for (const t of tables) {
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(t.name)) {
       throw new Error(`Invalid table name: "${t.name}" — must be alphanumeric/underscore`);
@@ -426,10 +446,10 @@ export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config
     const checks: string[] = [];
     for (const env of config.envVars) {
       if (env.defaultValue) {
-        checks.push(`const ${env.name} = process.env.${env.name} || '${env.defaultValue}';`);
+        // Set as process.env default, don't create const (avoids duplicates with auth)
+        checks.push(`if (!process.env.${env.name}) process.env.${env.name} = '${env.defaultValue}';`);
       } else if (env.required) {
         checks.push(`if (!process.env.${env.name}) { console.error('❌ Missing required env: ${env.name}'); process.exit(1); }`);
-        checks.push(`const ${env.name} = process.env.${env.name};`);
       }
     }
     if (config.cors) {
@@ -458,6 +478,27 @@ const app = express();
 ${configValidation}
 app.use(express.json());
 
+${hasUploads ? `const multer = require('multer');
+const uploadDir = './uploads';
+require('fs').mkdirSync(uploadDir, { recursive: true });
+const storage = multer.diskStorage({
+  destination: uploadDir,
+  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_'))
+});
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB default
+` : ''}
+${hasUploads ? "app.use('/uploads', express.static(uploadDir));" : ''}
+
+${hasRealtime ? `const { WebSocketServer } = require('ws');
+const wsClients = new Map(); // table -> Set<ws>
+
+function broadcast(table, data) {
+  const clients = wsClients.get(table);
+  if (!clients) return;
+  const msg = JSON.stringify({ table, ...data });
+  clients.forEach(ws => { if (ws.readyState === 1) ws.send(msg); });
+}
+` : ''}
 const writeLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { error: 'Too many requests' } });
 
 const db = new Database(process.env.DB_PATH || 'app.db');
@@ -471,6 +512,16 @@ ${crudBlocks}
 ${apiBlocks}
 ${hookBlocks}
 
+// ── Role guard middleware ────────────────────────────────────
+function roleGuard(role) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.id);
+    if (!user || user.role !== role) return res.status(403).json({ error: 'Insufficient permissions' });
+    next();
+  };
+}
+
 // ── Error handler ──────────────────────────────────────────────
 
 app.use((err, req, res, next) => {
@@ -481,6 +532,19 @@ app.use((err, req, res, next) => {
 // ── Start ──────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(\`NyxCode server listening on :\${PORT}\`));
+const server = app.listen(PORT, () => console.log(\`NyxCode server listening on :\${PORT}\`));
+${hasRealtime ? `
+// WebSocket server for realtime tables
+const wss = new WebSocketServer({ server });
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, 'http://localhost');
+  const table = url.searchParams.get('table');
+  if (!table) return ws.close(1008, 'Missing table param');
+  if (!wsClients.has(table)) wsClients.set(table, new Set());
+  wsClients.get(table).add(ws);
+  ws.on('close', () => wsClients.get(table)?.delete(ws));
+});
+console.log('WebSocket ready');
+` : ''}
 `;
 }

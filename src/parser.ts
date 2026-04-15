@@ -139,18 +139,31 @@ export class Parser {
     const method = this.consumeIdentifier().toUpperCase(); // GET, POST, etc.
     const path = this.consumeIdentifier(); // /api/stats
     
-    // Check for optional 'auth' keyword before {
+    // Check for optional 'auth' and 'guard=role' keywords before {
     let auth = false;
-    if (this.check(TokenType.Auth)) {
-      this.advance();
-      auth = true;
+    let guard: string | undefined;
+    
+    while (!this.check(TokenType.LeftBrace) && !this.isAtEnd()) {
+      if (this.check(TokenType.Auth)) {
+        this.advance();
+        auth = true;
+      } else if (this.check(TokenType.Identifier) && this.peek().value === 'guard') {
+        this.advance(); // consume 'guard'
+        if (this.check(TokenType.Equals)) {
+          this.advance(); // consume '='
+          guard = this.advance().value;
+          auth = true; // guard implies auth
+        }
+      } else {
+        break;
+      }
     }
     
     this.consume(TokenType.LeftBrace);
     const body = this.parseBody();
     this.consume(TokenType.RightBrace);
 
-    return { type: 'Api', method, path, body, auth, line: start.line, col: start.col } as any;
+    return { type: 'Api', method, path, body, auth, guard, line: start.line, col: start.col } as any;
   }
 
 
@@ -216,7 +229,7 @@ export class Parser {
 
     const columns: ColumnDef[] = [];
     const typeKeywords = new Set(['text', 'email', 'number', 'int', 'float', 'decimal', 'bool', 'auto']);
-    const constraintKeywords = new Set(['required', 'unique', 'default', 'ref', 'auto', 'min', 'max', 'format', 'pattern', 'enum']);
+    const constraintKeywords = new Set(['required', 'unique', 'default', 'ref', 'auto', 'min', 'max', 'format', 'pattern', 'realtime', 'enum']);
 
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       const colName = this.consumeIdentifier();
@@ -372,11 +385,19 @@ export class Parser {
       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
         const next = this.peek();
         // Stop if next token looks like a new rule name (known keywords)
-        const ruleKeywords = ['table', 'login', 'token', 'protect', 'hash', 'session', 'role'];
+        const ruleKeywords = ['table', 'login', 'token', 'protect', 'hash', 'session'];
         if (values.length > 0 && (next.type === TokenType.Identifier && ruleKeywords.includes(next.value))) break;
         if (values.length > 0 && next.value.startsWith('/')) break;
         if (next.type === TokenType.Identifier || next.type === TokenType.String) {
-          values.push(this.advance().value);
+          const val = this.advance().value;
+          // Handle key=value pairs like role=admin
+          if (this.check(TokenType.Equals)) {
+            this.advance(); // =
+            const rhs = this.advance().value;
+            values.push(val + '=' + rhs);
+          } else {
+            values.push(val);
+          }
         } else if (next.value.startsWith('/')) {
           values.push(this.advance().value);
         } else {
@@ -580,7 +601,7 @@ export class Parser {
     let body: Record<string, string> | undefined;
 
     // Parse body { } only for POST/PATCH/DELETE — not GET (GET uses { } for loading/error/empty states)
-    if (this.check(TokenType.LeftBrace) && kind !== 'get') {
+    if (this.check(TokenType.LeftBrace) && kind !== 'get' && kind !== 'live') {
       this.advance();
       body = {};
       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {

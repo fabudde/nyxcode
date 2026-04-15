@@ -228,8 +228,13 @@ try {
           const rawPath = parts[0];
           const mode = parts[1] || 'write'; // write = POST/PUT/DELETE only, all = everything, read = GET only
           const path = rawPath.startsWith('/api/') ? rawPath : `/api/${rawPath}`;
+          // Check for role=X
+          const rolePart = parts.find(pt => pt.startsWith('role='));
+          const role = rolePart ? rolePart.split('=')[1] : null;
           if (mode === 'all') {
-            return `\n// Protect ${path} (all methods)\napp.use('${path}', authMiddleware);`;
+            return role
+              ? `\n// Protect ${path} (all methods, role: ${role})\napp.use('${path}', authMiddleware, roleGuard('${role}'));`
+              : `\n// Protect ${path} (all methods)\napp.use('${path}', authMiddleware);`;
           } else if (mode === 'read') {
             return `\n// Protect ${path} (read only)\napp.use('${path}', (req, res, next) => { if (req.method === 'GET') return authMiddleware(req, res, next); next(); });`;
           } else {
@@ -244,6 +249,13 @@ try {
         );
       }
       writeFileSync(resolve(outDir, 'server.js'), serverCode);
+      // Print required npm deps
+      const deps = ['express', 'better-sqlite3', 'express-rate-limit'];
+      if (security) deps.push('bcryptjs', 'jsonwebtoken');
+      if (config?.cors) deps.push('cors');
+      if (tables.some((t: any) => t.columns.some((c: any) => c.type === 'upload'))) deps.push('multer');
+      if (tables.some((t: any) => t.columns.some((c: any) => c.constraints.includes('realtime')))) deps.push('ws');
+      console.log(`   📦 deps: ${deps.join(' ')}`);
       console.log(`   🖥️  server.js generated (${tables.length} table${tables.length !== 1 ? 's' : ''}${security ? ' + auth' : ''})`);
     }
   } else if (command === 'watch') {

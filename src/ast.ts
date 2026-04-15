@@ -36,13 +36,14 @@ export interface ComponentNode extends BaseNode {
   body: Statement[];
 }
 
-/** `api METHOD /path [auth] { ... }` */
+/** `api METHOD /path [auth] [guard=role] { ... }` */
 export interface ApiNode extends BaseNode {
   type: 'Api';
   method: string;
   path: string;
   body: Statement[];
   auth?: boolean;
+  guard?: string; // role name
 }
 
 /** `table name { ... }` */
@@ -132,7 +133,7 @@ export interface DataStatement extends BaseNode {
 }
 
 export interface DataSource {
-  kind: 'get' | 'post' | 'query' | 'patch' | 'delete';
+  kind: 'get' | 'post' | 'query' | 'patch' | 'delete' | 'live';
   value: string; // URL or SQL string
   body?: Record<string, string>;
   auth?: boolean; // include JWT Bearer token
