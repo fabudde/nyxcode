@@ -111,9 +111,11 @@ Card title="Hello" { p "Child content" }
 ```nyx
 state count = 0
 state name = "World"
+computed label = count > 0 ? "positive" : "zero"
 button "Count: {count}" on:click -> count = count + 1
 button "Reset" on:click -> count = 0
 h1 "Hello {name}"
+p "Status: {label}"   # {var} works with state AND computed
 ```
 
 ## Forms (zero JS!)

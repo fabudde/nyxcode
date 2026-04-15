@@ -287,7 +287,8 @@ page / {
 }
 ```
 - `state name = value` declares reactive state
-- `{name}` interpolates state in text content
+- `{name}` interpolates state/computed in text content (e.g. `p "Count: {count}"`)
+- Works in any nested element depth — compiles to reactive template bindings
 - State changes auto-trigger re-render
 
 ### Events (v0.12.0+)
@@ -338,6 +339,8 @@ page / {
 }
 ```
 - `computed name = expression` — derived from state, auto-updates
+- Supports ternary: `computed label = count > 0 ? "positive" : "zero"`
+- Interpolate in text: `p "Status: {label}"` — reactively updates
 - Works in both `page` blocks and `store` blocks
 
 
