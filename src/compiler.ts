@@ -19,7 +19,17 @@ import {
   HeadStatement, AnimateStatement, LayoutNode, StoreNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.16.2";
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+let NYXCODE_VERSION = '0.0.0';
+try {
+  const pkgPath = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+  NYXCODE_VERSION = JSON.parse(readFileSync(pkgPath, 'utf-8')).version;
+} catch {
+  NYXCODE_VERSION = '0.16.4'; // fallback
+}
 
 export interface CompilerOptions {
   /** Output mode */
