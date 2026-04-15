@@ -819,7 +819,9 @@ export class Compiler {
         if (rule.selector === '__raw__') {
           cssBlock += rule.properties[0].value + '\n';
         } else {
-          cssBlock += `.${className}${rule.selector.startsWith(':') || rule.selector.startsWith('>') || rule.selector.startsWith('~') || rule.selector.startsWith('+') ? '' : ' '}${rule.selector} {\n`;
+          const selfElements = ['body', 'html'];
+          const isSelf = rule.selector.startsWith(':') || rule.selector.startsWith('>') || rule.selector.startsWith('~') || rule.selector.startsWith('+') || selfElements.includes(rule.selector);
+          cssBlock += isSelf && selfElements.includes(rule.selector) ? `${rule.selector}.${className} {\n` : `.${className}${isSelf ? '' : ' '}${rule.selector} {\n`;
           for (const prop of rule.properties) {
             const cp = this.mapCSSProperty(prop.name);
             cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
@@ -1391,7 +1393,9 @@ export class Compiler {
         if (rule.selector === '__raw__') {
           cssBlock += rule.properties[0].value + '\n';
         } else {
-          cssBlock += `.${scopeClass}${rule.selector.startsWith(':') || rule.selector.startsWith('>') || rule.selector.startsWith('~') || rule.selector.startsWith('+') ? '' : ' '}${rule.selector} {\n`;
+          const selfElems = ['body', 'html'];
+          const isSelfScope = rule.selector.startsWith(':') || rule.selector.startsWith('>') || rule.selector.startsWith('~') || rule.selector.startsWith('+') || selfElems.includes(rule.selector);
+          cssBlock += isSelfScope && selfElems.includes(rule.selector) ? `${rule.selector}.${scopeClass} {\n` : `.${scopeClass}${isSelfScope ? '' : ' '}${rule.selector} {\n`;
           for (const prop of rule.properties) {
             const cp = this.mapCSSProperty(prop.name);
             cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;

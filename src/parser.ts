@@ -1861,12 +1861,23 @@ private parseElement(): ElementNode {
           while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
             const propName = this.advance().value;
             let propVal = '';
-            while (!this.check(TokenType.Comma) && !this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-              // If we already have a value and the next token is a CSS shorthand, stop — it's a new property
-              const nextTok = this.peek();
-              if (propVal && nextTok.type === TokenType.Identifier && CSS_SHORTHANDS.has(nextTok.value)) {
-                break;
+            let parenD = 0;
+            while (!this.isAtEnd()) {
+              // Inside parens: consume everything (for calc, clamp, etc.)
+              if (this.check(TokenType.LeftParen)) { parenD++; propVal += this.advance().value; continue; }
+              if (this.check(TokenType.RightParen)) { parenD--; propVal += this.advance().value; continue; }
+              if (parenD > 0) {
+                const tok = this.advance();
+                if (tok.type === TokenType.Comma) { propVal += ', '; }
+                else if ((tok.value === '-' || tok.value === '+') && propVal.length > 0 && !propVal.endsWith('(')) { propVal += ' ' + tok.value + ' '; }
+                else { propVal += tok.value; }
+                continue;
               }
+              // Outside parens: comma or } ends the property
+              if (this.check(TokenType.Comma) || this.check(TokenType.RightBrace)) break;
+              // If we already have a value and the next token is a CSS shorthand, stop
+              const nextTok = this.peek();
+              if (propVal && nextTok.type === TokenType.Identifier && CSS_SHORTHANDS.has(nextTok.value)) break;
               propVal += (propVal ? ' ' : '') + this.advance().value;
             }
             if (this.check(TokenType.Comma)) this.advance();
