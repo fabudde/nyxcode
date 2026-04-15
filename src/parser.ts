@@ -193,21 +193,28 @@ export class Parser {
   private parseMiddleware(): MiddlewareNode {
     const start = this.advance(); // consume 'middleware'
     const name = this.consumeIdentifier();
-    // Capture raw block content (like script blocks)
+    // Lexer captures raw block content (handles backticks, template literals, etc.)
     this.consume(TokenType.LeftBrace);
-    let depth = 1;
     let body = '';
-    while (depth > 0 && !this.isAtEnd()) {
-      const t = this.advance();
-      if (t.type === TokenType.LeftBrace) { depth++; body += '{ '; }
-      else if (t.type === TokenType.RightBrace) {
-        depth--;
-        if (depth === 0) break;
-        body += '} ';
+    // Check if lexer gave us a raw Script token (new path) or individual tokens (legacy)
+    if (this.check(TokenType.Script)) {
+      body = this.advance().value;
+    } else {
+      // Fallback: token-by-token (for cases without backticks)
+      let depth = 1;
+      while (depth > 0 && !this.isAtEnd()) {
+        const t = this.advance();
+        if (t.type === TokenType.LeftBrace) { depth++; body += '{ '; }
+        else if (t.type === TokenType.RightBrace) {
+          depth--;
+          if (depth === 0) break;
+          body += '} ';
+        }
+        else if (t.type === TokenType.String) { body += '"' + t.value + '" '; }
+        else { body += t.value + ' '; }
       }
-      else if (t.type === TokenType.String) { body += '"' + t.value + '" '; }
-      else { body += t.value + ' '; }
     }
+    this.consume(TokenType.RightBrace);
     return { type: 'Middleware', name, body: body.trim(), line: start.line, col: start.col };
   }
 

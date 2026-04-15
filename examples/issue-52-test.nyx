@@ -1,0 +1,19 @@
+middleware timing {
+  const start = Date.now();
+  res.on("finish", () => console.log(`${req.url} took ${Date.now()-start}ms`));
+}
+
+middleware auth {
+  if (!req.headers.authorization) {
+    return res.status(401).json({ error: `Unauthorized: ${req.path}` });
+  }
+}
+
+page / {
+  h1 "Issue 52 Test"
+  p "Middleware with backticks should work"
+}
+
+api GET /api/test [timing] {
+  respond 200 { message "ok" }
+}

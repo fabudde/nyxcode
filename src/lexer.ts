@@ -371,6 +371,74 @@ export class Lexer {
       }
     }
     
+    // Special: middleware keyword — capture raw block content (like script blocks)
+    // This ensures backticks, template literals, regex etc. are handled correctly
+    if (value === 'middleware') {
+      this.tokens.push({ type: TokenType.Identifier, value, line: this.line, col: startCol });
+      // Read identifier (middleware name)
+      while (this.pos < this.source.length && /\s/.test(this.source[this.pos]) && this.source[this.pos] !== '\n') {
+        this.pos++; this.col++;
+      }
+      const nameStart = this.pos;
+      let mwName = '';
+      while (this.pos < this.source.length && /[a-zA-Z0-9_]/.test(this.source[this.pos])) {
+        mwName += this.source[this.pos]; this.pos++; this.col++;
+      }
+      if (mwName) {
+        this.tokens.push({ type: TokenType.Identifier, value: mwName, line: this.line, col: startCol + (nameStart - (this.pos - mwName.length)) });
+      }
+      // Skip whitespace to opening brace
+      while (this.pos < this.source.length && /\s/.test(this.source[this.pos])) {
+        if (this.source[this.pos] === '\n') { this.line++; this.col = 0; }
+        this.pos++; this.col++;
+      }
+      if (this.pos < this.source.length && this.source[this.pos] === '{') {
+        this.pos++; this.col++; // skip opening {
+        let depth = 1;
+        let raw = '';
+        while (this.pos < this.source.length && depth > 0) {
+          const ch = this.source[this.pos];
+          // Skip string/template literals
+          if (ch === "'" || ch === '"' || ch === '`') {
+            const quote = ch;
+            raw += ch; this.pos++; this.col++;
+            while (this.pos < this.source.length && this.source[this.pos] !== quote) {
+              if (this.source[this.pos] === '\\') {
+                raw += this.source[this.pos]; this.pos++; this.col++;
+                if (this.pos < this.source.length) { raw += this.source[this.pos]; this.pos++; this.col++; }
+                continue;
+              }
+              if (quote === '`' && this.source[this.pos] === '$' && this.pos + 1 < this.source.length && this.source[this.pos + 1] === '{') {
+                raw += this.source[this.pos]; this.pos++; this.col++;
+                raw += this.source[this.pos]; this.pos++; this.col++;
+                let tmplDepth = 1;
+                while (this.pos < this.source.length && tmplDepth > 0) {
+                  if (this.source[this.pos] === '{') tmplDepth++;
+                  else if (this.source[this.pos] === '}') tmplDepth--;
+                  if (tmplDepth > 0) { if (this.source[this.pos] === '\n') { this.line++; this.col = 0; } raw += this.source[this.pos]; this.pos++; this.col++; }
+                }
+                if (this.pos < this.source.length) { raw += this.source[this.pos]; this.pos++; this.col++; }
+                continue;
+              }
+              if (this.source[this.pos] === '\n') { this.line++; this.col = 0; }
+              raw += this.source[this.pos]; this.pos++; this.col++;
+            }
+            if (this.pos < this.source.length) { raw += this.source[this.pos]; this.pos++; this.col++; }
+            continue;
+          }
+          if (ch === '{') depth++;
+          else if (ch === '}') { depth--; if (depth === 0) { this.pos++; this.col++; break; } }
+          if (ch === '\n') { this.line++; this.col = 0; }
+          raw += ch; this.pos++; this.col++;
+        }
+        // Emit as: LeftBrace, Script (raw body), RightBrace — parser can read it
+        this.tokens.push({ type: TokenType.LeftBrace, value: '{', line: this.line, col: startCol });
+        this.tokens.push({ type: TokenType.Script, value: raw.trim(), line: this.line, col: startCol });
+        this.tokens.push({ type: TokenType.RightBrace, value: '}', line: this.line, col: startCol });
+      }
+      return;
+    }
+
     this.tokens.push({ type, value, line: this.line, col: startCol });
   }
 
