@@ -149,7 +149,7 @@ export class Parser {
 
     const columns: ColumnDef[] = [];
     const typeKeywords = new Set(['text', 'email', 'number', 'int', 'float', 'decimal', 'bool', 'auto']);
-    const constraintKeywords = new Set(['required', 'unique', 'default', 'ref', 'auto']);
+    const constraintKeywords = new Set(['required', 'unique', 'default', 'ref', 'auto', 'min', 'max', 'format', 'pattern', 'enum']);
 
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       const colName = this.consumeIdentifier();
@@ -174,12 +174,14 @@ export class Parser {
       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
         const next = this.peek();
         if (next.type === TokenType.Identifier && constraintKeywords.has(next.value)) {
-          constraints.push(this.advance().value);
-          // Handle default="value" or default=value
-          if (constraints[constraints.length - 1] === 'default' && this.check(TokenType.Equals)) {
+          const kw = this.advance().value;
+          // Handle key=value pairs: min=3, max=500, format=email, default="user", pattern="^[a-z]+$"
+          if (this.check(TokenType.Equals)) {
             this.advance(); // =
             const val = this.advance().value;
-            constraints.push('=' + val);
+            constraints.push(kw + '=' + val);
+          } else {
+            constraints.push(kw);
           }
         } else {
           break; // Next column name or unknown token

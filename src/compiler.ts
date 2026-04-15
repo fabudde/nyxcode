@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.12.7";
+const NYXCODE_VERSION = "0.12.8";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -2012,8 +2012,10 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
       'ac': 'align-content',
       'as': 'align-self',
       'fd': 'flex-direction',
+      'fxw': 'flex-wrap',
       'fw2': 'flex-wrap',
       'fg': 'flex-grow',
+      'fxs': 'flex-shrink',
       'fs2': 'flex-shrink',
       'fb': 'flex-basis',
       

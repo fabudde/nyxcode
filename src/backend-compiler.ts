@@ -136,6 +136,44 @@ ${mapperLines.join('\n')}
 
 // ── CRUD generator ─────────────────────────────────────────────────────
 
+
+function generateValidation(columns: ColumnDef[]): string {
+  const checks: string[] = [];
+  for (const col of columns) {
+    const name = col.name;
+    for (const c of col.constraints) {
+      if (c === 'required') {
+        checks.push(`if (!req.body.${name} && req.body.${name} !== 0) return res.status(400).json({ error: '${name} is required' });`);
+      } else if (c.startsWith('min=')) {
+        const val = c.split('=')[1];
+        if (col.type === 'number' || col.type === 'int' || col.type === 'float') {
+          checks.push(`if (req.body.${name} !== undefined && req.body.${name} < ${val}) return res.status(400).json({ error: '${name} must be at least ${val}' });`);
+        } else {
+          checks.push(`if (req.body.${name} && req.body.${name}.length < ${val}) return res.status(400).json({ error: '${name} must be at least ${val} characters' });`);
+        }
+      } else if (c.startsWith('max=')) {
+        const val = c.split('=')[1];
+        if (col.type === 'number' || col.type === 'int' || col.type === 'float') {
+          checks.push(`if (req.body.${name} !== undefined && req.body.${name} > ${val}) return res.status(400).json({ error: '${name} must be at most ${val}' });`);
+        } else {
+          checks.push(`if (req.body.${name} && req.body.${name}.length > ${val}) return res.status(400).json({ error: '${name} must be at most ${val} characters' });`);
+        }
+      } else if (c.startsWith('format=')) {
+        const fmt = c.split('=')[1];
+        if (fmt === 'email') {
+          checks.push(`if (req.body.${name} && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(req.body.${name})) return res.status(400).json({ error: '${name} must be a valid email' });`);
+        } else if (fmt === 'url') {
+          checks.push(`if (req.body.${name} && !/^https?:\\/\\//.test(req.body.${name})) return res.status(400).json({ error: '${name} must be a valid URL' });`);
+        }
+      } else if (c.startsWith('pattern=')) {
+        const pat = c.split('=')[1];
+        checks.push(`if (req.body.${name} && !/${pat}/.test(req.body.${name})) return res.status(400).json({ error: '${name} has invalid format' });`);
+      }
+    }
+  }
+  return checks.length ? '    ' + checks.join('\n    ') + '\n' : '';
+}
+
 function crudForTable(table: TableNode, allTables: TableNode[]): string {
   const n = table.name;
   const insertCols = table.columns.filter(c => !isAutoColumn(c));
@@ -148,6 +186,7 @@ function crudForTable(table: TableNode, allTables: TableNode[]): string {
     `const ${c.name} = req.user ? req.user.id : req.body.${c.name};\n    `
   ).join('');
   const hasPassword = table.columns.some(c => c.name === 'password' || c.type === 'password');
+  const validationCode = generateValidation(insertCols);
   const stripPassword = hasPassword ? '.map(({ password: _, ...r }) => r)' : '';
   const placeholders = colNames.map(() => '?').join(', ');
   const colList = colNames.join(', ');
@@ -220,7 +259,7 @@ app.get('/api/${n}/:id', (req, res) => {
 
 app.post('/api/${n}', writeLimiter, (req, res) => {
   try {
-    const { ${bodyColList} } = req.body;
+${validationCode}    const { ${bodyColList} } = req.body;
     ${autoUserCols}const info = db.prepare(
       'INSERT INTO ${n} (${colList}) VALUES (${placeholders})'
     ).run(${colNames.join(', ')});

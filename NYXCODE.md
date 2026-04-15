@@ -475,6 +475,21 @@ table users {
 
 Auto-generates: CREATE TABLE + 5 CRUD endpoints per table (GET all, GET :id, POST, PUT, DELETE).
 
+### Validation (v0.12.8+)
+```nyx
+table users {
+  name text required min=2 max=50
+  email text required unique format=email
+  age number min=13 max=120
+  password password required min=8
+}
+```
+**Keywords:** `required`, `min=N`, `max=N`, `format=email|url`, `pattern="regex"`, `unique`.
+- Text: min/max = character length. Number: min/max = value range.
+- `format=email` → regex validation. `format=url` → https check.
+- Auto-generates server-side validation on POST (before INSERT).
+- Error: `{ "error": "name must be at least 2 characters" }`
+
 ### Table Relations (v0.11+)
 ```nyx
 table posts {
