@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.16.0)
+# NYXCODE.md — AI Context File (v0.16.2)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -818,5 +818,73 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 | Static page | 187 tokens | Tailwind HTML: 251 | **-25%** |
 | Full-stack blog | 169 tokens | Next.js+Prisma+NextAuth: 964 | **-82%** |
 
+## Middleware (v0.16.2)
+Define reusable Express middleware, attach to routes:
+```nyx
+middleware logger {
+  console.log(req.method, req.url)
+}
+
+middleware rateLimit {
+  if (tooFast) return res.status(429).json({ error: "Slow down" })
+}
+
+api GET /api/stats [logger, rateLimit] auth {
+  respond 200 "ok"
+}
+```
+Middleware names in `[]` before `auth`/`{`. Multiple comma-separated. Body is raw JS with `req`, `res`, `next`.
+
+## Declarative Error Handling (v0.16.2)
+Status-specific catch blocks after `data` or `form`:
+```nyx
+data posts = get /api/posts auth
+catch 401 -> redirect "/login"
+catch 403 -> toast "Forbidden"
+catch * -> show "Something went wrong"
+```
+Also works on forms:
+```nyx
+form /api/auth/login {
+  input email placeholder="Email"
+  input password placeholder="Password"
+  submit "Login"
+  success -> redirect "/dashboard"
+}
+catch 401 -> toast "Wrong credentials"
+catch 429 -> toast "Too many attempts"
+```
+**Actions:** `redirect "/path"`, `toast "message"`, `show "message"`. Wildcard `*` = catch-all.
+
+## Event Modifiers (v0.16.1)
+```nyx
+button on:click.prevent="doThing()"  # preventDefault
+a on:click.stop="handle()"           # stopPropagation
+input on:keydown.enter="submit()"     # key filter
+input on:keydown.ctrl.s="save()"      # modifier combo
+button on:click.once="init()"         # fires once
+```
+Modifiers: `.prevent`, `.stop`, `.once`, `.self`, `.enter`, `.escape`, `.space`, `.ctrl`, `.shift`, `.alt`, `.meta` + any key name.
+
+## Lifecycle Hooks (v0.16.1)
+```nyx
+onMount {
+  console.log("page loaded")
+  startTimer()
+}
+
+onDestroy {
+  clearInterval(timer)
+}
+```
+`onMount` = DOMContentLoaded. `onDestroy` = beforeunload.
+
+## Element Refs (v0.16.1)
+```nyx
+div ref=container { p "Hello" }
+button on:click="refs.container.style.color='red'" { text "Paint" }
+```
+`ref=name` → access via `refs.name` (auto-generates `getElementById`).
+
 ## Version
-v0.12.0 — 21 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺 (6 bugs found + fixed).
+v0.16.2 — 47 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺. All 50 GitHub issues closed.
