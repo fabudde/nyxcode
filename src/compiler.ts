@@ -763,9 +763,7 @@ export class Compiler {
   private compileStyleWithClass(style: StyleBlock, className: string): void {
     let cssBlock = `.${className} {\n`;
     for (const prop of style.properties) {
-      const cssProp = this.mapCSSProperty(prop.name);
-      const cssVal = this.resolveThemeValue(cssProp, prop.value);
-      cssBlock += `  ${cssProp}: ${cssVal};\n`;
+      cssBlock += this.compilePropToCSS(prop);
     }
     cssBlock += '}\n';
 
@@ -2281,6 +2279,49 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
     return value;
   }
 
+
+  // Typography utility expansions (#60)
+  private expandUtility(name: string, value: string): {name: string, value: string}[] | null {
+    switch (name) {
+      case 'truncate':
+        return [
+          { name: 'overflow', value: 'hidden' },
+          { name: 'text-overflow', value: 'ellipsis' },
+          { name: 'white-space', value: 'nowrap' },
+        ];
+      case 'line-clamp':
+        return [
+          { name: 'display', value: '-webkit-box' },
+          { name: '-webkit-line-clamp', value: value },
+          { name: '-webkit-box-orient', value: 'vertical' },
+          { name: 'overflow', value: 'hidden' },
+        ];
+      case 'caps':
+        return [{ name: 'text-transform', value: value || 'uppercase' }];
+      case 'lowercase':
+        return [{ name: 'text-transform', value: 'lowercase' }];
+      case 'capitalize':
+        return [{ name: 'text-transform', value: 'capitalize' }];
+      case 'balance':
+        return [{ name: 'text-wrap', value: 'balance' }];
+      case 'pretty':
+        return [{ name: 'text-wrap', value: 'pretty' }];
+      default:
+        return null;
+    }
+  }
+
+  
+  // Compile a single style property to CSS string(s)
+  private compilePropToCSS(prop: {name: string, value: string}): string {
+    const expanded = this.expandUtility(prop.name, prop.value);
+    if (expanded) {
+      return expanded.map(e => `  ${e.name}: ${e.value};\n`).join('');
+    }
+    const cp = this.mapCSSProperty(prop.name);
+    return `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+  }
+
   private mapCSSProperty(name: string): string {
     const mapping: Record<string, string> = {
       // Position
@@ -2334,6 +2375,22 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
       'ls': 'letter-spacing',
       'ta': 'text-align',
       'td': 'text-decoration',
+      // Typography shorthands (#60)
+      'tracking': 'letter-spacing',
+      'leading': 'line-height',
+      'indent': 'text-indent',
+      'wb': 'word-break',
+      'ww': 'overflow-wrap',
+      'hyphens': 'hyphens',
+      // Grid areas (#56)
+      'areas': 'grid-template-areas',
+      'area': 'grid-area',
+      'container': 'container-type',
+      'container-name': 'container-name',
+      'columns': 'columns',
+      'col-gap': 'column-gap',
+      'col-count': 'column-count',
+      'col-rule': 'column-rule',
       'tt': 'text-transform',
       'ws': 'white-space',
       'c': 'color',

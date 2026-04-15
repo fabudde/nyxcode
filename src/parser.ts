@@ -903,6 +903,32 @@ export class Parser {
             else { raw += (raw.endsWith('(') || raw.endsWith('\n') || raw.endsWith('@') ? '' : ' ') + tok.value; }
           }
           cssRules.push({ selector: '__raw__', properties: [{ name: '__raw__', value: raw.trim() }] });
+        } else if (this.pos + 1 < this.tokens.length && this.tokens[this.pos + 1].value === 'container') {
+          // Container query: @container(min-width: 400px) { ... }
+          this.advance(); // @
+          let cq = '@' + this.advance().value; // 'container'
+          // Optionally a name before the parenthesis
+          if (this.check(TokenType.Identifier)) cq += ' ' + this.advance().value;
+          if (this.check(TokenType.LeftParen)) {
+            cq += '(';
+            this.advance();
+            while (!this.check(TokenType.RightParen) && !this.isAtEnd()) {
+              const t = this.advance();
+              if (t.type === TokenType.Colon) cq += ': ';
+              else cq += (cq.endsWith('(') ? '' : ' ') + t.value;
+            }
+            this.advance(); // )
+            cq += ')';
+          }
+          this.consume(TokenType.LeftBrace);
+          let cqBlock = cq + ' {\n';
+          while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            const p = this.parseStyleProperty();
+            cqBlock += '  ' + p.name + ': ' + p.value + ';\n';
+          }
+          this.consume(TokenType.RightBrace);
+          cqBlock += '}';
+          cssRules.push({ selector: '__raw__', properties: [{ name: '__raw__', value: cqBlock }] });
         } else {
           // Responsive block: @mobile { ... }
           this.advance(); // @
@@ -1017,6 +1043,12 @@ export class Parser {
     'd', 'of', 'ox', 'oy', 'v', 'cur',
     'tf', 'tr', 'anim', 'fi',
     'pe', 'us', 'ap', 'rs', 'ol', 'wc', 'ct', 'iso',
+    // Typography utilities (#60)
+    'tracking', 'leading', 'indent', 'truncate', 'line-clamp',
+    'balance', 'pretty', 'caps', 'lowercase', 'capitalize',
+    'columns', 'col-gap', 'col-count', 'col-rule', 'hyphens', 'ww',
+    // Grid areas + container (#55, #56)
+    'areas', 'area', 'container', 'container-name',
     'obf', 'obp', 'bf', 'fil', 'mix', 'si', 'sa',
     'ji', 'js', 'oc', 'ow', 'o', 't', 'l', 'b',
   ]);
