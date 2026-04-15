@@ -381,6 +381,32 @@ export class Parser {
 
   private parseTheme(): ThemeNode {
     const start = this.consume(TokenType.Theme);
+    // Theme preset: theme "brutalist" (no braces needed)
+    if (this.check(TokenType.String)) {
+      const preset = this.advance().value;
+      // Allow optional override block: theme "brutalist" { colors { ... } }
+      const sections: ThemeSection[] = [];
+      if (this.check(TokenType.LeftBrace)) {
+        this.advance();
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          // Parse section inline
+          const sectionName = this.consumeIdentifier();
+          this.consume(TokenType.LeftBrace);
+          const entries: Record<string, string> = {};
+          while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            const key = this.consumeIdentifier();
+            let val = '';
+            if (this.peek().type === TokenType.String) val = this.advance().value;
+            else while (!this.check(TokenType.RightBrace) && !this.check(TokenType.Identifier) && !this.isAtEnd()) val += this.advance().value;
+            entries[key] = val.trim();
+          }
+          this.consume(TokenType.RightBrace);
+          sections.push({ name: sectionName, entries });
+        }
+        this.consume(TokenType.RightBrace);
+      }
+      return { type: 'Theme', preset, sections, line: start.line, col: start.col } as any;
+    }
     this.consume(TokenType.LeftBrace);
 
     const sections: ThemeSection[] = [];
