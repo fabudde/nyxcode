@@ -69,7 +69,7 @@ div $card { p "Using preset" }     # $card shorthand
 div preset=card { p "Same thing" } # explicit
 ```
 
-## CSS Shorthands (75+)
+## CSS Shorthands (100+)
 ```
 bg=background  c=color     p=padding    m=margin     r=border-radius
 fs=font-size   fw=font-weight  ff=font-family  lh=line-height
@@ -79,6 +79,26 @@ ai=align-items  jc=justify-content  fd=flex-direction  fg=flex-grow
 gap/gg=gap  tf=transform  tr=transition  anim=animation
 ta=text-align  td=text-decoration  tt=text-transform
 shadow=box-shadow  cur=cursor  fi=filter  bf=backdrop-filter
+tracking=letter-spacing  leading=line-height  indent=text-indent
+areas=grid-template-areas  area=grid-area  container=container-type
+```
+
+## Theme Presets
+```nyx
+theme "brutalist"       # or: glassmorphism, editorial, neon, minimal-dark
+```
+
+## Utilities
+```nyx
+truncate              # overflow:hidden + text-overflow:ellipsis + nowrap
+line-clamp 3          # multiline truncation
+balance / pretty      # text-wrap
+caps / lowercase      # text-transform
+```
+
+## Nested Selectors + Extended Pseudo-Classes
+```nyx
+style { > a { c white }; first-child { fw bold }; disabled { op 0.5 } }
 ```
 
 ## Layout Attributes

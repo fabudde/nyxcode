@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.16.2)
+# NYXCODE.md — AI Context File (v0.17.1)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -145,6 +145,62 @@ theme {
 - **Implicit theme colors (v0.9.0+):** Write `c primary` instead of `c var(--colors-primary)` — compiler auto-resolves!
 - Works everywhere: style blocks, presets, inline styles, CSS rules.
 - Font heading auto-applies to h1-h6, font body to body/p/span/li.
+
+### Theme Presets (v0.17.0)
+One line = entire visual identity:
+```nyx
+theme "brutalist"       # Mono font, hard borders, raw industrial
+theme "glassmorphism"   # Blur, transparency, soft gradients
+theme "editorial"       # Serif fonts, clean typography, whitespace
+theme "neon"            # Dark bg, glowing green accents, monospace
+theme "minimal-dark"    # Subtle dark theme, indigo accents
+```
+Optional overrides: `theme "neon" { colors { primary #ff6600 } }`
+
+## CSS Functions (v0.17.0)
+```nyx
+div { style { w calc(100% - 2rem); fs clamp(1rem, 2vw, 2rem); h min(100vh, 800px) } }
+```
+
+## Nested Selectors (v0.17.0)
+Child/sibling selectors inside style blocks:
+```nyx
+nav { style { > a { c white; td none }; ~ p { m 0 }; + div { bt 1px solid #eee } } }
+```
+
+## Extended Pseudo-Classes (v0.17.0)
+```nyx
+style {
+  first-child { fw bold }
+  last-child { border-bottom none }
+  nth-child(odd) { bg #f5f5f5 }
+  disabled { op 0.5 }
+  focus-visible { outline 2px solid blue }
+}
+```
+All: first-child, last-child, nth-child(), nth-of-type(), disabled, enabled, checked, required, optional, focus-within, focus-visible, visited, empty, first-of-type, last-of-type, only-child, not(), placeholder, placeholder-shown.
+
+## Grid Template Areas (v0.17.1)
+```nyx
+div { style { d grid; areas "header header" "sidebar main" "footer footer" } }
+div "Header" { style { area header } }
+```
+
+## Container Queries (v0.17.1)
+```nyx
+div { style { container inline-size; @container(min-width: 400px) { fs 1.5rem } } }
+```
+
+## Typography Utilities (v0.17.1)
+```nyx
+h1 { style { tracking 0.05em; balance } }      # letter-spacing + text-wrap: balance
+p { style { truncate; w 200px } }                 # overflow:hidden + text-overflow:ellipsis
+div { style { line-clamp 3 } }                    # multiline truncation
+p { style { leading 1.8; indent 2rem; pretty } }  # line-height + text-indent + text-wrap:pretty
+span { style { caps } }                            # text-transform: uppercase
+```
+Shorthands: tracking, leading, indent, wb (word-break), ww (overflow-wrap), hyphens, columns, col-gap, col-count.
+Utilities: truncate, line-clamp N, balance, pretty, caps, lowercase, capitalize.
 
 ## Pages & Routing
 ```nyx
