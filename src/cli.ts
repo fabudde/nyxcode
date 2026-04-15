@@ -36,7 +36,7 @@ const file = args[1];
 
 if (!command || (command !== 'dev' && !file) || (!file && command !== '--help')) {
   console.log(`
-🦞 NyxCode v0.3.0
+🦞 NyxCode v0.15.1
 
 Usage:
   nyx parse <file.nyx>              Parse file → AST (JSON)

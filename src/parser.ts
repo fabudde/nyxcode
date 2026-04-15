@@ -31,7 +31,7 @@ import {
 const ELEMENT_TAGS = new Set([
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
   'p', 'text', 'span', 'link', 'img', 'video',
-  'button', 'input', 'select', 'checkbox', 'radio', 'toggle', 'slider', 'textarea',
+  'button', 'input', 'select', 'option', 'optgroup', 'checkbox', 'radio', 'toggle', 'slider', 'textarea',
   'card', 'badge', 'table', 'list', 'metric', 'chart', 'avatar', 'tag',
   'alert', 'toast', 'modal', 'tooltip', 'progress', 'spinner',
   'div', 'row', 'col', 'grid', 'stack', 'container', 'section', 'aside', 'nav', 'footer', 'header', 'main', 'article', 'figure', 'figcaption', 'ul', 'ol', 'li', 'a', 'label', 'form', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'blockquote', 'pre', 'code', 'strong', 'em', 'small', 'sup', 'sub', 'details', 'summary',
@@ -505,6 +505,7 @@ export class Parser {
         }
         return this.parseStyle();
       case TokenType.Form: return this.parseForm();
+      case TokenType.Table: return this.parseElement(); // HTML <table> inside page body
       case TokenType.Script: return this.parseScript();
       case TokenType.Preset: return this.parsePreset();
       case TokenType.Auth: return this.parseAuth();

@@ -15,11 +15,11 @@ import {
 const ELEMENT_TAGS = new Set([
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
   'p', 'text', 'span', 'link', 'img', 'video', 'icon',
-  'button', 'input', 'select', 'checkbox', 'radio', 'toggle', 'slider', 'textarea',
+  'button', 'input', 'select', 'option', 'optgroup', 'checkbox', 'radio', 'toggle', 'slider', 'textarea',
   'card', 'badge', 'table', 'list', 'metric', 'chart', 'avatar', 'tag',
   'alert', 'toast', 'modal', 'tooltip', 'progress', 'spinner',
   'row', 'col', 'grid', 'stack', 'container', 'section', 'aside', 'nav', 'footer',
-  'slot', 'submit',
+  'slot', 'submit', 'br', 'hr', 'div', 'main', 'article', 'header', 'figure', 'figcaption', 'ul', 'ol', 'li', 'a', 'label', 'form', 'thead', 'tbody', 'tr', 'td', 'th', 'blockquote', 'pre', 'code', 'strong', 'em', 'small', 'sup', 'sub', 'details', 'summary',
   'div', 'main', 'header', 'article', 'ul', 'ol', 'li', 'a', 'form',
   'label', 'pre', 'code', 'blockquote', 'hr', 'br', 'strong', 'em',
   'small', 'sup', 'sub', 'dl', 'dt', 'dd', 'figure', 'figcaption',

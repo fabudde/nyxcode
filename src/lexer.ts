@@ -253,6 +253,35 @@ export class Lexer {
         let raw = '';
         while (this.pos < this.source.length && depth > 0) {
           const ch = this.source[this.pos];
+          // Skip regex literals (e.g., /"/g — don't confuse the quote inside)
+          if (ch === '/' && this.pos + 1 < this.source.length && this.source[this.pos + 1] !== '/' && this.source[this.pos + 1] !== '*') {
+            // Heuristic: if prev non-whitespace char is not an identifier/number/), it's a regex
+            let prevIdx = raw.length - 1;
+            while (prevIdx >= 0 && /\s/.test(raw[prevIdx])) prevIdx--;
+            const prevCh = prevIdx >= 0 ? raw[prevIdx] : '';
+            const isRegex = !prevCh || /[=(:,;!&|?{+\-~^%<>\[]/.test(prevCh);
+            if (isRegex) {
+              raw += ch; // opening /
+              this.pos++;
+              while (this.pos < this.source.length && this.source[this.pos] !== '/') {
+                if (this.source[this.pos] === '\\') {
+                  raw += this.source[this.pos]; this.pos++;
+                  if (this.pos < this.source.length) { raw += this.source[this.pos]; this.pos++; }
+                  continue;
+                }
+                if (this.source[this.pos] === '\n') break; // regex can't span lines
+                raw += this.source[this.pos];
+                this.pos++;
+              }
+              if (this.pos < this.source.length && this.source[this.pos] === '/') {
+                raw += this.source[this.pos]; this.pos++; // closing /
+                while (this.pos < this.source.length && /[gimsuy]/.test(this.source[this.pos])) {
+                  raw += this.source[this.pos]; this.pos++; // flags
+                }
+              }
+              continue;
+            }
+          }
           // Skip string literals (don't count braces inside strings)
           if (ch === "'" || ch === '"' || ch === '`') {
             const quote = ch;

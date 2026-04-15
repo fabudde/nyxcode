@@ -19,7 +19,7 @@ import {
   HeadStatement, AnimateStatement, LayoutNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.15.1";
+const NYXCODE_VERSION = "0.15.2";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -1983,6 +1983,11 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
 
   private mapCSSProperty(name: string): string {
     const mapping: Record<string, string> = {
+      // Position
+      't': 'top',
+      'l': 'left',
+      'b': 'bottom',
+      
       // Layout
       'bg': 'background',
       'bgc': 'background-color',
@@ -2052,6 +2057,7 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
       'fw2': 'flex-wrap',
       'fg': 'flex-grow',
       'fxs': 'flex-shrink',
+      'fsk': 'flex-shrink',
       'fs2': 'flex-shrink',
       'fb': 'flex-basis',
       
@@ -2064,10 +2070,15 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
       // Display
       'd': 'display',
       'of': 'overflow',
+      'ox': 'overflow-x',
       'ofx': 'overflow-x',
+      'oy': 'overflow-y',
       'ofy': 'overflow-y',
       'v': 'visibility',
       'cur': 'cursor',
+      'us': 'user-select',
+      'pe': 'pointer-events',
+      'ap': 'appearance',
       
       // Transforms & Transitions  
       'tf': 'transform',
