@@ -12,6 +12,20 @@ nyxcode dev app.nyx            # Dev server + hot reload
 nyxcode parse app.nyx          # Debug AST output
 ```
 
+
+## Comments
+
+```nyx
+# Full line comment
+page / {
+  h1 "Hello" # Inline comment
+  # Temporarily disable:
+  # p "This won't render"
+}
+```
+
+`#` starts a comment until end of line. `#fff` is a hex color (alphanumeric after `#`).
+
 ## Hero Example: Full-Stack Blog (16 lines)
 ```nyx
 table posts { title text required, body text, created auto }
