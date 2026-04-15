@@ -821,7 +821,7 @@ export class Compiler {
         if (rule.selector === '__raw__') {
           cssBlock += rule.properties[0].value + '\n';
         } else {
-          cssBlock += `${rule.selector} {\n`;
+          cssBlock += `.${className}${rule.selector.startsWith(':') || rule.selector.startsWith('>') || rule.selector.startsWith('~') || rule.selector.startsWith('+') ? '' : ' '}${rule.selector} {\n`;
           for (const prop of rule.properties) {
             const cp = this.mapCSSProperty(prop.name);
             cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
@@ -1393,7 +1393,7 @@ export class Compiler {
         if (rule.selector === '__raw__') {
           cssBlock += rule.properties[0].value + '\n';
         } else {
-          cssBlock += `${rule.selector} {\n`;
+          cssBlock += `.${scopeClass}${rule.selector.startsWith(':') || rule.selector.startsWith('>') || rule.selector.startsWith('~') || rule.selector.startsWith('+') ? '' : ' '}${rule.selector} {\n`;
           for (const prop of rule.properties) {
             const cp = this.mapCSSProperty(prop.name);
             cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;

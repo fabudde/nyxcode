@@ -1,0 +1,10 @@
+page / {
+  div {
+    style {
+      first-child { fw bold }
+      last-child { border-bottom none }
+    }
+    p "Item 1"
+    p "Item 2"
+  }
+}

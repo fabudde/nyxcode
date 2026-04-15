@@ -840,6 +840,7 @@ export class Parser {
     const pseudoElements: PseudoElementBlock[] = [];
 
     const PSEUDO_CLASSES = new Set(['hover', 'focus', 'active']);
+    const EXTENDED_PSEUDO_CLASSES = new Set(['first-child', 'last-child', 'nth-child', 'nth-of-type', 'disabled', 'enabled', 'checked', 'required', 'optional', 'focus-within', 'focus-visible', 'visited', 'empty', 'first-of-type', 'last-of-type', 'only-child', 'not', 'placeholder', 'placeholder-shown']);
     const PSEUDO_ELEMENTS = new Set(['before', 'after']);
     const cssRules: Array<{selector: string, properties: StyleProperty[]}> = [];
 
@@ -910,6 +911,36 @@ export class Parser {
         }
         this.consume(TokenType.RightBrace);
         pseudoElements.push({ selector, properties: props });
+      } else if (this.peek().value === '>' || this.peek().value === '~' || this.peek().value === '+') {
+        // Nested selector: > a { }, ~ p { }, + div { }
+        const combinator = this.advance().value;
+        let nestedSel = combinator + ' ';
+        while (!this.check(TokenType.LeftBrace) && !this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          const tok = this.advance();
+          if (tok.type === TokenType.Colon) nestedSel += ':';
+          else nestedSel += tok.value;
+        }
+        this.consume(TokenType.LeftBrace);
+        const nestedProps: StyleProperty[] = [];
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          nestedProps.push(this.parseStyleProperty());
+        }
+        this.consume(TokenType.RightBrace);
+        cssRules.push({ selector: nestedSel.trim(), properties: nestedProps });
+      } else if (this.peek().type === TokenType.Identifier && EXTENDED_PSEUDO_CLASSES.has(this.peek().value)) {
+        let pseudoName = this.advance().value;
+        let pseudoArgs = '';
+        if (this.check(TokenType.LeftParen)) {
+          this.advance();
+          while (!this.check(TokenType.RightParen) && !this.isAtEnd()) pseudoArgs += this.advance().value;
+          this.advance();
+        }
+        const pseudoSel = ':' + pseudoName + (pseudoArgs ? '(' + pseudoArgs + ')' : '');
+        this.consume(TokenType.LeftBrace);
+        const pProps: StyleProperty[] = [];
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) pProps.push(this.parseStyleProperty());
+        this.consume(TokenType.RightBrace);
+        cssRules.push({ selector: pseudoSel, properties: pProps });
       } else {
         properties.push(this.parseStyleProperty());
       }
@@ -1104,6 +1135,8 @@ export class Parser {
 
       // Outside parentheses: normal rules
       if (next.type === TokenType.RightBrace || next.type === TokenType.At) break;
+      // Stop at nested selector combinators (> ~ +)
+      if (next.type === TokenType.GreaterThan || next.value === '~' || next.value === '+') break;
 
       // Comma handling: depends on whether the property allows commas in its value
       if (next.type === TokenType.Comma) {
@@ -1136,7 +1169,7 @@ export class Parser {
         }
       }
 
-      if (['hover', 'focus', 'active', 'before', 'after'].includes(next.value)) break;
+      if (['hover', 'focus', 'active', 'before', 'after', 'first-child', 'last-child', 'disabled', 'checked', 'focus-within', 'focus-visible', 'placeholder', 'empty', 'visited'].includes(next.value)) break;
       // If we see an identifier that's a known CSS property, it's the NEXT property
       if (next.type === TokenType.Identifier && value.length > 0) {
         // Check for hyphenated property: e.g., 'border' + '-' + 'color' = 'border-color'

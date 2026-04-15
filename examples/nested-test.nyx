@@ -1,0 +1,26 @@
+page / {
+  nav {
+    style {
+      d flex
+      gap 1rem
+      > a { c white; td none }
+    }
+    link "/" "Home"
+    link "/about" "About"
+  }
+  div {
+    style {
+      first-child { fw bold }
+      last-child { border-bottom none }
+    }
+    p "Item 1"
+    p "Item 2"
+    p "Item 3"
+  }
+  input placeholder="Type here" {
+    style {
+      disabled { op 0.5 }
+      focus-visible { outline 2px solid blue }
+    }
+  }
+}
