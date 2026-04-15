@@ -16,10 +16,10 @@ import {
   FormStatement, AuthStatement, ElementNode, Expression, ScriptStatement,
   StyleProperty, ResponsiveBlock, Attribute, PseudoElementBlock,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
-  HeadStatement, AnimateStatement, LayoutNode,
+  HeadStatement, AnimateStatement, LayoutNode, StoreNode,
 } from './ast.js';
 
-const NYXCODE_VERSION = "0.15.3";
+const NYXCODE_VERSION = "0.16.0";
 
 export interface CompilerOptions {
   /** Output mode */
@@ -48,6 +48,7 @@ export class Compiler {
   private pageClass: string = '';
   private stateVars: Map<string, string> = new Map(); // name -> initial value
   private computedVars: Map<string, string> = new Map(); // name -> expression
+  private stores: Map<string, { fields: Array<{name: string, value?: string, isAction: boolean, actionBody?: string}>, computed: Array<{name: string, expression: string}> }> = new Map();
   private effects: string[] = [];
   private hasReactivity: boolean = false;
   private components: Map<string, ComponentNode> = new Map();
@@ -145,6 +146,11 @@ export class Compiler {
     // Process preset blocks
     for (const node of program.body) {
       if (node.type === 'Preset') this.compilePreset(node as any);
+    }
+
+    // Process store blocks — global reactive state across pages
+    for (const node of program.body) {
+      if (node.type === 'Store') this.processStore(node as any);
     }
 
     // If we have a layout, compile its CSS once (shared across all pages)
@@ -274,6 +280,11 @@ export class Compiler {
     // Process preset blocks
     for (const node of program.body) {
       if (node.type === 'Preset') this.compilePreset(node as any);
+    }
+
+    // Process store blocks — global reactive state
+    for (const node of program.body) {
+      if (node.type === 'Store') this.processStore(node as any);
     }
 
     // If we have a layout, extract head/script nodes from layout body
@@ -805,6 +816,13 @@ export class Compiler {
         return `\${${this.propertyToJS(content.path)}}`;
       case 'NumberLiteral':
         return String(content.value);
+      case 'StoreAccess':
+        // Store field binding: user.name -> reactive bind to store state
+        if (this.stores.has(content.store)) {
+          this.hasReactivity = true;
+          return `__NYX_BIND:state.${content.store}.${content.field}`;
+        }
+        return `\${${content.store}.${content.field}}`;
       case 'Identifier':
         // Check if this references a state var — if so, use binding
         if (this.stateVars.has(content.name)) {
@@ -1644,6 +1662,38 @@ export class Compiler {
     return '';
   }
 
+  /**
+   * Process a store block — register fields as namespaced state vars.
+   * `store user { name = "" role = "guest" }` becomes:
+   * - State vars: user.name, user.role (namespaced)
+   * - Global JS object: __nyx_store_user with reactive properties
+   */
+  private processStore(store: StoreNode): void {
+    const fields: Array<{name: string, value?: string, isAction: boolean, actionBody?: string}> = [];
+    const computed: Array<{name: string, expression: string}> = [];
+
+    for (const field of store.body) {
+      if (field.isAction) {
+        fields.push({ name: field.name, isAction: true, actionBody: field.actionBody });
+      } else if (field.value?.startsWith('__computed:')) {
+        // Computed field inside store
+        const expr = field.value.replace('__computed:', '');
+        computed.push({ name: field.name, expression: expr });
+      } else {
+        let val = field.value || '""';
+        // Re-quote string values (parser strips quotes)
+        if (val && val !== 'true' && val !== 'false' && val !== 'null' && val !== 'undefined'
+            && !/^-?\d/.test(val) && !val.startsWith('[') && !val.startsWith('{') && !val.startsWith('"')) {
+          val = JSON.stringify(val);
+        }
+        fields.push({ name: field.name, value: val, isAction: false });
+      }
+    }
+
+    this.stores.set(store.name, { fields, computed });
+    if (fields.length > 0) this.hasReactivity = true;
+  }
+
   private compileComputed(computed: ComputedStatement): string {
     this.hasReactivity = true;
     this.computedVars.set(computed.name, computed.expression);
@@ -1747,6 +1797,41 @@ export class Compiler {
       runtime += `  let ${name} = { get value() { return __nyx.state.${name}; }, set value(v) { __nyx.state.${name} = v; } };\n`;
     }
 
+    // Store initialization — global reactive state objects
+    for (const [storeName, store] of this.stores) {
+      runtime += `\n  // Store: ${storeName}\n`;
+      runtime += `  const ${storeName} = {};\n`;
+      // Create state vars namespaced under store
+      for (const field of store.fields) {
+        if (!field.isAction) {
+          const stateKey = `${storeName}.${field.name}`;
+          runtime += `  __nyx.createState('${stateKey}', ${field.value || '""'});\n`;
+          runtime += `  Object.defineProperty(${storeName}, '${field.name}', {\n`;
+          runtime += `    get() { return __nyx.state['${stateKey}']; },\n`;
+          runtime += `    set(v) { __nyx.state['${stateKey}'] = v; },\n`;
+          runtime += `    enumerable: true\n`;
+          runtime += `  });\n`;
+        } else if (field.actionBody) {
+          runtime += `  ${storeName}.${field.name} = function() { ${field.actionBody} };\n`;
+        }
+      }
+      // Store computed values
+      for (const comp of store.computed) {
+        // Resolve field references within the store's own fields
+        let resolvedExpr = comp.expression;
+        for (const field of store.fields) {
+          resolvedExpr = resolvedExpr.replace(new RegExp(`\\b${field.name}\\b`, 'g'), `__nyx.state['${storeName}.${field.name}']`);
+        }
+        runtime += `  __nyx.defineComputed('${storeName}.${comp.name}', () => ${resolvedExpr});\n`;
+        runtime += `  Object.defineProperty(${storeName}, '${comp.name}', {\n`;
+        runtime += `    get() { return __nyx.computedDefs['${storeName}.${comp.name}'](); },\n`;
+        runtime += `    enumerable: true\n`;
+        runtime += `  });\n`;
+      }
+      // Make store globally accessible
+      runtime += `  window.__nyx_store_${storeName} = ${storeName};\n`;
+    }
+
     // Computed values
     for (const [name, expr] of this.computedVars) {
       runtime += `  __nyx.defineComputed('${name}', () => ${expr});\n`;
@@ -1769,6 +1854,11 @@ export class Compiler {
         const parts = expr.split('.');
         if (parts[0] === 'state' && parts.length === 2 && __nyx.subscribers.has(parts[1])) {
           return __nyx.state[parts[1]];
+        }
+        // Store fields: state.storeName.field -> __nyx.state['storeName.field']
+        if (parts[0] === 'state' && parts.length === 3) {
+          const key = parts[1] + '.' + parts[2];
+          if (__nyx.subscribers.has(key)) return __nyx.state[key];
         }
         if (parts[0] === 'computed' && parts.length === 2 && parts[1] in __nyx.computedDefs) {
           return __nyx.computed[parts[1]];
@@ -2174,21 +2264,33 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
     if (action.startsWith('toggle')) {
       return `this.classList.toggle('${action.replace('toggle .', '')}')`;
     }
+    // Normalize spaces around dots: "user . name" -> "user.name"
+    action = action.replace(/\s*\.\s*/g, '.');
     // State mutations: count + 1, count - 1, name = "new"
+    // Check if action references a store field
+    for (const [storeName, store] of this.stores) {
+      for (const field of store.fields) {
+        if (!field.isAction && action.includes(`${storeName}.${field.name}`)) {
+          if (action.includes('=')) {
+            const [lhs, ...rhsParts] = action.split('=');
+            const rhs = rhsParts.join('=').trim();
+            const rhsResolved = this.resolveStateRefs(rhs);
+            const rhsFinal = rhsResolved.replace(/"/g, "'");
+            return `__nyx.state['${lhs.trim()}'] = ${rhsFinal}`;
+          }
+        }
+      }
+    }
     // Check if action references a state var
     for (const [name] of this.stateVars) {
       if (action.includes(name)) {
-        // Convert "count + 1" to "__nyx.state.count = __nyx.state.count + 1"
-        // Convert "count = 0" to "__nyx.state.count = 0"
         if (action.includes('=')) {
           const [lhs, ...rhsParts] = action.split('=');
           const rhs = rhsParts.join('=').trim();
           const rhsResolved = this.resolveStateRefs(rhs);
-          // Use single quotes for strings inside onclick (which uses double quotes)
           const rhsFinal = rhsResolved.replace(/"/g, "'");
           return `__nyx.state.${lhs.trim()} = ${rhsFinal}`;
         } else {
-          // Shorthand: "count + 1" means increment
           const resolved = this.resolveStateRefs(action);
           return `__nyx.state.${name} = ${resolved}`;
         }
@@ -2200,6 +2302,17 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
   /** Replace state var names in an expression with __nyx.state.name */
   private resolveStateRefs(expr: string): string {
     let result = expr;
+    // Resolve store field access: user.name -> __nyx.state['user.name']
+    for (const [storeName, store] of this.stores) {
+      for (const field of store.fields) {
+        if (!field.isAction) {
+          result = result.replace(new RegExp(`\\b${storeName}\\.${field.name}\\b`, 'g'), `__nyx.state['${storeName}.${field.name}']`);
+        }
+      }
+      for (const comp of store.computed) {
+        result = result.replace(new RegExp(`\\b${storeName}\\.${comp.name}\\b`, 'g'), `${storeName}.${comp.name}`);
+      }
+    }
     for (const [name] of this.stateVars) {
       // Replace standalone occurrences (not inside other words)
       result = result.replace(new RegExp(`\\b${name}\\b`, 'g'), `__nyx.state.${name}`);
@@ -2218,7 +2331,7 @@ ${this.scripts.length > 0 ? '<script>' + this.scripts.join(';') + '</script>' : 
       case 'NumberLiteral':
         return String(expr.value);
       case 'StoreAccess':
-        return `$${expr.store}.${expr.field}`;
+        return `${expr.store}.${expr.field}`;
       case 'Identifier':
         return expr.name;
       default:

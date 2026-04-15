@@ -291,6 +291,34 @@ export class Parser {
         this.advance();
       }
 
+      // Skip optional 'state' keyword inside store (just syntactic sugar)
+      if (this.peek().type === TokenType.State) this.advance();
+      // Handle 'computed' keyword inside store
+      if (this.peek().type === TokenType.Computed) {
+        this.advance();
+        const compName = this.consumeIdentifier();
+        this.consume(TokenType.Equals);
+        let expr = '';
+        let parenDepth = 0;
+        while (!this.isAtEnd()) {
+          const next = this.peek();
+          if (next.type === TokenType.RightBrace && parenDepth === 0) break;
+          if (next.type === TokenType.LeftParen) parenDepth++;
+          if (next.type === TokenType.RightParen) parenDepth--;
+          // Stop at next field declaration
+          if (parenDepth === 0 && (next.type === TokenType.State || next.type === TokenType.Computed ||
+              (next.type === TokenType.Identifier && this.peekAt(1)?.type === TokenType.Equals))) break;
+          const tok = this.advance();
+          if (tok.type === TokenType.String) {
+            expr += '"' + tok.value + '"';
+          } else {
+            expr += tok.value;
+          }
+        }
+        body.push({ name: compName, visibility, value: '__computed:' + expr.trim(), isAction: false });
+        continue;
+      }
+
       const fieldName = this.consumeIdentifier();
 
       if (this.check(TokenType.Arrow)) {
@@ -1517,6 +1545,7 @@ private parseElement(): ElementNode {
             const cur = this.peek();
             if (cur.type === TokenType.RightBrace) break;
             if (cur.type === TokenType.LeftBrace) {
+              if (action.trim().length > 0) break; // Action complete — { starts element children
               action += ' {';
               this.advance();
               let depth = 1;
@@ -1553,7 +1582,14 @@ private parseElement(): ElementNode {
           this.advance(); // .
           path += '.' + this.consumeIdentifier();
         }
-        content = { type: 'PropertyAccess', path, line: next.line, col: next.col };
+        // If we already had an Identifier content (e.g., "user"), combine into StoreAccess
+        if (content && (content as any).type === 'Identifier') {
+          const storeName = (content as any).name;
+          const field = path.substring(1); // remove leading dot
+          content = { type: 'StoreAccess', store: storeName, field, line: next.line, col: next.col } as StoreAccess;
+        } else {
+          content = { type: 'PropertyAccess', path, line: next.line, col: next.col };
+        }
       }
       // Attribute: key=value or key="complex value" (including keyword tokens like style=)
       // Attribute: key=value — handle keywords that can also be attribute names
@@ -1648,8 +1684,13 @@ private parseElement(): ElementNode {
         let action = '';
         while (!this.isAtEnd() && !this.isStatementStart()) {
           const cur = this.peek();
-          // Handle inline body { key } in arrow actions
+          // LeftBrace after arrow: if action already has content, this is the element BODY, not part of the action
           if (cur.type === TokenType.LeftBrace) {
+            if (action.trim().length > 0) {
+              // Action is complete — { starts element children
+              break;
+            }
+            // Otherwise it's an inline JS object in the action
             action += ' {';
             this.advance();
             let depth = 1;
@@ -1675,7 +1716,8 @@ private parseElement(): ElementNode {
           }
         }
         attributes.push({ name: 'onClick', value: action.trim() });
-        break;
+        // Don't break — continue loop so { } can be parsed as element children
+        continue;
       }
       // Comma (sibling separator in inline)
       else if (next.type === TokenType.Comma) {

@@ -1,0 +1,33 @@
+# Store example — global reactive state across pages
+
+store user {
+  name = "Guest"
+  role = "viewer"
+}
+
+store cart {
+  items = 0
+  total = 0
+}
+
+page / {
+  h1 "Store Demo"
+  
+  h3 "User Store"
+  p "Name: "
+  p "Role: "
+  button on:click -> user.name = "Nyx" { text "Login as Nyx" }
+  button on:click -> user.role = "admin" { text "Make Admin" }
+  
+  h3 "Cart Store"
+  p "Items: "
+  button on:click -> cart.items = cart.items + 1 { text "Add Item" }
+  button on:click -> cart.items = 0 { text "Clear Cart" }
+  
+  h3 "Page State + Computed"
+  state counter = 0
+  computed doubled = counter * 2
+  p "Counter: "
+  p "Doubled: "
+  button on:click -> counter = counter + 1 { text "+1" }
+}
