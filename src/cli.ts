@@ -36,7 +36,7 @@ const file = args[1];
 
 if (!command || (command !== 'dev' && !file) || (!file && command !== '--help')) {
   console.log(`
-🦞 NyxCode v0.15.2
+🦞 NyxCode v${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}
 
 Usage:
   nyx parse <file.nyx>              Parse file → AST (JSON)
