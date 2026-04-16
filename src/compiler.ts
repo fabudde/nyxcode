@@ -836,11 +836,13 @@ export class Compiler {
       }
     }
 
-    // CSS Rules: .class { props }, tag { props }, @keyframes (raw)
+    // CSS Rules: .class { props }, tag { props }, @keyframes (structured)
     if (style.cssRules) {
       for (const rule of style.cssRules) {
         if (rule.selector === '__raw__') {
           cssBlock += rule.properties[0].value + '\n';
+        } else if (rule.selector === '__keyframes__' && rule.keyframeName && rule.keyframeSteps) {
+          cssBlock += this.buildKeyframesCSS(rule.keyframeName, rule.keyframeSteps);
         } else {
           const selfElements = ['body', 'html'];
           const isSelf = rule.selector.startsWith(':') || rule.selector.startsWith('>') || rule.selector.startsWith('~') || rule.selector.startsWith('+') || selfElements.includes(rule.selector);
@@ -855,6 +857,29 @@ export class Compiler {
     }
 
     this.css.push(cssBlock);
+  }
+
+  /** Build `@keyframes NAME { 0% { ... } 50% { ... } }` CSS with shorthand + theme resolution. */
+  private buildKeyframesCSS(name: string, steps: Array<{ selector: string; properties: StyleProperty[] }>): string {
+    let css = `@keyframes ${name} {\n`;
+    for (const step of steps) {
+      css += `  ${step.selector} {\n`;
+      for (const prop of step.properties) {
+        // Use expandUtility (shorthand combos like 'px 1rem') first
+        const expanded = this.expandUtility(prop.name, prop.value);
+        if (expanded) {
+          for (const e of expanded) {
+            css += `    ${e.name}: ${e.value};\n`;
+          }
+        } else {
+          const cp = this.mapCSSProperty(prop.name);
+          css += `    ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+        }
+      }
+      css += `  }\n`;
+    }
+    css += `}\n`;
+    return css;
   }
 
   private compileContent(content: string | Expression | undefined): string {
@@ -1415,6 +1440,8 @@ export class Compiler {
       for (const rule of style.cssRules) {
         if (rule.selector === '__raw__') {
           cssBlock += rule.properties[0].value + '\n';
+        } else if (rule.selector === '__keyframes__' && rule.keyframeName && rule.keyframeSteps) {
+          cssBlock += this.buildKeyframesCSS(rule.keyframeName, rule.keyframeSteps);
         } else {
           const selfElems = ['body', 'html'];
           const isSelfScope = rule.selector.startsWith(':') || rule.selector.startsWith('>') || rule.selector.startsWith('~') || rule.selector.startsWith('+') || selfElems.includes(rule.selector);
@@ -2469,6 +2496,8 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
       'tf': 'transform',
       'tr': 'transition',
       'anim': 'animation',
+      'fi': 'filter',
+      'bdf': 'backdrop-filter',
       
       // Legacy (keep working)
       'text': 'color',

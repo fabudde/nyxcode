@@ -951,7 +951,7 @@ export class Parser {
     const PSEUDO_CLASSES = new Set(['hover', 'focus', 'active']);
     const EXTENDED_PSEUDO_CLASSES = new Set(['first-child', 'last-child', 'nth-child', 'nth-of-type', 'disabled', 'enabled', 'checked', 'required', 'optional', 'focus-within', 'focus-visible', 'visited', 'empty', 'first-of-type', 'last-of-type', 'only-child', 'not', 'placeholder', 'placeholder-shown']);
     const PSEUDO_ELEMENTS = new Set(['before', 'after']);
-    const cssRules: Array<{selector: string, properties: StyleProperty[]}> = [];
+    const cssRules: Array<{selector: string, properties: StyleProperty[], keyframeName?: string, keyframeSteps?: Array<{selector: string, properties: StyleProperty[]}>}> = [];
 
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       // CSS selector rule: .class { }, ::pseudo { }, tag { }
@@ -965,27 +965,51 @@ export class Parser {
         this.consume(TokenType.RightBrace);
         cssRules.push({ selector, properties: ruleProps });
       } else if (this.check(TokenType.At)) {
-        // Check: @keyframes → raw CSS rule
+        // Check: @keyframes → structured parse with shorthand support
         if (this.pos + 1 < this.tokens.length && this.tokens[this.pos + 1].value === 'keyframes') {
-          // Collect @keyframes as raw CSS
-          let raw = '';
           this.advance(); // @
-          raw += '@';
-          // Collect tokens until matching closing brace (nested braces!)
-          let depth = 0;
-          let started = false;
-          while (!this.isAtEnd()) {
-            const tok = this.advance();
-            if (tok.type === TokenType.LeftBrace) { depth++; started = true; raw += ' {\n'; }
-            else if (tok.type === TokenType.RightBrace) { depth--; raw += '}\n'; if (started && depth === 0) break; }
-            else if (tok.type === TokenType.Comma) { raw += ', '; }
-            else if (tok.type === TokenType.Colon) { raw += ': '; }
-            else if (tok.type === TokenType.LeftParen) { raw += '('; }
-            else if (tok.type === TokenType.RightParen) { raw += ')'; }
-            else if (tok.value === '%' || tok.value === ';') { raw += tok.value + ' '; }
-            else { raw += (raw.endsWith('(') || raw.endsWith('\n') || raw.endsWith('@') ? '' : ' ') + tok.value; }
+          this.advance(); // keyframes
+          const animName = this.consumeIdentifier();
+          this.consume(TokenType.LeftBrace);
+
+          const steps: Array<{ selector: string; properties: StyleProperty[] }> = [];
+
+          while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            // Parse selector: "0%", "50%", "from", "to", or "0%, 100%"
+            const selectorParts: string[] = [];
+            while (!this.check(TokenType.LeftBrace) && !this.isAtEnd()) {
+              const t = this.advance();
+              if (t.type === TokenType.Comma) {
+                selectorParts.push(',');
+              } else if (t.value === '%') {
+                // Attach % directly to the previous token
+                if (selectorParts.length > 0) {
+                  selectorParts[selectorParts.length - 1] = selectorParts[selectorParts.length - 1] + '%';
+                }
+              } else {
+                selectorParts.push(t.value);
+              }
+            }
+            const selector = selectorParts.join(' ').replace(/\s*,\s*/g, ', ').trim();
+
+            this.consume(TokenType.LeftBrace);
+            // Parse properties using regular parseStyleProperty (expands shorthands!)
+            const kfProps: StyleProperty[] = [];
+            while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+              kfProps.push(this.parseStyleProperty());
+            }
+            this.consume(TokenType.RightBrace);
+
+            steps.push({ selector, properties: kfProps });
           }
-          cssRules.push({ selector: '__raw__', properties: [{ name: '__raw__', value: raw.trim() }] });
+          this.consume(TokenType.RightBrace);
+
+          cssRules.push({
+            selector: '__keyframes__',
+            properties: [],
+            keyframeName: animName,
+            keyframeSteps: steps,
+          });
         } else if (this.pos + 1 < this.tokens.length && this.tokens[this.pos + 1].value === 'container') {
           // Container query: @container(min-width: 400px) { ... }
           this.advance(); // @
@@ -1322,10 +1346,12 @@ export class Parser {
         }
         if (Parser.CSS_PROPERTIES.has(next.value)) break;
       }
-      // String tokens in style values: preserve quotes (needed for CSS content property)
+      // String tokens in style values: preserve quotes ONLY for `content` property
+      // (other properties like animation, transition, font-family use unquoted strings)
       if (next.type === TokenType.String) {
         const strVal = this.advance().value;
-        value += (value ? ' ' : '') + `"${strVal}"`;
+        const needsQuotes = fullPropName === 'content' || fullPropName === 'quotes';
+        value += (value ? ' ' : '') + (needsQuotes ? `"${strVal}"` : strVal);
         continue;
       }
       // Handle hyphenated identifiers and values

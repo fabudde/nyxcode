@@ -196,6 +196,9 @@ export interface ResponsiveBlock {
 export interface CssRule {
   selector: string;
   properties: StyleProperty[];
+  /** If present, this is an @keyframes rule with step-based properties (supports shorthand expansion). */
+  keyframeName?: string;
+  keyframeSteps?: Array<{ selector: string; properties: StyleProperty[] }>;
 }
 
 /** `form /api/path auth { ... success -> reload }` */

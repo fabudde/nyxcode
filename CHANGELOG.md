@@ -1,3 +1,33 @@
+## v0.18.1 — "Animate This" (2026-04-16)
+
+### Features
+- **`@keyframes` in `style {}` blocks with full shorthand support** — Animations are now first-class inside style blocks. Write `tf translateY(-15px)` instead of `transform: translateY(-15px)`, combine multiple properties per step with commas, use theme color resolution inside keyframes. (Fabian Issue #61)
+  ```nyx
+  style {
+    @keyframes float {
+      0%, 100% { tf translateY(0) }
+      50% { tf translateY(-15px) }
+    }
+    @keyframes pulse {
+      0%, 100% { op 0.5, shadow 0 0 10px rgba(0,255,65,0.3) }
+      50% { op 1, shadow 0 0 30px rgba(0,255,65,0.8) }
+    }
+    .floating { anim "float 4s ease-in-out infinite" }
+  }
+  ```
+- **New shorthands** — `fi` → `filter`, `bdf` → `backdrop-filter`. Needed for glitch/blur effects inside keyframes.
+
+### Bug Fixes
+- **String values in animation/transition/font-family are no longer double-quoted** — `anim "float 4s..."` now emits `animation: float 4s...;` instead of `animation: "float 4s...";`. Quotes are preserved only for `content` and `quotes` properties (where they're required).
+- **Negative numbers in CSS values no longer get a leading space** — `translateY(-15px)` stays `translateY(-15px)`, not `translateY(- 15px)`. Applies to keyframe selectors and inside parentheses.
+- **`0%, 100%` keyframe selectors emit clean CSS** — No more doubled spaces around commas.
+
+### Contributors
+- Fabian 🐻 (Issue #61, test cases)
+- Nyx 🦞 (structured keyframe AST + shorthand expansion)
+
+---
+
 ## v0.18.0 — "Page & Polish" (2026-04-16)
 
 ### Features
