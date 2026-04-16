@@ -1,3 +1,60 @@
+## v0.21.2 — "Version, Plural" (2026-04-16)
+
+Dogfooding-triggered patch: Kiro 🐺 was writing a site-wide footer in
+NyxCode when the version string refused to render properly. Turns out
+`${__version__}` was broken in two different ways on two different code
+paths — one that had been wrong since we added interpolation in
+`v0.20.0`, one that had been wrong even earlier.
+
+### Fixes
+
+- **#81 — `${__version__}` now resolves correctly everywhere.** Two
+  separate bugs in one issue:
+
+  1. **Page scope:** `${__version__}` rendered as the literal string
+     `${0.21.1}` — the `${...}` wrapper was left in the output because
+     `escapeContent()` did a naked `replace(/__version__/g, …)` that
+     substituted the inner identifier without consuming the
+     interpolation delimiters.
+
+  2. **Component scope:** `${__version__}` rendered as the empty
+     string because the component-level `interpolate()` helper only
+     looked up names in `props` and had no knowledge of compiler
+     built-ins like `__version__`.
+
+  Both paths now share a single source of truth. A new private helper
+  `resolveBuiltins()` handles `${__name__}` patterns in escaped text
+  content, and the component `interpolate()` falls back to the same
+  built-in resolver when an identifier isn't in `props`. Unknown
+  built-ins are left as literal text (no crash, no empty string) so
+  future additions don't silently eat user content.
+
+  ```nyx
+  component Footer {
+    p "Built with NyxCode v${__version__}"
+  }
+  page / {
+    p "Running v${__version__}"
+    use Footer
+  }
+  ```
+
+  Both now render `0.21.2` cleanly. Built-ins only resolve inside
+  explicit `${...}` interpolation now — bare `__version__` in text is
+  no longer silently substituted. If you were relying on the bare
+  form, wrap it: `"v${__version__}"`.
+
+### Meta
+
+This is the second bugs-from-production release in a row ("Hosting
+Finds Bugs" found README bugs, this one found footer bugs) and the
+pattern is becoming the point: **ship it, use it, fix what breaks.**
+Kiro deployed mindsmatter.now on v0.21.1 this morning, wrote a footer,
+and the footer revealed #81 inside of ninety minutes. The project's
+growing into its own dogfooding culture in real time.
+
+---
+
 ## v0.21.1 — "Hosting Finds Bugs" (2026-04-16)
 
 First bugs-from-production release. While hosting the v0.21.0 benchmark

@@ -1809,11 +1809,21 @@ export class Compiler {
 
     // Helper: resolve `${propName}` and `${expr}` interpolation (Kiro #75)
     // Supports simple identifiers AND ternaries like `${active == "home" ? "is-active" : ""}`
+    // Built-ins like __version__ fall back to compiler globals when not in props (#81).
+    const resolveBuiltin = (name: string): string | undefined => {
+      if (name === '__version__') return NYXCODE_VERSION;
+      return undefined;
+    };
     const interpolate = (s: string): string => {
-      return s.replace(/\$\{([^}]+)\}/g, (_, raw) => {
+      return s.replace(/\$\{([^}]+)\}/g, (match, raw) => {
         const expr = raw.trim();
-        // Simple identifier lookup
-        if (/^[a-zA-Z_][\w]*$/.test(expr)) return props[expr] ?? '';
+        // Simple identifier lookup (props first, built-ins second)
+        if (/^[a-zA-Z_][\w]*$/.test(expr)) {
+          if (expr in props) return props[expr];
+          const builtin = resolveBuiltin(expr);
+          if (builtin !== undefined) return builtin;
+          return ''; // unknown identifier → empty (preserves v0.20 behavior for missing props)
+        }
         // Ternary: `cond ? "a" : "b"` or `cond ? a : b`
         const tern = expr.match(/^(.+?)\s*\?\s*(.+?)\s*:\s*(.+)$/);
         if (tern) {
@@ -2792,9 +2802,22 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
       .replace(/"/g, '&quot;');
   }
 
+  /**
+   * Resolve built-in variables like `${__version__}` in any string.
+   * Shared by page-level escapeContent() and component-level interpolate() (#81).
+   */
+  private resolveBuiltins(str: string): string {
+    return str.replace(/\$\{(__\w+__)\}/g, (match, name) => {
+      switch (name) {
+        case '__version__': return NYXCODE_VERSION;
+        default: return match; // unknown built-in → leave literal
+      }
+    });
+  }
+
   private escapeContent(str: string): string {
-    // Replace __version__ with actual NyxCode version
-    let result = str.replace(/__version__/g, NYXCODE_VERSION);
+    // Resolve built-ins like ${__version__} before escaping (#81)
+    let result = this.resolveBuiltins(str);
     // For text content between tags, quotes don't need escaping
     result = result
       .replace(/&/g, '&amp;')
