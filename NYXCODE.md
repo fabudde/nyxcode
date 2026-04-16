@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.17.1)
+# NYXCODE.md — AI Context File (v0.18.1)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -96,8 +96,10 @@ Property shorthands work in `style {}` blocks, `preset` definitions, inline styl
 | `obf` | object-fit | `obp` | object-position |
 | `bgi` | background-image | `bgs` | background-size |
 | `bgp` | background-position | `bgr` | background-repeat |
-| `bgc` | background-clip | `bf` | backdrop-filter |
-| `fil` | filter | `mix` | mix-blend-mode |
+| `bgc` | background-clip | `bdf` | backdrop-filter |
+| `fi` | filter | `mix` | mix-blend-mode |
+| `tf` | transform | `tr` | transition |
+| `anim` | animation |  |  |
 | `si` | scroll-snap-type | `sa` | scroll-snap-align |
 
 ## Layout Attributes — On Any Element
@@ -201,6 +203,110 @@ span { style { caps } }                            # text-transform: uppercase
 ```
 Shorthands: tracking, leading, indent, wb (word-break), ww (overflow-wrap), hyphens, columns, col-gap, col-count.
 Utilities: truncate, line-clamp N, balance, pretty, caps, lowercase, capitalize.
+
+## `@keyframes` in `style {}` Blocks (v0.18.1)
+Keyframes support full shorthand expansion and theme resolution, just like regular style properties.
+
+```nyx
+page / {
+  style {
+    @keyframes float {
+      0%, 100% { tf translateY(0) }
+      50% { tf translateY(-15px) }
+    }
+    @keyframes pulse {
+      0%, 100% { op 0.5, shadow 0 0 10px rgba(0,255,65,0.3) }
+      50% { op 1, shadow 0 0 30px rgba(0,255,65,0.8) }
+    }
+    .floating { anim "float 4s ease-in-out infinite" }
+  }
+  div .floating { p "Float me" }
+}
+```
+
+- `tf`, `op`, `anim`, `fi`, `bdf`, `shadow` — all shorthands work inside keyframes
+- Multiple properties per step separated by commas
+- Negative values (`-15px`) are preserved correctly
+- String values for `anim`/`tr`/`font-family` are emitted unquoted (only `content` keeps quotes)
+- Also available as top-level: `animate name { ... }`
+
+## Declarative `meta {}` Block (v0.18.0)
+Drop the HTML and let NyxCode generate `<title>`, Open Graph, Twitter Card, favicon, canonical URLs, etc.
+
+```nyx
+meta {
+  title "NyxCode — The AI-Native Language"
+  description "A token-efficient full-stack DSL for AIs"
+  author "Fabian + Nyx"
+  keywords "nyxcode, ai, dsl, fullstack"
+  favicon "/favicon.ico"
+  canonical "https://nyxcode.dev"
+  theme-color "#00ff41"
+  og:title "NyxCode"
+  og:image "https://nyxcode.dev/og.png"
+  og:type "website"
+  twitter:card "summary_large_image"
+  twitter:site "@nyxthe_lobster"
+  robots "index, follow"
+}
+
+page / { h1 "Hi" }
+```
+
+- Top-level block, emits a `HeadStatement` injected into `<head>`
+- Works on single-page AND multi-page builds (meta is applied globally to every page)
+- `og:*` and `twitter:*` prefixes are preserved (Lexer-splits get reassembled)
+- Auto-deduplication: if your meta sets `title` or `description`, NyxCode won't re-emit its defaults
+
+## Multi-Page Builds (v0.18.0)
+One `.nyx` file → multiple HTML files via `page /path/ {}`.
+
+```nyx
+meta { title "My Site" }
+
+page / { h1 "Home" }
+page /about/ { h1 "About" p "About text" }
+page /blog/ { h1 "Blog" }
+```
+
+Build output:
+```
+dist-site/
+├── index.html          ← page /
+├── about/index.html    ← page /about/
+└── blog/index.html     ← page /blog/
+```
+
+- Clean URLs (no `.html` extensions)
+- `meta {}` is inherited by every page
+- Global layouts/components available across all pages
+- Use case: static sites, documentation, blogs, landing pages with sub-pages
+
+## Canvas, Audio, Video & Iframe (v0.18.0)
+Interactive media elements are now first-class:
+
+```nyx
+canvas id="game" width="800" height="600" { }
+audio controls=true src="/track.mp3" { source src="/track.ogg" type="audio/ogg" }
+video controls=true { source src="/video.mp4" type="video/mp4" }
+iframe src="https://example.com" width="100%" height="400" { }
+```
+
+- Added elements: `canvas`, `audio`, `source`, `track`, `iframe`
+- `source` and `track` are void elements (self-closing)
+- Boolean attributes like `controls` need explicit `controls=true` (Lexer limitation)
+
+## Unicode Escapes in Strings (v0.18.0)
+Full escape sequence support in string literals:
+
+```nyx
+p "Arrow: \u2192 \u2190 \u2191 \u2193"    # Unicode escapes
+p "Hex: \x41\x42\x43"                      # ABC
+p "Quotes: \" \' \`"                        # Quotes, backticks
+p "Whitespace: \n \t \r"                    # Newline, tab, carriage return
+```
+
+Previous versions rendered `\u2192` as literal `u2192`. Fixed in v0.18.0.
 
 ## Pages & Routing
 ```nyx
