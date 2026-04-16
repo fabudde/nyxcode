@@ -1,0 +1,31 @@
+table posts { title text required, body text, created auto }
+
+security {
+  table users
+  login email password
+  token jwt
+  protect /api/posts
+}
+
+theme { colors { bg #0a0a12, primary #667eea, card #1a1a2e } }
+
+page / {
+  style { bg var(--colors-bg) }
+  h1 "My Blog" style="color: var(--colors-primary);"
+
+  form /api/posts auth {
+    input title placeholder="Title" required
+    textarea body placeholder="Write..."
+    submit "Publish"
+    success -> reload
+  }
+
+  data posts = get /api/posts auth
+  each posts -> post {
+    section {
+      style { bg var(--colors-card), radius 12px, p 1.5rem }
+      h3 .title
+      p .body
+    }
+  }
+}

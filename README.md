@@ -269,18 +269,23 @@ Emits all the right `<meta>` tags, OpenGraph, Twitter cards, canonical — witho
 
 ## Benchmark
 
-Full-stack blog with auth, database, forms, and theming:
+Full-stack blog with SQLite + JWT auth + forms + theming, measured head-to-head against Next.js 14 + Prisma + bcrypt + JWT. [Reproduce yourself](./benchmarks/blog/) — sources and methodology are committed.
 
-| Metric | NyxCode | TypeScript + React + Express | Savings |
-|---|---|---|---|
-| Lines of code | 30 | 500+ | **94%** |
-| Files | 1 | 10+ | **90%** |
-| Config files | 0 | 5+ (tsconfig, vite, package, etc.) | **100%** |
-| Direct dependencies | 0 | 50+ | **100%** |
-| Time to running app | ~10s | ~5min (npm install) | **~97%** |
-| Context tokens for AI | ~800 | ~12,000 | **~93%** |
+| Metric | NyxCode | Next.js + Prisma + JWT | Ratio |
+|---|---:|---:|---:|
+| Source files | **1** | 19 | 19× |
+| Lines of code | **31** | 488 | 15.7× |
+| AI tokens (cl100k_base) | **183** | 3,350 | **18.3×** |
+| Config files | **0** | 9 | — |
+| Direct dependencies | **0** | 19 (7 prod + 12 dev) | — |
+| Installed packages (transitive) | **39** | 415 | 10.6× |
+| `node_modules` size | **15 MB** | 442 MB | 29.5× |
+| Install time (warm cache) | **2 s** | 7 s | 3.5× |
+| Build time | **0.09 s** | 15 s | **167×** |
 
-The last row is the one that matters in 2026.
+Tokens measured with `tiktoken` (GPT-4 / Claude compatible). Full methodology and reproduction instructions in [`benchmarks/blog/RESULTS.md`](./benchmarks/blog/RESULTS.md).
+
+The row that matters in 2026 is **AI tokens**: 94.5% fewer tokens means cheaper LLM API calls, smaller context windows, and faster generation when the AI writes or modifies the app.
 
 ---
 

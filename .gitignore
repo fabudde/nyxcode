@@ -2,3 +2,9 @@ node_modules/
 dist/
 dist-site/
 archive/
+
+# Benchmark build artifacts
+benchmarks/blog/nyxcode/dist-site/
+benchmarks/blog/nextjs/node_modules/
+benchmarks/blog/nextjs/.next/
+benchmarks/blog/nextjs/prisma/dev.db*
