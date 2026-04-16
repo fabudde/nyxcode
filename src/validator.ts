@@ -25,6 +25,14 @@ const ELEMENT_TAGS = new Set([
   'small', 'sup', 'sub', 'dl', 'dt', 'dd', 'figure', 'figcaption',
   'details', 'summary', 'mark', 'abbr', 'cite', 'time', 'address',
   'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption',
+  // SVG elements (#62)
+  'svg', 'g', 'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon',
+  'defs', 'use', 'symbol', 'marker', 'mask', 'clipPath',
+  'linearGradient', 'radialGradient', 'stop',
+  'filter', 'feGaussianBlur', 'feColorMatrix', 'feBlend', 'feOffset', 'feMerge', 'feMergeNode', 'feFlood', 'feComposite', 'feMorphology', 'feTurbulence', 'feDisplacementMap',
+  'pattern', 'image', 'foreignObject', 'title', 'desc',
+  'animate', 'animateTransform', 'animateMotion', 'set', 'mpath',
+  'tspan', 'textPath', 'switch',
 ]);
 
 export interface ValidationError {

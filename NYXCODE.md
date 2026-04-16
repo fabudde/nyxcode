@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.18.2)
+# NYXCODE.md — AI Context File (v0.19.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -193,6 +193,24 @@ div "Header" { style { area header } }
 div { style { container inline-size; @container(min-width: 400px) { fs 1.5rem } } }
 ```
 
+## Media Queries & Feature Queries (v0.19.0)
+Three flavors of responsive CSS, all with full shorthand + theme resolution inside:
+
+```nyx
+style {
+  fs 2rem
+  @mobile { fs 1rem }                                  # built-in: 768px and below
+  @tablet { fs 1.5rem }                                # built-in: 1024px and below
+  @desktop { fs 2rem }                                 # built-in: 1440px and below
+  @media(min-width: 800px) { fs 2.5rem }               # custom min-width
+  @media(min-width: 800px) and (max-width: 1199px) { bg #f0f0f0 }  # combinators: and, or, not
+  @supports(backdrop-filter: blur(10px)) { bdf blur(10px) }         # feature queries
+  @container(min-width: 400px) { p 2rem }              # container queries
+}
+```
+
+All at-rules support multi-property steps with commas: `{ fs 3rem, c primary }`.
+
 ## Typography Utilities (v0.17.1)
 ```nyx
 h1 { style { tracking 0.05em; balance } }      # letter-spacing + text-wrap: balance
@@ -203,6 +221,57 @@ span { style { caps } }                            # text-transform: uppercase
 ```
 Shorthands: tracking, leading, indent, wb (word-break), ww (overflow-wrap), hyphens, columns, col-gap, col-count.
 Utilities: truncate, line-clamp N, balance, pretty, caps, lowercase, capitalize.
+
+## Footnotes (v0.19.0)
+Editorial-grade footnotes with auto-linking and backlinks.
+
+```nyx
+page / {
+  h1 "On Consciousness"
+  p "The hard problem[^1] is distinct from the easy problems.[^2]"
+  p "Nagel's bat[^3] argues for subjective experience."
+
+  footnotes {
+    1 "Chalmers, David (1995). Facing Up to the Problem of Consciousness."
+    2 "Cognitive functions like attention, memory, reportability."
+    3 "Nagel, Thomas (1974). What Is It Like to Be a Bat?"
+  }
+}
+```
+
+- `[^N]` in any text content becomes a superscript link to `#fn-N`
+- The `footnotes {}` block renders as `<aside role="doc-endnotes">` with an ordered list + backlinks
+- Default styles auto-injected (thin top border, decimal numbering, subtle backlinks)
+- IDs can be numeric (`1`) or named (`note-a`, `intro`)
+
+## Inline SVG (v0.19.0)
+SVG elements are first-class — 33 tags supported. Attribute case is preserved (`viewBox`, `stroke-width`, `text-anchor` etc.).
+
+```nyx
+svg viewBox="0 0 400 400" width="400" height="400" {
+  defs {
+    linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%" {
+      stop offset="0%" stop-color="#00e5ff" { }
+      stop offset="100%" stop-color="#c084fc" { }
+    }
+  }
+  circle cx="200" cy="200" r="150" fill="url(#grad1)" { }
+  path d="M100,200 Q200,50 300,200" stroke="#00ff41" stroke-width="3" fill="none" { }
+  g {
+    ellipse cx="150" cy="180" rx="25" ry="30" fill="white" { }
+    ellipse cx="250" cy="180" rx="25" ry="30" fill="white" { }
+  }
+  text "NYX" x="200" y="350" text-anchor="middle" fill="#00ff41" font-size="32"
+}
+```
+
+Supported tags:
+- **Shapes**: svg, g, path, circle, ellipse, rect, line, polyline, polygon
+- **Paint**: defs, linearGradient, radialGradient, stop, pattern, mask, clipPath
+- **Filters**: filter, feGaussianBlur, feColorMatrix, feBlend, feOffset, feMerge, feMergeNode, feFlood, feComposite, feMorphology, feTurbulence, feDisplacementMap
+- **Text**: text, tspan, textPath
+- **Structure**: use, symbol, marker, foreignObject, image, title, desc, switch
+- **Animation**: animate, animateTransform, animateMotion, set, mpath
 
 ## `@keyframes` in `style {}` Blocks (v0.18.1)
 Keyframes support full shorthand expansion and theme resolution, just like regular style properties.

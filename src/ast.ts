@@ -18,7 +18,7 @@ export interface Program extends BaseNode {
   body: TopLevelNode[];
 }
 
-export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode | ConfigNode | HookNode | MiddlewareNode
+export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode | ConfigNode | HookNode | MiddlewareNode | FootnotesStatement
   | PresetNode | HeadStatement;
 
 /** `page /path { ... }` */
@@ -114,12 +114,19 @@ export type Statement =
   | HeadStatement
   | AnimateStatement
   | PresetNode
-  | ScriptStatement;
+  | ScriptStatement
+  | FootnotesStatement;
 
 /** `head { ... }` — inject into <head>: fonts, meta, raw CSS */
 export interface HeadStatement extends BaseNode {
   type: 'Head';
   content: string; // Raw HTML to inject into <head>
+}
+
+/** `footnotes { 1 "..." 2 "..." }` — editorial footnote section. References use `[^N]` in text. */
+export interface FootnotesStatement extends BaseNode {
+  type: 'Footnotes';
+  entries: Array<{ id: string; content: string }>;
 }
 
 /** `animate name { from { ... } to { ... } }` — @keyframes */
@@ -199,6 +206,9 @@ export interface CssRule {
   /** If present, this is an @keyframes rule with step-based properties (supports shorthand expansion). */
   keyframeName?: string;
   keyframeSteps?: Array<{ selector: string; properties: StyleProperty[] }>;
+  /** If present, this is an at-rule wrapper (e.g. @media, @supports, @container) that contains
+   *  regular style properties which should go through full shorthand/theme resolution. */
+  atRulePrelude?: string;  // e.g. "@media (min-width: 800px)" — written verbatim before the `{`
 }
 
 /** `form /api/path auth { ... success -> reload }` */

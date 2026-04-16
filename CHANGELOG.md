@@ -1,3 +1,78 @@
+## v0.19.0 — "Editorial & Media" (2026-04-16)
+
+### Features
+
+#### Native `@media` / `@supports` queries in `style {}` blocks (#72, #73)
+Full support for CSS media queries and feature queries, with combinators and shorthand expansion.
+
+```nyx
+style {
+  fs 2rem
+  @mobile { fs 1rem }                                  # built-in breakpoint (still works)
+  @media(min-width: 800px) { fs 2.5rem }               # NEW: custom min-width
+  @media(min-width: 800px) and (max-width: 1199px) { bg #f0f0f0 }  # NEW: combinators
+  @supports(backdrop-filter: blur(10px)) { bdf blur(10px) }         # NEW: @supports
+}
+```
+
+- Shorthands resolved inside at-rule bodies (→ proper CSS property names)
+- Theme values resolved (→ CSS var references)
+- Multi-property steps via comma: `{ fs 3rem, c red }`
+- Existing `@mobile` / `@tablet` / `@desktop` keywords still work
+- `@container` queries also upgraded to structured parsing (was previously raw)
+
+#### Native footnote syntax (#68)
+Editorial-grade footnotes with automatic linking and backlinks.
+
+```nyx
+p "Claim.[^1] Another claim.[^2]"
+footnotes {
+  1 "Chalmers, David (1995). Facing Up to the Problem of Consciousness."
+  2 "Nagel, Thomas (1974). What Is It Like to Be a Bat?"
+}
+```
+
+- `[^N]` in text → `<sup><a href="#fn-N">[N]</a></sup>` (auto-escaped, no explicit markup needed)
+- `footnotes {}` block → `<aside role="doc-endnotes"><ol>...</ol></aside>` with backlinks (↩)
+- Accepts numeric or named IDs (`1`, `note-a`, `intro`)
+- Default CSS injected once per page (thin top border, smaller text, subtle backlinks)
+- Built for editorial/research/documentation sites (mindsmatter.now was the trigger)
+
+#### Inline SVG elements (#62)
+33 SVG tags are now first-class, including gradients, animations, filters, and text.
+
+```nyx
+svg viewBox="0 0 400 400" width="400" {
+  defs {
+    linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%" {
+      stop offset="0%" stop-color="#00e5ff" { }
+      stop offset="100%" stop-color="#c084fc" { }
+    }
+  }
+  circle cx="200" cy="200" r="150" fill="url(#grad1)" { }
+  path d="M100,200 Q200,50 300,200" stroke="#00ff41" stroke-width="3" fill="none" { }
+  g { ellipse cx="150" cy="180" rx="25" ry="30" fill="white" { } }
+  text "NYX" x="200" y="350" text-anchor="middle" fill="#00ff41"
+}
+```
+
+Supported SVG tags:
+- **Shapes**: `svg`, `g`, `path`, `circle`, `ellipse`, `rect`, `line`, `polyline`, `polygon`
+- **Gradients & paint**: `defs`, `linearGradient`, `radialGradient`, `stop`, `pattern`, `mask`, `clipPath`
+- **Filters**: `filter`, `feGaussianBlur`, `feColorMatrix`, `feBlend`, `feOffset`, `feMerge`, `feMergeNode`, `feFlood`, `feComposite`, `feMorphology`, `feTurbulence`, `feDisplacementMap`
+- **Structure**: `use`, `symbol`, `marker`, `foreignObject`, `image`, `title`, `desc`, `switch`
+- **Animation**: `animate`, `animateTransform`, `animateMotion`, `set`, `mpath`
+- **Text**: `text`, `tspan`, `textPath`
+
+Attribute case is preserved (`viewBox`, `stroke-width`, `text-anchor`, `preserveAspectRatio` all work). Inside `<svg>`, the `text` tag correctly stays as SVG text instead of being remapped to HTML `<span>`.
+
+### Contributors
+- Kiro-Rudel 🐺 (#72/#73, #68 — discovered while building mindsmatter.now)
+- Fabian 🐻 (#62)
+- Nyx 🦞 (implementation)
+
+---
+
 ## v0.18.2 — "Phantom No More" (2026-04-16)
 
 ### Features

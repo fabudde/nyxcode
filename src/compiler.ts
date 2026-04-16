@@ -71,6 +71,8 @@ export class Compiler {
   private presets: Map<string, string> = new Map(); // preset name → CSS class name
   private scripts: string[] = [];
   private animations: string[] = [];
+  private footnotesStyleInjected: boolean = false;
+  private svgDepth: number = 0;  // Tracks nesting inside <svg> so SVG-specific tags (text, title) aren't remapped to HTML (#62)
   private styleCache: Map<string, string> = new Map(); // hash -> className for dedup
   private staticMode: boolean = false; // When true, don't emit data-navigate on links
   private layout: LayoutNode | null = null; // Layout wrapping all pages
@@ -602,13 +604,45 @@ export class Compiler {
       case 'Computed': return this.compileComputed(stmt as ComputedStatement);
       case 'Head': this.headInjections.push((stmt as HeadStatement).content); return '';
       case 'Animate': this.animations.push(`@keyframes ${(stmt as AnimateStatement).name} { ${(stmt as AnimateStatement).content} }`); return '';
+      case 'Footnotes': return this.compileFootnotes(stmt as any);
       default: return '';
     }
+  }
+
+  /** Render `footnotes { 1 "..." }` block to an <ol> with backlinks. (#68) */
+  private compileFootnotes(stmt: { entries: Array<{ id: string; content: string }> }): string {
+    if (!stmt.entries.length) return '';
+    // Register scoped CSS for footnote styling once
+    if (!this.footnotesStyleInjected) {
+      this.css.push(`.nyx-footnotes{margin-top:3rem;padding-top:1.5rem;border-top:1px solid currentColor;font-size:0.875rem;opacity:0.85}
+.nyx-footnotes ol{list-style:decimal;padding-left:1.5rem}
+.nyx-footnotes li{margin-bottom:0.5rem}
+.nyx-footnotes a.nyx-fnback{margin-left:0.4em;text-decoration:none;opacity:0.6}
+.nyx-footnotes a.nyx-fnback:hover{opacity:1}
+.nyx-fnref a{text-decoration:none}`);
+      this.footnotesStyleInjected = true;
+    }
+    const items = stmt.entries.map(e => {
+      const content = this.escapeContent(e.content);
+      return `<li id="fn-${e.id}">${content} <a href="#fnref-${e.id}" class="nyx-fnback" aria-label="Back to reference">↩</a></li>`;
+    }).join('\n');
+    return `<aside class="nyx-footnotes" role="doc-endnotes"><ol>${items}</ol></aside>`;
   }
 
   // --- Element compilation ---
 
   private compileElement(el: ElementNode): string {
+    // Track SVG nesting so 'text', 'title', 'filter' etc. inside SVG don't get HTML-remapped (#62)
+    const enteringSvg = el.tag === 'svg';
+    if (enteringSvg) this.svgDepth++;
+    try {
+      return this._compileElementBody(el);
+    } finally {
+      if (enteringSvg) this.svgDepth--;
+    }
+  }
+
+  private _compileElementBody(el: ElementNode): string {
     // In layout mode: replace slot with page content at ANY depth
     if (el.tag === 'slot' && this.layoutSlotContent !== null) {
       return this.layoutSlotContent;
@@ -836,13 +870,15 @@ export class Compiler {
       }
     }
 
-    // CSS Rules: .class { props }, tag { props }, @keyframes (structured)
+    // CSS Rules: .class { props }, tag { props }, @keyframes (structured), @media/@container/@supports (structured)
     if (style.cssRules) {
       for (const rule of style.cssRules) {
         if (rule.selector === '__raw__') {
           cssBlock += rule.properties[0].value + '\n';
         } else if (rule.selector === '__keyframes__' && rule.keyframeName && rule.keyframeSteps) {
           cssBlock += this.buildKeyframesCSS(rule.keyframeName, rule.keyframeSteps);
+        } else if (rule.selector === '__atrule__' && rule.atRulePrelude) {
+          cssBlock += this.buildAtRuleCSS(rule.atRulePrelude, rule.properties, `.${className}`);
         } else {
           const selfElements = ['body', 'html'];
           const isSelf = rule.selector.startsWith(':') || rule.selector.startsWith('>') || rule.selector.startsWith('~') || rule.selector.startsWith('+') || selfElements.includes(rule.selector);
@@ -857,6 +893,24 @@ export class Compiler {
     }
 
     this.css.push(cssBlock);
+  }
+
+  /** Build `@media/@container/@supports PRELUDE { SELECTOR { props } }` with shorthand + theme resolution. */
+  private buildAtRuleCSS(prelude: string, properties: StyleProperty[], innerSelector: string): string {
+    let css = `${prelude} {\n  ${innerSelector} {\n`;
+    for (const prop of properties) {
+      const expanded = this.expandUtility(prop.name, prop.value);
+      if (expanded) {
+        for (const e of expanded) {
+          css += `    ${e.name}: ${e.value};\n`;
+        }
+      } else {
+        const cp = this.mapCSSProperty(prop.name);
+        css += `    ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+      }
+    }
+    css += `  }\n}\n`;
+    return css;
   }
 
   /** Build `@keyframes NAME { 0% { ... } 50% { ... } }` CSS with shorthand + theme resolution. */
@@ -1442,6 +1496,8 @@ export class Compiler {
           cssBlock += rule.properties[0].value + '\n';
         } else if (rule.selector === '__keyframes__' && rule.keyframeName && rule.keyframeSteps) {
           cssBlock += this.buildKeyframesCSS(rule.keyframeName, rule.keyframeSteps);
+        } else if (rule.selector === '__atrule__' && rule.atRulePrelude) {
+          cssBlock += this.buildAtRuleCSS(rule.atRulePrelude, rule.properties, `.${scopeClass}`);
         } else {
           const selfElems = ['body', 'html'];
           const isSelfScope = rule.selector.startsWith(':') || rule.selector.startsWith('>') || rule.selector.startsWith('~') || rule.selector.startsWith('+') || selfElems.includes(rule.selector);
@@ -2242,6 +2298,8 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
   // --- Helpers ---
 
   private mapTag(tag: string): string {
+    // Inside SVG, 'text' must stay as <text> not become <span>.
+    if (this.svgDepth > 0 && tag === 'text') return 'text';
     const mapping: Record<string, string> = {
       'row': 'div',
       'col': 'div',
@@ -2677,10 +2735,15 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
     // Replace __version__ with actual NyxCode version
     let result = str.replace(/__version__/g, NYXCODE_VERSION);
     // For text content between tags, quotes don't need escaping
-    return result
+    result = result
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+    // Footnote references: [^1] → <sup><a href="#fn-1" id="fnref-1">[1]</a></sup> (#68)
+    result = result.replace(/\[\^(\w+)\]/g, (_m, id) => {
+      return `<sup class="nyx-fnref"><a href="#fn-${id}" id="fnref-${id}">[${id}]</a></sup>`;
+    });
+    return result;
   }
 
   private isVoidElement(tag: string): boolean {

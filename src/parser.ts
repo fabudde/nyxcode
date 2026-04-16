@@ -37,6 +37,14 @@ const ELEMENT_TAGS = new Set([
   'div', 'row', 'col', 'grid', 'stack', 'container', 'section', 'aside', 'nav', 'footer', 'header', 'main', 'article', 'figure', 'figcaption', 'ul', 'ol', 'li', 'a', 'label', 'form', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'blockquote', 'pre', 'code', 'strong', 'em', 'small', 'sup', 'sub', 'details', 'summary',
   'canvas',
   'slot', 'submit', 'br', 'hr',
+  // SVG elements (#62)
+  'svg', 'g', 'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon',
+  'defs', 'use', 'symbol', 'marker', 'mask', 'clipPath',
+  'linearGradient', 'radialGradient', 'stop',
+  'filter', 'feGaussianBlur', 'feColorMatrix', 'feBlend', 'feOffset', 'feMerge', 'feMergeNode', 'feFlood', 'feComposite', 'feMorphology', 'feTurbulence', 'feDisplacementMap',
+  'pattern', 'image', 'foreignObject', 'title', 'desc',
+  'animate', 'animateTransform', 'animateMotion', 'set', 'mpath',
+  'tspan', 'textPath', 'switch',
 ]);
 
 const CSS_SHORTHANDS = new Set([
@@ -106,6 +114,7 @@ export class Parser {
       case TokenType.Identifier:
         if (token.value === 'middleware') return this.parseMiddleware();
         if (token.value === 'meta') return this.parseMeta() as any;
+        if (token.value === 'footnotes') return this.parseFootnotes() as any;
         throw this.error(`Unexpected identifier '${token.value}' at top level.`);
       case TokenType.EOF: return null;
       default:
@@ -577,6 +586,34 @@ export class Parser {
     return { type: 'Head', content, line: start.line, col: start.col };
   }
 
+  /**
+   * Parse `footnotes { 1 "Source text" 2 "Another source" }` — editorial footnote block (#68).
+   * References in text use `[^N]` syntax (handled in compiler's escapeContent).
+   */
+  private parseFootnotes(): import('./ast').FootnotesStatement {
+    const start = this.consume(TokenType.Identifier); // 'footnotes'
+    this.consume(TokenType.LeftBrace);
+
+    const entries: Array<{ id: string; content: string }> = [];
+
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      // Accept either a number (1, 2, 3) or an identifier (note-a, intro, etc.) as the id
+      const idTok = this.advance();
+      if (idTok.type === TokenType.Identifier || idTok.type === TokenType.Number || idTok.type === TokenType.String) {
+        const id = String(idTok.value);
+        // Followed by a string literal as the content
+        if (!this.check(TokenType.String)) {
+          throw this.error(`Expected string content after footnote id '${id}'`);
+        }
+        const content = this.advance().value;
+        entries.push({ id, content });
+      }
+    }
+    this.consume(TokenType.RightBrace);
+
+    return { type: 'Footnotes', entries, line: start.line, col: start.col };
+  }
+
   /** Compile meta entries to <head> HTML. Escapes attribute values. */
   private buildMetaHtml(entries: Array<{ key: string; value: string }>): string {
     const esc = (s: string) =>
@@ -695,6 +732,10 @@ export class Parser {
         // Meta block: meta { title "..."; description "..."; og:image "..." }
         if (this.peek().value === 'meta' && this.peekAt(1)?.type === TokenType.LeftBrace) {
           return this.parseMeta();
+        }
+        // Footnotes block: footnotes { 1 "source" 2 "source" }
+        if (this.peek().value === 'footnotes' && this.peekAt(1)?.type === TokenType.LeftBrace) {
+          return this.parseFootnotes();
         }
         // Lifecycle hooks: onMount { }, onDestroy { }
         if ((this.peek().value === 'onMount' || this.peek().value === 'onDestroy') && this.peekAt(1)?.type === TokenType.LeftBrace) {
@@ -951,7 +992,7 @@ export class Parser {
     const PSEUDO_CLASSES = new Set(['hover', 'focus', 'active']);
     const EXTENDED_PSEUDO_CLASSES = new Set(['first-child', 'last-child', 'nth-child', 'nth-of-type', 'disabled', 'enabled', 'checked', 'required', 'optional', 'focus-within', 'focus-visible', 'visited', 'empty', 'first-of-type', 'last-of-type', 'only-child', 'not', 'placeholder', 'placeholder-shown']);
     const PSEUDO_ELEMENTS = new Set(['before', 'after']);
-    const cssRules: Array<{selector: string, properties: StyleProperty[], keyframeName?: string, keyframeSteps?: Array<{selector: string, properties: StyleProperty[]}>}> = [];
+    const cssRules: Array<{selector: string, properties: StyleProperty[], keyframeName?: string, keyframeSteps?: Array<{selector: string, properties: StyleProperty[]}>, atRulePrelude?: string}> = [];
 
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       // CSS selector rule: .class { }, ::pseudo { }, tag { }
@@ -1010,32 +1051,47 @@ export class Parser {
             keyframeName: animName,
             keyframeSteps: steps,
           });
-        } else if (this.pos + 1 < this.tokens.length && this.tokens[this.pos + 1].value === 'container') {
-          // Container query: @container(min-width: 400px) { ... }
+        } else if (this.pos + 1 < this.tokens.length && (this.tokens[this.pos + 1].value === 'container' || this.tokens[this.pos + 1].value === 'media' || this.tokens[this.pos + 1].value === 'supports')) {
+          // Structured at-rule: @container(...), @media(...), @supports(...)
+          // All wrap regular style properties — shorthands + theme colors get resolved.
           this.advance(); // @
-          let cq = '@' + this.advance().value; // 'container'
-          // Optionally a name before the parenthesis
-          if (this.check(TokenType.Identifier)) cq += ' ' + this.advance().value;
-          if (this.check(TokenType.LeftParen)) {
-            cq += '(';
-            this.advance();
-            while (!this.check(TokenType.RightParen) && !this.isAtEnd()) {
-              const t = this.advance();
-              if (t.type === TokenType.Colon) cq += ': ';
-              else cq += (cq.endsWith('(') ? '' : ' ') + t.value;
+          let prelude = '@' + this.advance().value; // 'container' | 'media' | 'supports'
+          // Optionally a name before the parenthesis (@container foo(min-width: 400px))
+          if (this.check(TokenType.Identifier) && !this.check(TokenType.LeftParen)) {
+            prelude += ' ' + this.advance().value;
+          }
+          // Parse any number of space-separated parenthetical conditions + combinators (and, or, not)
+          while (this.check(TokenType.LeftParen) || (this.check(TokenType.Identifier) && ['and', 'or', 'not'].includes(this.peek().value))) {
+            if (this.check(TokenType.Identifier)) {
+              prelude += ' ' + this.advance().value;
+              continue;
             }
-            this.advance(); // )
-            cq += ')';
+            // Parenthesis group: (min-width: 800px) or (max-width: 1200px) etc.
+            prelude += ' (';
+            this.advance(); // (
+            let depth = 1;
+            let first = true;
+            while (depth > 0 && !this.isAtEnd()) {
+              const t = this.peek();
+              if (t.type === TokenType.LeftParen) { depth++; prelude += '('; this.advance(); first = true; continue; }
+              if (t.type === TokenType.RightParen) { depth--; this.advance(); if (depth === 0) break; prelude += ')'; continue; }
+              if (t.type === TokenType.Colon) { prelude += ': '; this.advance(); first = true; continue; }
+              prelude += (first ? '' : ' ') + this.advance().value;
+              first = false;
+            }
+            prelude += ')';
           }
           this.consume(TokenType.LeftBrace);
-          let cqBlock = cq + ' {\n';
+          const atProps: StyleProperty[] = [];
           while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-            const p = this.parseStyleProperty();
-            cqBlock += '  ' + p.name + ': ' + p.value + ';\n';
+            atProps.push(this.parseStyleProperty());
           }
           this.consume(TokenType.RightBrace);
-          cqBlock += '}';
-          cssRules.push({ selector: '__raw__', properties: [{ name: '__raw__', value: cqBlock }] });
+          cssRules.push({
+            selector: '__atrule__',
+            properties: atProps,
+            atRulePrelude: prelude,
+          });
         } else {
           // Responsive block: @mobile { ... }
           this.advance(); // @
@@ -2313,6 +2369,8 @@ private parseElement(): ElementNode {
       t.type === TokenType.State || t.type === TokenType.Effect ||
       t.type === TokenType.Computed || t.type === TokenType.Head ||
       t.type === TokenType.Animate ||
+      (t.type === TokenType.Identifier && t.value === 'footnotes' && this.peekAt(1)?.type === TokenType.LeftBrace) ||
+      (t.type === TokenType.Identifier && t.value === 'meta' && this.peekAt(1)?.type === TokenType.LeftBrace) ||
       (t.type === TokenType.Identifier && ELEMENT_TAGS.has(t.value)) ||
       // Uppercase identifiers are component invocations (e.g., Card, Header)
       (t.type === TokenType.Identifier && t.value[0] >= 'A' && t.value[0] <= 'Z');
