@@ -1,3 +1,36 @@
+## v0.21.3 — "Write Where I Told You" (2026-04-16)
+
+Short, late-night fix. Found this while testing `preset` behavior — noticed
+that `nyx build hello.nyx -o /tmp/out/page.html` silently dropped the flag
+and wrote to `./dist-site/index.html` instead. Two latent bugs, one patch.
+
+### Fixes
+
+- **#82 — `nyx build` now honors `-o` / `--output`, and defaults output
+  next to the input file.** Two separate problems:
+
+  1. **Flag was never implemented.** `-o path/to/file.html`,
+     `--output path/`, and `--output=path/` are all parsed now. A
+     `.html` path produces single-file output; anything else is treated
+     as a directory. Passing `-o file.html` against a multi-page
+     project now errors out instead of silently discarding pages.
+
+  2. **Default output was CWD-relative.** The old code did
+     `resolve('dist-site')`, so running `nyx build /a/b/site.nyx` from
+     `/tmp` dumped the build in `/tmp/dist-site/`. The new default is
+     `<input-file-dir>/dist-site/` — sibling of the input file, like
+     every other build tool.
+
+  The fix is mirrored in `nyx watch`, which had the same hard-coded
+  default.
+
+### Docs
+
+- `nyx --help` now lists the `-o <path>` option and gives two
+  copy-paste examples (single-file and directory forms).
+
+---
+
 ## v0.21.2 — "Version, Plural" (2026-04-16)
 
 Dogfooding-triggered patch: Kiro 🐺 was writing a site-wide footer in
