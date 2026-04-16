@@ -303,14 +303,29 @@ The row that matters in 2026 is **AI tokens**: 94.5% fewer tokens means cheaper 
 ## CLI
 
 ```bash
-nyx build page.nyx              # Compile → dist-site/
-nyx dev page.nyx                # Dev server with live reload
-nyx dev page.nyx --port=8080    # Custom port
-nyx watch page.nyx              # Watch mode (tracks imports)
-nyx flatten app.nyx > flat.nyx  # Multi-file → single .nyx
-nyx parse page.nyx              # Output AST as JSON
-nyx tokens page.nyx             # Show token stream
+nyx build page.nyx                       # → <input-dir>/dist-site/index.html
+nyx build page.nyx -o build/index.html   # single-file output
+nyx build page.nyx -o public/            # custom directory
+nyx build page.nyx --output=public/      # equals-form also works
+nyx dev page.nyx                         # Dev server with live reload
+nyx dev page.nyx --port=8080             # Custom port
+nyx watch page.nyx                       # Watch mode (tracks imports)
+nyx watch page.nyx -o build/             # watch → custom dir
+nyx flatten app.nyx > flat.nyx           # Multi-file → single .nyx
+nyx parse page.nyx                       # Output AST as JSON
+nyx tokens page.nyx                      # Show token stream
 ```
+
+### Output path (`-o` / `--output`)
+
+Since **v0.21.3**, `build` and `watch` accept `-o <path>` / `--output <path>`:
+
+- **File path ending in `.html`** → single-file output at that exact path.
+  Errors out if the project has multiple `page` blocks — use a directory instead.
+- **Any other path** → treated as an output directory. Multi-page projects
+  get one `index.html` per route (`/about` → `<dir>/about/index.html`).
+- **No flag** → defaults to `<input-file-dir>/dist-site/` (sibling of the
+  input file), not the current working directory.
 
 `nyxcode` works as an alias for `nyx` — both commands are identical.
 

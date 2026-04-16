@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.21.0)
+# NYXCODE.md — AI Context File (v0.21.3)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -7,13 +7,20 @@ A token-efficient language replacing TypeScript/Next.js. One `.nyx` file = full-
 ## Quick Start
 ```bash
 npm i -g @fabudde/nyxcode
-nyx build app.nyx              # Compile to dist-site/
+nyx build app.nyx              # → <input-dir>/dist-site/index.html
+nyx build app.nyx -o build.html  # single-file output
+nyx build app.nyx -o public/   # custom directory
 nyx dev app.nyx                # Dev server + hot reload
 nyx parse app.nyx              # Debug AST output
 nyx flatten app.nyx > flat.nyx # Multi-file → single file
 ```
 
 The CLI is available as `nyx` (preferred) or `nyxcode` (alias). Both work identically.
+
+**Output path rules (v0.21.3):**
+- `-o path/to/file.html` → single-file output (errors on multi-page projects)
+- `-o path/to/dir/` → directory output (one `index.html` per route)
+- No flag → defaults to `<input-file-dir>/dist-site/`, NOT the current working dir
 
 
 ## Comments
