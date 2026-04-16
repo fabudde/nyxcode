@@ -12,12 +12,18 @@ One `.nyx` file → full-stack app with database, auth & API. 68% fewer tokens t
 ## Install
 
 ```bash
-npm install @fabudde/nyxcode
+# Global install (recommended — gives you the `nyx` command)
+npm install -g @fabudde/nyxcode
 
-# or run directly:
+nyx build app.nyx
+nyx dev app.nyx              # Dev server + hot reload
+nyx flatten app.nyx > flat.nyx
+
+# Or run without installing:
 npx @fabudde/nyxcode build app.nyx
-npx @fabudde/nyxcode dev app.nyx       # Dev server + hot reload
 ```
+
+The CLI is available as `nyx` (preferred) or `nyxcode` (alias) — both work identically.
 
 ## Why NyxCode?
 
@@ -197,7 +203,7 @@ head "<style>.custom { animation: spin 1s infinite; }</style>"
 One `.nyx` → multiple HTML files. Each page = standalone with SEO tags.
 
 ```bash
-npx @fabudde/nyxcode build docs.nyx
+nyx build docs.nyx
 # ✅ Built: 12 pages to dist-site/
 ```
 
@@ -234,12 +240,16 @@ No JS router on static sites. Plain `<a href>`. Zero JavaScript.
 ## CLI
 
 ```bash
-npx @fabudde/nyxcode build page.nyx           # Compile to HTML (+ server.js if full-stack)
-npx @fabudde/nyxcode dev page.nyx             # Dev server + hot reload
-npx @fabudde/nyxcode dev page.nyx --port=8080 # Custom port
-npx @fabudde/nyxcode parse page.nyx           # Output AST as JSON
-npx @fabudde/nyxcode tokens page.nyx          # Show token stream
+nyx build page.nyx              # Compile to HTML (+ server.js if full-stack)
+nyx dev page.nyx                # Dev server + hot reload
+nyx dev page.nyx --port=8080    # Custom port
+nyx watch page.nyx              # Watch mode (rebuild on change, tracks imports)
+nyx flatten app.nyx > flat.nyx  # Multi-file → single .nyx source
+nyx parse page.nyx              # Output AST as JSON
+nyx tokens page.nyx             # Show token stream
 ```
+
+`nyxcode` is available as an alias — both commands work identically. Use whichever you prefer.
 
 ## AI Integration
 

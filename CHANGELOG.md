@@ -24,12 +24,12 @@ meta {
 - **All top-level nodes merge**: pages, components, themes, layouts, stores, APIs, tables, meta — everything from imported files ends up in the final AST
 - **Component instantiation is unchanged**: `use nav(current="home")` inside page bodies still works identically
 
-#### `nyxcode flatten` command
+#### `nyx flatten` command
 
 For AI context windows, audits, or shipping a single-file artifact:
 
 ```bash
-nyxcode flatten app.nyx > out.nyx
+nyx flatten app.nyx > out.nyx
 ```
 
 - Concatenates entry + all transitive imports into one `.nyx` source

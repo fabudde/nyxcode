@@ -7,10 +7,13 @@ A token-efficient language replacing TypeScript/Next.js. One `.nyx` file = full-
 ## Quick Start
 ```bash
 npm i -g @fabudde/nyxcode
-nyxcode build app.nyx          # Compile to dist-site/
-nyxcode dev app.nyx            # Dev server + hot reload
-nyxcode parse app.nyx          # Debug AST output
+nyx build app.nyx              # Compile to dist-site/
+nyx dev app.nyx                # Dev server + hot reload
+nyx parse app.nyx              # Debug AST output
+nyx flatten app.nyx > flat.nyx # Multi-file → single file
 ```
+
+The CLI is available as `nyx` (preferred) or `nyxcode` (alias). Both work identically.
 
 
 ## Comments
@@ -751,10 +754,10 @@ myapp/
     about.nyx          # page /about/ { }
 ```
 
-### `nyxcode flatten` — multi-file → single file
+### `nyx flatten` — multi-file → single file
 
 ```bash
-nyxcode flatten app.nyx > flat.nyx
+nyx flatten app.nyx > flat.nyx
 ```
 
 Concatenates everything into one `.nyx` file. Use it for AI context windows, audits, or to ship a single-file artifact.
