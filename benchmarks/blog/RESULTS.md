@@ -19,18 +19,18 @@ Both apps implement the identical feature set:
 
 ## Results
 
-| Metric | NyxCode | Next.js + Prisma + JWT | Ratio |
-|---|---:|---:|---:|
-| Source files | **1** | 19 | 19× |
-| Lines of code | **31** | 488 | 15.7× |
-| Bytes of source | **639** | 12,547 | 19.6× |
-| AI tokens (cl100k_base) | **183** | 3,350 | 18.3× |
-| Config files | **0** | 9 | — |
-| Direct dependencies | **0** | 19 (7 prod + 12 dev) | — |
-| Installed packages (transitive) | **39** | 415 | 10.6× |
-| `node_modules` size | **15 MB** | 442 MB | 29.5× |
-| Install time (warm cache) | **2 s** | 7 s | 3.5× |
-| Build time | **0.09 s** | 15 s | 167× |
+| Metric | NyxCode | Next.js + Prisma + JWT | Ratio | Reduction |
+|---|---:|---:|---:|---:|
+| Source files | **1** | 19 | 19× | 94.7% |
+| Lines of code | **31** | 488 | 15.7× | 93.6% |
+| Bytes of source | **639** | 12,547 | 19.6× | 94.9% |
+| AI tokens (cl100k_base) | **183** | 3,350 | 18.3× | **94.5%** |
+| Config files | **0** | 9 | — | 100% |
+| Direct dependencies | **0** | 19 (7 prod + 12 dev) | — | 100% |
+| Installed packages (transitive) | **39** | 415 | 10.6× | 90.6% |
+| `node_modules` size | **15 MB** | 442 MB | 29.5× | 96.6% |
+| Install time (warm cache) | **2 s** | 7 s | 3.5× | 71.4% |
+| Build time | **0.09 s** | 15 s | 167× | **99.4%** |
 
 ## Token reduction
 
