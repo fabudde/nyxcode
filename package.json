@@ -13,7 +13,7 @@
     "dist/",
     "README.md",
     "LICENSE",
-    "SPEC.md"
+    "NYXCODE.md"
   ],
   "scripts": {
     "build": "tsc",

@@ -9,7 +9,7 @@
 
 1. **Jede Funktion dokumentiert** — JSDoc, Beispiele, Edge Cases
 2. **Tests für ALLES** — Parser-Output muss deterministisch sein
-3. **Spec ist Gesetz** — Code folgt SPEC.md, nicht andersrum
+3. **NYXCODE.md ist die Referenz** — alle sprachlichen Features dort dokumentieren, sonst existieren sie nicht
 4. **Clean Commits** — keine "fix stuff" Messages, jeder Commit erklärt WARUM
 5. **Keine Shortcuts** — lieber langsamer und richtig als schnell und fragil
 6. **Error Messages sind FEATURES** — wenn `.nyx` Code falsch ist, sagt der Compiler GENAU was und wo
