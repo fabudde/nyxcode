@@ -307,12 +307,18 @@ export class Parser {
     const constraintKeywords = new Set(['required', 'unique', 'default', 'ref', 'auto', 'min', 'max', 'format', 'pattern', 'realtime', 'enum']);
 
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      // Skip optional commas between columns (supports both inline and multi-line styles).
+      // Issue #79: `table posts { title text required, body text, created auto }` previously
+      // treated the `,` as a column name because consumeIdentifier() falls through to any token.
+      while (this.check(TokenType.Comma)) this.advance();
+      if (this.check(TokenType.RightBrace) || this.isAtEnd()) break;
+
       const colName = this.consumeIdentifier();
       let colType = 'text'; // default type
       const constraints: string[] = [];
 
       // Next token should be the TYPE (text, email, number, etc.) or a table ref [tablename]
-      if (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      if (!this.check(TokenType.RightBrace) && !this.check(TokenType.Comma) && !this.isAtEnd()) {
         const next = this.peek();
         if (next.type === TokenType.LeftBracket) {
           // Foreign key reference: [tablename]
@@ -325,8 +331,8 @@ export class Parser {
         }
       }
 
-      // Rest are constraints until we hit the next column name
-      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      // Rest are constraints until we hit the next column name, comma, or end
+      while (!this.check(TokenType.RightBrace) && !this.check(TokenType.Comma) && !this.isAtEnd()) {
         const next = this.peek();
         if (next.type === TokenType.Identifier && constraintKeywords.has(next.value)) {
           const kw = this.advance().value;

@@ -277,7 +277,15 @@ export class Validator {
         });
       }
 
-      if (isComponentTag(el.tag)) {
+      // A tag is a component if either:
+      //   (a) it matches PascalCase convention (isComponentTag), OR
+      //   (b) it's declared in definedComponents or imported via extComps.
+      // Rule (b) ensures lower-case component names (e.g. `component compA`) are
+      // still recognized as components, fixing false "unused" + "unknown tag"
+      // warnings for cross-file imports (issue #78).
+      const isKnownComponent = definedComponents.has(el.tag) || extComps.has(el.tag);
+
+      if (isComponentTag(el.tag) || isKnownComponent) {
         usedComponents.add(el.tag);
         if (!definedComponents.has(el.tag) && !extComps.has(el.tag)) {
           if (importedPaths.length === 0) {
@@ -289,9 +297,7 @@ export class Validator {
             });
           }
         }
-      }
-
-      if (!isComponentTag(el.tag) && !ELEMENT_TAGS.has(el.tag) && el.tag !== 'style') {
+      } else if (!ELEMENT_TAGS.has(el.tag) && el.tag !== 'style') {
         const suggestion = findSimilarTag(el.tag);
         errors.push({
           message: 'Unknown tag "' + el.tag + '"' + (suggestion ? ' (did you mean "' + suggestion + '"?)' : ''),

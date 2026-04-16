@@ -1029,6 +1029,18 @@ security {
 ```
 Auto-generates: Register (`POST /api/auth/register`), Login (`POST /api/auth/login`), Me (`GET /api/auth/me`), JWT middleware, bcrypt hashing, rate limiting.
 
+**Auto-generated users table (v0.21.1+):** If you don't declare `table users { ... }` explicitly, NyxCode synthesizes one from the `login` rule (identity field as required+unique, password required). Declare it yourself to add extra columns like `name`, `role`, etc.
+
+```nyx
+# These two are equivalent:
+
+security { table users, login email password, token jwt }   # Auto-creates users table
+
+# Same as:
+table users { email email required unique, password text required }
+security { table users, login email password, token jwt }
+```
+
 **Protect modes (v0.12.0+):**
 | Mode | GET | POST/PUT/DELETE | Use case |
 |------|-----|-----------------|----------|

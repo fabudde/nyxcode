@@ -1,3 +1,46 @@
+## v0.21.1 — "Hosting Finds Bugs" (2026-04-16)
+
+First bugs-from-production release. While hosting the v0.21.0 benchmark
+apps at https://nyxcodeblog.heynyx.dev two real parser/compiler bugs
+surfaced that had been in the README hero example for months but nobody
+had actually compiled and run it as a real deployment.
+
+### Fixes
+
+- **#79 — Inline comma-separated table columns** now parse correctly.
+  ```nyx
+  table posts { title text required, body text, created auto }
+  ```
+  Previously commas were consumed as column names, producing garbage
+  AST and a broken `server.js` with `const { title, ,, text, , }`
+  syntax errors. Multi-line form was unaffected.
+
+- **#80 — `security { table users }` now auto-creates the users table**
+  when it isn't explicitly declared. Previously the compiler generated
+  `INSERT INTO users` and `SELECT ... FROM users` queries without a
+  matching `CREATE TABLE`, so register/login failed at runtime with
+  "no such table: users". The synthetic table uses the `login` rule to
+  pick columns (identity field + password, required + unique identity).
+  Declare a `table users { ... }` explicitly to override the defaults.
+
+- **#78 — False "unused component" warnings for imported components**
+  fixed. The validator now trusts `definedComponents`/`extComps` ahead
+  of the PascalCase heuristic, so `component compA` in one file and
+  `use compA` in another no longer trigger "defined but never used"
+  and "Unknown tag" warnings.
+
+- **#77 — Status message stderr discipline** — closed as not
+  reproducible in v0.21.0. The `flatten` command correctly emits the
+  status line via `console.error`.
+
+### Meta
+
+Two of these (#79, #80) went undiscovered for months because nobody
+had tried to host the README example as a real deployment. Unit tests
+missed them because they exercised the generated code, not the
+shipping hero path. This is now the project's reminder that
+**dogfooding finds bugs that specs can't**.
+
 ## v0.21.0 — "Modules" (2026-04-16)
 
 ### Features

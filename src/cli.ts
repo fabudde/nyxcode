@@ -490,6 +490,41 @@ try {
     const config = ast.body.find((n: any) => n.type === 'Config') as ConfigNode | undefined;
     const hooks = ast.body.filter((n: any) => n.type === 'Hook') as HookNode[];
 
+    // Issue #80: auto-inject users table when security block references one that wasn't declared.
+    // Previously the compiler generated INSERT/SELECT against `users` without a corresponding
+    // CREATE TABLE, breaking register/login at runtime. Now we synthesize a minimal user table
+    // with sensible defaults (id auto-inc + login fields + password) if the user didn't declare one.
+    if (security) {
+      const userTableName = (security.rules.find(r => r.name === 'table')?.value) || 'users';
+      if (!tables.some(t => t.name === userTableName)) {
+        const loginRule = security.rules.find(r => r.name === 'login')?.value || 'email password';
+        const loginFields = loginRule.split(/\s+/).filter(Boolean);
+        const identityField = loginFields[0] || 'email';
+        const passwordField = loginFields[loginFields.length - 1] || 'password';
+
+        const syntheticCols: any[] = [];
+        // identity field: required + unique
+        syntheticCols.push({ name: identityField, type: identityField === 'email' ? 'email' : 'text', constraints: ['required', 'unique'] });
+        // any additional login fields between identity and password
+        for (const f of loginFields.slice(1, -1)) {
+          syntheticCols.push({ name: f, type: 'text', constraints: ['required'] });
+        }
+        // password field (only add if distinct from identity)
+        if (passwordField !== identityField) {
+          syntheticCols.push({ name: passwordField, type: 'text', constraints: ['required'] });
+        }
+        const syntheticTable = {
+          type: 'Table',
+          name: userTableName,
+          columns: syntheticCols,
+          line: (security as any).line || 1,
+          col: (security as any).col || 1,
+        } as TableNode;
+        tables.unshift(syntheticTable);
+        console.error(`\x1b[90mℹ️  Auto-generating "${userTableName}" table for security block (declare it explicitly to customize).\x1b[0m`);
+      }
+    }
+
     if (tables.length > 0 || apis.length > 0) {
       // Extract protected paths from security block
       const protectedPaths = security 
