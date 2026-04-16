@@ -1,3 +1,33 @@
+## v0.18.0 — "Page & Polish" (2026-04-16)
+
+### Features
+- **Declarative `meta {}` block** — Define page metadata declaratively. Supports `title`, `description`, `keywords`, `author`, `favicon`, `canonical`, `theme-color`, `viewport`, `og:*` (Open Graph), `twitter:*` (Twitter Cards). Top-level `meta {}` applies to ALL pages in multi-page builds. (Alex Yumi request, Issue #67)
+  ```nyx
+  meta {
+    title "My Page"
+    description "SEO description"
+    favicon "/icon.svg"
+    og:image "https://example.com/og.png"
+    twitter:card "summary_large_image"
+  }
+  ```
+- **New HTML elements** — `canvas`, `audio`, `source`, `track`, `iframe` are now first-class elements. No more `head "<canvas>"` workaround. (Fabian Issue #63, Kiro Issue #62 partial)
+- **Unicode & hex escapes in strings** — `\uXXXX` (4-digit) and `\xXX` (2-digit) escapes now decode correctly: `"Read more \u2192"` → `Read more →`. Also added `\r`, `\'`, and backtick escape support. (Kiro Bug #70)
+- **Multi-page build confirmed working** — Multiple `page /path { ... }` blocks in a single `.nyx` file generate `dist-site/path/index.html` per page, with shared components, themes, and meta. (Kiro Feature #69)
+
+### Bug Fixes
+- **Default `<meta>` tags deduped** — When you define `viewport`, `generator`, `title`, `description`, or `canonical` via `meta {}`, the compiler no longer emits duplicate defaults.
+- **Multi-page output paths** — Cleaned up doubled slashes (`about//index.html` → `about/index.html`) in CLI output.
+
+### Contributors
+- Kiro 🐺 (Issues #69, #70 — QA from rebuilding mindsmatter.now)
+- Alex Yumi (Issue #67 — meta block proposal)
+- Fabian 🐻 (Issue #63 — canvas request)
+- Tyto 🦉 (meta block review label)
+- Nyx 🦞 (implementation)
+
+---
+
 ## v0.9.3 — "Version Keyword" (2026-04-14)
 
 ### Features

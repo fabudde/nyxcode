@@ -65,6 +65,7 @@ export class Compiler {
   private components: Map<string, ComponentNode> = new Map();
   private importResolver?: (path: string) => Program | null;
   private headInjections: string[] = [];
+  private globalHeadInjections: string[] = []; // From top-level `meta {}` or `head "..."` blocks — shared across all pages
   private themeVars: Map<string, string> = new Map();
   private themeColorNames: Map<string, string> = new Map(); // value name → full CSS var name (e.g. 'primary' → 'colors-primary')
   private presets: Map<string, string> = new Map(); // preset name → CSS class name
@@ -164,6 +165,13 @@ export class Compiler {
       if (node.type === 'Store') this.processStore(node as any);
     }
 
+    // Collect top-level `meta {}` (parsed as Head) nodes — apply to ALL pages
+    for (const node of program.body) {
+      if (node.type === 'Head') {
+        this.globalHeadInjections.push((node as HeadStatement).content);
+      }
+    }
+
     // If we have a layout, compile its CSS once (shared across all pages)
     // and cache the layout HTML template with <!--SLOT--> placeholder
     let layoutCssBlocks: string[] = [];
@@ -211,7 +219,7 @@ export class Compiler {
       this.computedVars = new Map();
       this.effects = [];
       this.hasReactivity = false;
-      this.headInjections = [...layoutHeadInjections]; // Start with layout head injections
+      this.headInjections = [...layoutHeadInjections, ...this.globalHeadInjections]; // Start with layout + global (top-level meta/head) injections
       this.animations = [];
       this.scripts = []; // Reset scripts per page — prevent cross-page bleed
       this.usedInteractiveElements = new Set(layoutInteractiveElements); // Start with layout elements
@@ -298,6 +306,13 @@ export class Compiler {
       if (node.type === 'Store') this.processStore(node as any);
     }
 
+    // Collect top-level `meta {}` and `head` nodes — they apply to ALL pages
+    for (const node of program.body) {
+      if (node.type === 'Head') {
+        this.globalHeadInjections.push((node as HeadStatement).content);
+      }
+    }
+
     // If we have a layout, extract head/script nodes from layout body
     // and compile layout elements to wrap page content
     if (this.layout) {
@@ -311,6 +326,12 @@ export class Compiler {
           this.compilePreset(stmt as any);
         }
       }
+    }
+
+    // Prepend global head injections (from top-level `meta {}`) before page compilation
+    // so they appear in the final <head>.
+    if (this.globalHeadInjections.length > 0) {
+      this.headInjections.push(...this.globalHeadInjections);
     }
 
     // Multi-page: compile ALL pages
@@ -465,15 +486,17 @@ export class Compiler {
     const animCSS = this.animations.length > 0 ? '\n    ' + this.animations.join('\n    ') : '';
     const elementDefaults = this.buildElementDefaults();
 
+    // Dedup defaults against user-provided meta {} tags
+    const hasViewport = /<meta[^>]+name=["']viewport["']/i.test(headExtra);
+    const hasGenerator = /<meta[^>]+name=["']generator["']/i.test(headExtra);
+    const hasTitle = headExtra.includes('<title>');
+    const hasDescription = /<meta[^>]+name=["']description["']/i.test(headExtra);
+    const hasCanonical = /<link[^>]+rel=["']canonical["']/i.test(headExtra);
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="generator" content="NyxCode v${NYXCODE_VERSION}">
-  <title>NyxCode - ${this.escapeHtml(pageTitle)}</title>
-  <meta name="description" content="NyxCode documentation - ${this.escapeHtml(pageTitle)}">
-  <link rel="canonical" href="https://nyxcode.io${pagePath}">` + headExtra + `
+  <meta charset="UTF-8">${hasViewport ? '' : '\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">'}${hasGenerator ? '' : `\n  <meta name="generator" content="NyxCode v${NYXCODE_VERSION}">`}${hasTitle ? '' : `\n  <title>NyxCode - ${this.escapeHtml(pageTitle)}</title>`}${hasDescription ? '' : `\n  <meta name="description" content="NyxCode documentation - ${this.escapeHtml(pageTitle)}">`}${hasCanonical ? '' : `\n  <link rel="canonical" href="https://nyxcode.io${pagePath}">`}` + headExtra + `
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :where(body) { font-family: system-ui, -apple-system, sans-serif; }` + animCSS + elementDefaults + `
@@ -2156,12 +2179,13 @@ export class Compiler {
     const animCSS = this.animations.length > 0 ? '\n    ' + this.animations.join('\n    ') : '';
     const elementDefaults = this.buildElementDefaults();
 
+    const hasViewport = /<meta[^>]+name=["']viewport["']/i.test(headExtra);
+    const hasGenerator = /<meta[^>]+name=["']generator["']/i.test(headExtra);
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="generator" content="NyxCode v${NYXCODE_VERSION}">
+  <meta charset="UTF-8">${hasViewport ? '' : '\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">'}${hasGenerator ? '' : `\n  <meta name="generator" content="NyxCode v${NYXCODE_VERSION}">`}
   ${headExtra.includes('<title>') ? '' : '<title>NyxCode App</title>'}${headExtra}
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2629,7 +2653,7 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
   }
 
   private isVoidElement(tag: string): boolean {
-    return ['input', 'img', 'br', 'hr', 'meta', 'link'].includes(tag);
+    return ['input', 'img', 'br', 'hr', 'meta', 'link', 'source', 'track'].includes(tag);
   }
 
   private nextId(prefix: string): string {

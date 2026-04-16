@@ -30,11 +30,12 @@ import {
 /** Set of tags that are recognized as built-in elements */
 const ELEMENT_TAGS = new Set([
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  'p', 'text', 'span', 'link', 'img', 'video',
+  'p', 'text', 'span', 'link', 'img', 'video', 'audio', 'source', 'track', 'iframe',
   'button', 'input', 'select', 'option', 'optgroup', 'checkbox', 'radio', 'toggle', 'slider', 'textarea',
   'card', 'badge', 'table', 'list', 'metric', 'chart', 'avatar', 'tag',
   'alert', 'toast', 'modal', 'tooltip', 'progress', 'spinner',
   'div', 'row', 'col', 'grid', 'stack', 'container', 'section', 'aside', 'nav', 'footer', 'header', 'main', 'article', 'figure', 'figcaption', 'ul', 'ol', 'li', 'a', 'label', 'form', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'blockquote', 'pre', 'code', 'strong', 'em', 'small', 'sup', 'sub', 'details', 'summary',
+  'canvas',
   'slot', 'submit', 'br', 'hr',
 ]);
 
@@ -104,6 +105,7 @@ export class Parser {
       case TokenType.Preset: return this.parsePreset() as any;
       case TokenType.Identifier:
         if (token.value === 'middleware') return this.parseMiddleware();
+        if (token.value === 'meta') return this.parseMeta() as any;
         throw this.error(`Unexpected identifier '${token.value}' at top level.`);
       case TokenType.EOF: return null;
       default:
@@ -531,6 +533,83 @@ export class Parser {
   }
 
   /**
+   * Parse `meta { title "..."; description "..."; og:image "..." }`
+   * Declarative page metadata — compiles to <title>, <meta>, <link> tags.
+   * Supports: title, description, keywords, author, favicon, canonical, theme-color,
+   *   viewport, robots, og:*, twitter:*
+   * Output: HeadStatement with injected HTML.
+   */
+  private parseMeta(): HeadStatement {
+    const start = this.consume(TokenType.Identifier); // 'meta'
+    this.consume(TokenType.LeftBrace);
+
+    const entries: Array<{ key: string; value: string }> = [];
+
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      // Parse key — may be "og", then ":", then "title" (reassemble)
+      if (!this.check(TokenType.Identifier)) {
+        this.advance(); // skip unknown
+        continue;
+      }
+      let key = this.advance().value;
+      // Handle og:title, twitter:card, etc.
+      while (this.check(TokenType.Colon) && this.peekAt(1)?.type === TokenType.Identifier) {
+        this.advance(); // :
+        key += ':' + this.advance().value;
+      }
+      // Handle hyphenated keys like theme-color (lexer may produce separate tokens)
+      // In NyxCode lexer, 'theme-color' is a single identifier, so no special handling needed.
+
+      // Value must be a string literal
+      if (!this.check(TokenType.String)) {
+        throw this.error(`Expected string value for meta key '${key}'.`);
+      }
+      const value = this.advance().value;
+      entries.push({ key, value });
+
+      // Optional comma or newline between entries
+      while (this.check(TokenType.Comma)) this.advance();
+    }
+
+    this.consume(TokenType.RightBrace);
+
+    const content = this.buildMetaHtml(entries);
+    return { type: 'Head', content, line: start.line, col: start.col };
+  }
+
+  /** Compile meta entries to <head> HTML. Escapes attribute values. */
+  private buildMetaHtml(entries: Array<{ key: string; value: string }>): string {
+    const esc = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const parts: string[] = [];
+    for (const { key, value } of entries) {
+      const v = esc(value);
+      if (key === 'title') {
+        parts.push(`<title>${v}</title>`);
+      } else if (key === 'favicon') {
+        // Infer type from extension
+        const ext = (value.split('.').pop() || '').toLowerCase();
+        const typeMap: Record<string, string> = {
+          'svg': 'image/svg+xml', 'png': 'image/png', 'ico': 'image/x-icon',
+          'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'webp': 'image/webp',
+        };
+        const type = typeMap[ext];
+        parts.push(`<link rel="icon"${type ? ` type="${type}"` : ''} href="${v}">`);
+      } else if (key === 'canonical') {
+        parts.push(`<link rel="canonical" href="${v}">`);
+      } else if (key.startsWith('og:')) {
+        parts.push(`<meta property="${key}" content="${v}">`);
+      } else if (key.startsWith('twitter:')) {
+        parts.push(`<meta name="${key}" content="${v}">`);
+      } else {
+        // description, keywords, author, viewport, theme-color, robots, generator, etc.
+        parts.push(`<meta name="${key}" content="${v}">`);
+      }
+    }
+    return parts.join('\n  ');
+  }
+
+  /**
    * Parse `animate name { ... }` — @keyframes definition.
    * Content between { } is raw CSS keyframe body.
    * Reconstructs proper CSS formatting from tokens.
@@ -613,6 +692,10 @@ export class Parser {
       case TokenType.Head: return this.parseHead();
       case TokenType.Animate: return this.parseAnimate();
       case TokenType.Identifier:
+        // Meta block: meta { title "..."; description "..."; og:image "..." }
+        if (this.peek().value === 'meta' && this.peekAt(1)?.type === TokenType.LeftBrace) {
+          return this.parseMeta();
+        }
         // Lifecycle hooks: onMount { }, onDestroy { }
         if ((this.peek().value === 'onMount' || this.peek().value === 'onDestroy') && this.peekAt(1)?.type === TokenType.LeftBrace) {
           const hookName = this.advance().value;

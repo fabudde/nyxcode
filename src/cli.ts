@@ -190,7 +190,7 @@ try {
         if (pagePath === '/') {
           fileDirPath = outDir;
         } else {
-          fileDirPath = resolve(outDir, pagePath.replace(/^\//, ''));
+          fileDirPath = resolve(outDir, pagePath.replace(/^\//, '').replace(/\/+$/, ''));
         }
         mkdirSync(fileDirPath, { recursive: true });
         const outFile = resolve(fileDirPath, 'index.html');
@@ -201,7 +201,7 @@ try {
       console.log(`✅ Built: ${results.length} pages to dist-site/`);
       console.log(`   Total: ${totalBytes} bytes`);
       for (const { path: pagePath } of results) {
-        const rel = pagePath === '/' ? 'index.html' : pagePath.replace(/^\//, '') + '/index.html';
+        const rel = pagePath === '/' ? 'index.html' : pagePath.replace(/^\//, '').replace(/\/+$/, '') + '/index.html';
         console.log(`   📄 ${rel}`);
       }
     }

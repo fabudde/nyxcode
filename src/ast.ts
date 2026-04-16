@@ -19,7 +19,7 @@ export interface Program extends BaseNode {
 }
 
 export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode | ConfigNode | HookNode | MiddlewareNode
-  | PresetNode;
+  | PresetNode | HeadStatement;
 
 /** `page /path { ... }` */
 export interface PageNode extends BaseNode {

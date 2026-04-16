@@ -154,8 +154,38 @@ export class Lexer {
         switch (escaped) {
           case 'n': value += '\n'; break;
           case 't': value += '\t'; break;
+          case 'r': value += '\r'; break;
+          case "'": value += "'"; break;
           case '"': value += '"'; break;
+          case '`': value += '`'; break;
           case '\\': value += '\\'; break;
+          case 'u': {
+            // \uXXXX — 4-digit unicode escape
+            let hex = '';
+            for (let i = 0; i < 4 && !this.isAtEnd() && /[0-9a-fA-F]/.test(this.peek()); i++) {
+              hex += this.advance();
+            }
+            if (hex.length === 4) {
+              value += String.fromCharCode(parseInt(hex, 16));
+            } else {
+              // Invalid escape — preserve literal
+              value += '\\u' + hex;
+            }
+            break;
+          }
+          case 'x': {
+            // \xXX — 2-digit hex escape
+            let hex = '';
+            for (let i = 0; i < 2 && !this.isAtEnd() && /[0-9a-fA-F]/.test(this.peek()); i++) {
+              hex += this.advance();
+            }
+            if (hex.length === 2) {
+              value += String.fromCharCode(parseInt(hex, 16));
+            } else {
+              value += '\\x' + hex;
+            }
+            break;
+          }
           default: value += escaped;
         }
       } else {
