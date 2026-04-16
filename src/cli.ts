@@ -308,6 +308,25 @@ const args = process.argv.slice(2);
 const command = args[0];
 const file = args[1];
 
+/**
+ * Parse --output / -o flag from args. Supports:
+ *   -o path/to/file.html       → single-file output
+ *   --output path/to/dir/      → directory output
+ *   -o=path/to/thing           → equals-form
+ * Returns the path string, or null if not present.
+ */
+function getOutputFlag(argv: string[]): string | null {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '-o' || a === '--output') {
+      return argv[i + 1] ?? null;
+    }
+    if (a.startsWith('-o=')) return a.slice(3);
+    if (a.startsWith('--output=')) return a.slice(9);
+  }
+  return null;
+}
+
 if (!command || (command !== 'dev' && !file) || (!file && command !== '--help')) {
   console.log(`
 🦞 NyxCode v${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}
@@ -316,16 +335,21 @@ Usage:
   nyx parse <file.nyx>              Parse file → AST (JSON)
   nyx flatten <file.nyx>            Flatten multi-file project to single .nyx source
   nyx tokens <file.nyx>             Tokenize file → Token list
-  nyx build <file.nyx>              Compile file → HTML output
-  nyx watch <file.nyx>              Watch file & rebuild on change
+  nyx build <file.nyx> [-o <path>]  Compile file → HTML output
+  nyx watch <file.nyx> [-o <path>]  Watch file & rebuild on change
   nyx dev <file.nyx> [--port=3000]  Dev server with live reload
 
 Examples:
   nyx parse examples/hello.nyx
   nyx build examples/hello.nyx
+  nyx build examples/hello.nyx -o build/index.html    # single-file output
+  nyx build examples/hello.nyx -o public/             # directory output
   nyx watch examples/landing.nyx
   nyx dev examples/docs.nyx
   nyx dev examples/landing.nyx --port=8080
+
+Output:
+  Without -o: defaults to <input-file-dir>/dist-site/
 `);
   process.exit(0);
 }
@@ -443,14 +467,40 @@ try {
 
     // Count pages to determine output mode
     const pages = ast.body.filter((n: any) => n.type === 'Page');
-    const outDir = resolve('dist-site');
+
+    // Resolve output path (Issue #82):
+    //  -o <file.html>   → single-file output (error if multi-page)
+    //  -o <dir>         → use as output directory
+    //  (no flag)        → default to <input-file-dir>/dist-site/ (sibling of input)
+    const outputFlag = getOutputFlag(args);
+    let outDir: string;
+    let singleFilePath: string | null = null;
+
+    if (outputFlag) {
+      const outResolved = resolve(outputFlag);
+      const looksLikeFile = extname(outputFlag).toLowerCase() === '.html';
+      if (looksLikeFile) {
+        if (pages.length > 1) {
+          console.error(`\x1b[31m❌ Cannot use -o <file.html> with a multi-page project (${pages.length} pages). Pass a directory path instead, e.g. -o ./build/\x1b[0m`);
+          process.exit(1);
+        }
+        singleFilePath = outResolved;
+        outDir = dirname(outResolved);
+      } else {
+        outDir = outResolved;
+      }
+    } else {
+      // Default: sibling of input file (not CWD)
+      outDir = resolve(dirname(filePath), 'dist-site');
+    }
 
     if (pages.length <= 1) {
       // Single page — legacy behavior: one index.html
       const output = compiler.compile(ast);
       mkdirSync(outDir, { recursive: true });
-      writeFileSync(resolve(outDir, 'index.html'), output.html);
-      console.log(`✅ Built: ${outDir}/index.html`);
+      const outFile = singleFilePath ?? resolve(outDir, 'index.html');
+      writeFileSync(outFile, output.html);
+      console.log(`✅ Built: ${outFile}`);
       console.log(`   HTML: ${output.html.length} bytes`);
       if (output.css) console.log(`   CSS:  ${output.css.length} bytes`);
       if (output.js) console.log(`   JS:   ${output.js.length} bytes`);
@@ -461,9 +511,9 @@ try {
 
       for (const { path: pagePath, html } of results) {
         // Convert route to file path:
-        //   /docs        → dist-site/docs/index.html
-        //   /docs/install → dist-site/docs/install/index.html
-        //   /            → dist-site/index.html
+        //   /docs        → <outDir>/docs/index.html
+        //   /docs/install → <outDir>/docs/install/index.html
+        //   /            → <outDir>/index.html
         let fileDirPath: string;
         if (pagePath === '/') {
           fileDirPath = outDir;
@@ -476,7 +526,7 @@ try {
         totalBytes += html.length;
       }
 
-      console.log(`✅ Built: ${results.length} pages to dist-site/`);
+      console.log(`✅ Built: ${results.length} pages to ${outDir}/`);
       console.log(`   Total: ${totalBytes} bytes`);
       for (const { path: pagePath } of results) {
         const rel = pagePath === '/' ? 'index.html' : pagePath.replace(/^\//, '').replace(/\/+$/, '') + '/index.html';
@@ -616,14 +666,36 @@ try {
         const compiler = new Compiler({ pretty: true });
 
         const pages = ast.body.filter((n: any) => n.type === 'Page');
-        const outDir = resolve('dist-site');
+
+        // Resolve output path (Issue #82) — mirrors build-command logic
+        const outputFlag = getOutputFlag(args);
+        let outDir: string;
+        let singleFilePath: string | null = null;
+        if (outputFlag) {
+          const outResolved = resolve(outputFlag);
+          const looksLikeFile = extname(outputFlag).toLowerCase() === '.html';
+          if (looksLikeFile) {
+            if (pages.length > 1) {
+              console.error(`\x1b[31m❌ Cannot use -o <file.html> with multi-page project. Use a directory.\x1b[0m`);
+              return { ok: false, pages: 0, bytes: 0, ms: performance.now() - start };
+            }
+            singleFilePath = outResolved;
+            outDir = dirname(outResolved);
+          } else {
+            outDir = outResolved;
+          }
+        } else {
+          outDir = resolve(dirname(filePath), 'dist-site');
+        }
+
         let totalBytes = 0;
         let pageCount = 0;
 
         if (pages.length <= 1) {
           const output = compiler.compile(ast);
           mkdirSync(outDir, { recursive: true });
-          writeFileSync(resolve(outDir, 'index.html'), output.html);
+          const outFile = singleFilePath ?? resolve(outDir, 'index.html');
+          writeFileSync(outFile, output.html);
           totalBytes = output.html.length;
           pageCount = 1;
         } else {
