@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.19.0)
+# NYXCODE.md — AI Context File (v0.20.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -620,9 +620,48 @@ form /api/auth/login {
 ```
 
 ## Components
+
+### Preferred syntax (v0.20.0+)
+Parameter list in parentheses, `${expr}` interpolation for everything:
+
+```nyx
+component nav(current) {
+  nav {
+    style { d flex, gap 2rem }
+    a "Home" href="/" class="${current == 'home' ? 'active' : ''}"
+    a "Docs" href="/docs/" class="${current == 'docs' ? 'active' : ''}"
+  }
+}
+
+component citation-card(num, title, claim, source, status="Unverified") {
+  div {
+    style { p 1.5rem, border "1px solid #ccc", radius 8px }
+    h3 "#${num} — ${title}"
+    p "${claim}"
+    span "${status}"
+    p "— ${source}" { style { fs 0.85rem, c #666 } }
+  }
+}
+
+page /citations/ {
+  use nav(current="citations")
+  use citation-card(1, "Hard Problem", "Subjective experience...", "Chalmers 1995", "Canonical")
+  use citation-card(num=2, title="Multiple Drafts", claim="...", source="Dennett 1991")
+}
+```
+
+- `component name(p1, p2, p3="default")` — parenthesized params, optional defaults
+- `use name(arg1, arg2, ...)` — positional args (mapped in declaration order)
+- `use name(key=val, key2=val2)` — named args
+- `use name arg=val` — attribute-form (no parens, no `use` keyword needed)
+- `${propName}` — interpolation in content AND attributes
+- `${cond ? "a" : "b"}` — ternary with `==` / `!=` comparison
+- Component names can be lowercase or uppercase
+
+### Legacy block-form syntax (still supported)
 ```nyx
 component Card {
-  props title, subtitle="Default"
+  props title subtitle="Default"
   div {
     style { bg #1a1a2e, r 12px, p 2rem }
     h3 .title
@@ -635,10 +674,11 @@ page / {
   Card title="Hello" { p "Slotted content!" }
 }
 ```
-- `props` declares accepted properties with optional defaults.
+- `props` declares accepted properties with optional defaults (space-separated).
+- Type annotations like `name: string` are parsed and ignored (NyxCode is dynamically typed).
 - `slot` renders children passed to the component.
-- `.propName` accesses prop values as content.
-- Components start with uppercase.
+- `.propName` accesses prop values as content (legacy; use `${propName}` for new code).
+- Components with no `style {}` render with NO wrapper div (v0.20.0+).
 
 ### Component Style Blocks (v0.10.0+)
 ```nyx

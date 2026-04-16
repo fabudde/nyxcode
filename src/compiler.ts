@@ -1718,8 +1718,8 @@ export class Compiler {
       }
     }
 
-    // Style dedup: reuse class if identical style already emitted
-    let scopeClass = "";
+    // Style dedup: reuse class if identical style already emitted (ONLY if component has a style{})
+    let scopeClass: string | null = null;
     const styleStmt = comp.body.find(s => s.type === "Style") as StyleBlock | undefined;
     if (styleStmt) {
       const hash = this.hashStyle(styleStmt);
@@ -1731,8 +1731,15 @@ export class Compiler {
         this.compileStyleWithClass(styleStmt, scopeClass);
         this.styleCache.set(hash, scopeClass);
       }
-    } else {
-      scopeClass = `nyx-${this.nextId("c")}`;
+    }
+
+    // Resolve positional args (__arg0, __arg1, ...) to named props
+    for (let i = 0; i < comp.props.length; i++) {
+      const posKey = `__arg${i}`;
+      if (posKey in props && !(comp.props[i].name in props)) {
+        props[comp.props[i].name] = props[posKey];
+        delete props[posKey];
+      }
     }
 
     // Compile children passed to this component (for slot substitution)
@@ -1743,9 +1750,14 @@ export class Compiler {
       }
     }
 
-    // Compile component body, substituting prop references
-    let html = `${this.ind()}<div class="${scopeClass}">\n`;
-    this.indent++;
+    // Build body HTML. Wrapper div is only emitted when scopeClass exists (style{} was present).
+    // This keeps component output clean when the component is just structural (#75).
+    const emitWrapper = scopeClass !== null;
+    let html = '';
+    if (emitWrapper) {
+      html += `${this.ind()}<div class="${scopeClass}">\n`;
+      this.indent++;
+    }
 
     for (const stmt of comp.body) {
       if (stmt.type === 'Style') continue; // Already handled
@@ -1756,6 +1768,13 @@ export class Compiler {
         }
         continue;
       }
+      // Skip accidental element named exactly as a prop type (e.g. stray 'string', 'number')
+      // This happens when the parser mis-tokenizes `props name: string` without Colon support on older versions.
+      if (stmt.type === 'Element' && (stmt as ElementNode).children.length === 0 &&
+          (stmt as ElementNode).attributes.length === 0 && !(stmt as ElementNode).content &&
+          ['string', 'number', 'bool', 'boolean'].includes((stmt as ElementNode).tag)) {
+        continue;
+      }
       if (stmt.type === 'Element') {
         html += this.compileElementWithProps(stmt as ElementNode, props, slotHtml);
       } else {
@@ -1763,8 +1782,10 @@ export class Compiler {
       }
     }
 
-    this.indent--;
-    html += `${this.ind()}</div>\n`;
+    if (emitWrapper) {
+      this.indent--;
+      html += `${this.ind()}</div>\n`;
+    }
 
     return html;
   }
@@ -1786,13 +1807,48 @@ export class Compiler {
       this.usedInteractiveElements.add(tag);
     }
 
+    // Helper: resolve `${propName}` and `${expr}` interpolation (Kiro #75)
+    // Supports simple identifiers AND ternaries like `${active == "home" ? "is-active" : ""}`
+    const interpolate = (s: string): string => {
+      return s.replace(/\$\{([^}]+)\}/g, (_, raw) => {
+        const expr = raw.trim();
+        // Simple identifier lookup
+        if (/^[a-zA-Z_][\w]*$/.test(expr)) return props[expr] ?? '';
+        // Ternary: `cond ? "a" : "b"` or `cond ? a : b`
+        const tern = expr.match(/^(.+?)\s*\?\s*(.+?)\s*:\s*(.+)$/);
+        if (tern) {
+          const [, condRaw, thenRaw, elseRaw] = tern;
+          const unwrap = (v: string) => {
+            v = v.trim();
+            if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) return v.slice(1, -1);
+            if (/^[a-zA-Z_][\w]*$/.test(v)) return props[v] ?? v;
+            return v;
+          };
+          // Evaluate cond: supports `a == "b"`, `a != "b"`, `a`
+          const eq = condRaw.match(/^(.+?)\s*(==|!=)\s*(.+)$/);
+          let result = false;
+          if (eq) {
+            const [, lhs, op, rhs] = eq;
+            const l = unwrap(lhs);
+            const r = unwrap(rhs);
+            result = op === '==' ? l === r : l !== r;
+          } else {
+            const v = unwrap(condRaw);
+            result = !!v && v !== 'false' && v !== '0';
+          }
+          return result ? unwrap(thenRaw) : unwrap(elseRaw);
+        }
+        return '';
+      });
+    };
+
     let content = '';
 
     if (el.content) {
       if (typeof el.content === 'string') {
-        content = this.escapeContent(el.content);
+        content = this.escapeContent(interpolate(el.content));
       } else if (el.content.type === 'StringLiteral') {
-        content = this.escapeContent((el.content as any).value);
+        content = this.escapeContent(interpolate((el.content as any).value));
       } else if (el.content.type === 'PropertyAccess') {
         const propName = (el.content as any).path.replace(/^\./, '');
         content = this.escapeContent(props[propName] ?? '');
@@ -1820,10 +1876,15 @@ export class Compiler {
     let filteredAttrs = el.attributes.map(a => {
       let val = a.value;
       if (typeof val === 'string') {
+        // Exact-match dot prop: attr=.propName (legacy)
         for (const [propName, propVal] of Object.entries(props)) {
           if (val === '.' + propName) {
             val = propVal;
           }
+        }
+        // Full ${expr} interpolation (Kiro #75) — shares the ternary-aware helper
+        if (typeof val === 'string') {
+          val = interpolate(val);
         }
       }
       return { name: a.name, value: val };

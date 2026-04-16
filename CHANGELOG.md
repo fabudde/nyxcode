@@ -1,3 +1,83 @@
+## v0.20.0 — "Components, Properly" (2026-04-16)
+
+### Features
+
+#### Native component syntax with positional + named arguments (#75)
+Kiro 🐺 migrated all of mindsmatter.now to a single 2,378-line `.nyx` file and discovered the "8 copies of the same nav" problem. This release fixes it.
+
+```nyx
+# Define with parenthesized parameter list (new, preferred)
+component nav(current) {
+  nav {
+    style { d flex, gap 2rem }
+    a "Home" href="/" class="${current == 'home' ? 'active' : ''}"
+    a "Manifesto" href="/manifesto/" class="${current == 'manifesto' ? 'active' : ''}"
+  }
+}
+
+component citation-card(num, title, claim, source, status) {
+  div {
+    style { p 1.5rem, border "1px solid #ccc", radius 8px }
+    h3 "#${num} — ${title}"
+    p "${claim}"
+    span "${status}"
+    p "— ${source}"
+  }
+}
+
+# Use with positional OR named arguments
+page /citations/ {
+  use nav(current="citations")
+  use citation-card(1, "Hard Problem", "Subjective experience is the crux.", "Chalmers 1995", "Canonical")
+  use citation-card(num=2, title="Multiple Drafts", claim="...", source="Dennett 1991", status="Canonical")
+}
+```
+
+- **`component name(params)` syntax** — Parenthesized parameter list, optional defaults with `=`
+- **`use name(...)` instantiation** — Positional args, named args, or mixed
+- **Legacy `component X { props ... }` block form still works** — No breaking changes
+- **Optional type annotations** — `component X { props name: string }` parses correctly now (type is ignored; NyxCode is dynamically typed)
+- **Also supports attribute-form invocation**: `use NavBar current="home"` (no parens)
+- **And the uppercase shortcut**: `NavBar current="home"` (no `use` keyword, existing behavior preserved)
+
+#### Full `${expr}` interpolation in strings and attributes
+Works inside text content AND attribute values. Supports:
+
+- **Simple identifiers**: `${propName}` → replaced with prop value
+- **Ternary expressions**: `${current == "home" ? "active" : ""}` → evaluated at compile time
+- **Comparisons**: `==` and `!=` against string/identifier
+- **Multiple per string**: `"#${num} — ${title}"` works as expected
+
+```nyx
+component card(theme, label) {
+  div class="card card-${theme}" {
+    h2 "${label}"
+    span "Mode: ${theme == 'dark' ? 'Night' : 'Day'}"
+  }
+}
+```
+
+### Bug Fixes
+
+- **Stripped stray `<string>` / `<number>` elements** — When `props name: string` appeared without proper type parsing, `string` would leak as an empty element in output. Fixed at parser level (type annotations now consumed) AND compiler level (orphan type-name elements skipped as defensive measure).
+- **Removed unconditional `<div class="nyx-c_X">` wrapper** — Components without a `style {}` block now render their body directly with no wrapper div. Only components that actually need scoped CSS get a wrapper. Huge DOM cleanup for structural components like `nav`, `footer`, `Header`.
+- **Positional args resolve to named props correctly** — `use card(1, "Title")` now maps to `{num: "1", title: "Title"}` based on component parameter declaration order.
+
+### Real-World Impact
+
+Kiro's mindsmatter.nyx refactored:
+- Before: 2,378 lines (nav copy-pasted 8x, footer 8x, citation cards 10x)
+- After: ~1,600 lines estimated (component definitions + use statements)
+- **~33% reduction**, zero functional change
+- All 8 pages build clean
+
+### Contributors
+- Kiro 🐺 (#75 — proposal, syntax design, real-world validation)
+- Fabian 🐻 (release direction: "richtig gut umgesetzt")
+- Nyx 🦞 (parser + compiler implementation)
+
+---
+
 ## v0.19.0 — "Editorial & Media" (2026-04-16)
 
 ### Features

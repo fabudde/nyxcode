@@ -108,7 +108,7 @@ export class Parser {
       case TokenType.Config: return this.parseConfig();
       case TokenType.Before: return this.parseHook('before');
       case TokenType.After: return this.parseHook('after');
-      case TokenType.Use: return this.parseUse();
+      case TokenType.Use: return this.parseUse() as any;
       case TokenType.Layout: return this.parseLayout();
       case TokenType.Preset: return this.parsePreset() as any;
       case TokenType.Identifier:
@@ -135,12 +135,36 @@ export class Parser {
   private parseComponent(): ComponentNode {
     const start = this.consume(TokenType.Component);
     const name = this.consumeIdentifier();
+
+    // NEW (v0.20.0): Support `component nav(active, theme="light")` syntax (Kiro #75)
+    // Keeps backwards-compat with `component NavBar { props ... }` block form.
+    let props: PropDef[] = [];
+    if (this.check(TokenType.LeftParen)) {
+      this.advance(); // (
+      while (!this.check(TokenType.RightParen) && !this.isAtEnd()) {
+        const pname = this.consumeIdentifier();
+        let optional = false;
+        let defaultValue: string | undefined;
+        if (this.check(TokenType.Question)) { this.advance(); optional = true; }
+        if (this.check(TokenType.Equals)) {
+          this.advance();
+          if (this.check(TokenType.String)) defaultValue = this.advance().value;
+          else if (this.check(TokenType.Number)) defaultValue = this.advance().value;
+          else defaultValue = this.advance().value;
+          optional = true;
+        }
+        props.push({ name: pname, optional, defaultValue });
+        if (this.check(TokenType.Comma)) this.advance();
+      }
+      this.consume(TokenType.RightParen);
+    }
+
     this.consume(TokenType.LeftBrace);
 
-    let props: PropDef[] = [];
+    // Legacy block-form: `component X { props name?: type = default ... }`
     if (this.check(TokenType.Props)) {
-      this.advance(); // consume 'props'
-      props = this.parseProps();
+      this.advance();
+      props = [...props, ...this.parseProps()];
     }
 
     const body = this.parseBody();
@@ -516,10 +540,60 @@ export class Parser {
     return { type: 'Security', rules, line: start.line, col: start.col };
   }
 
-  private parseUse(): UseStatement {
+  /**
+   * Parse `use "./component.nyx"` (import)
+   * OR `use componentName(arg1, arg2, key=val)` (component invocation — Kiro #75)
+   * OR `use componentName arg1="x" arg2="y"` (attribute form, also component invocation)
+   */
+  private parseUse(): UseStatement | ElementNode {
     const start = this.consume(TokenType.Use);
-    const path = this.consume(TokenType.String).value;
-    return { type: 'Use', path, line: start.line, col: start.col };
+
+    // Form 1: `use "./path.nyx"` — import
+    if (this.check(TokenType.String)) {
+      const path = this.advance().value;
+      return { type: 'Use', path, line: start.line, col: start.col };
+    }
+
+    // Form 2/3: `use componentName(...)` or `use componentName key=val`
+    const name = this.consumeIdentifier();
+    const attributes: Attribute[] = [];
+    let posIndex = 0;
+
+    if (this.check(TokenType.LeftParen)) {
+      this.advance(); // (
+      while (!this.check(TokenType.RightParen) && !this.isAtEnd()) {
+        // Each arg: either `key=value` or positional `value`
+        if (this.check(TokenType.Identifier) && this.peekAt(1)?.type === TokenType.Equals) {
+          const key = this.advance().value;
+          this.advance(); // =
+          const tok = this.advance();
+          attributes.push({ name: key, value: String(tok.value) });
+        } else {
+          const tok = this.advance();
+          attributes.push({ name: `__arg${posIndex++}`, value: String(tok.value) });
+        }
+        if (this.check(TokenType.Comma)) this.advance();
+      }
+      this.consume(TokenType.RightParen);
+    } else {
+      // Attribute form: `use Name key=val key2=val2`
+      while (this.check(TokenType.Identifier) && this.peekAt(1)?.type === TokenType.Equals) {
+        const key = this.advance().value;
+        this.advance(); // =
+        const tok = this.advance();
+        attributes.push({ name: key, value: String(tok.value) });
+      }
+    }
+
+    // Return a ComponentInvocation element — compiler will resolve it via this.components map
+    return {
+      type: 'Element',
+      tag: name,
+      attributes,
+      children: [],
+      line: start.line,
+      col: start.col,
+    } as ElementNode;
   }
 
   private parseLayout(): LayoutNode {
@@ -728,6 +802,7 @@ export class Parser {
       case TokenType.Computed: return this.parseComputed();
       case TokenType.Head: return this.parseHead();
       case TokenType.Animate: return this.parseAnimate();
+      case TokenType.Use: return this.parseUse() as any;
       case TokenType.Identifier:
         // Meta block: meta { title "..."; description "..."; og:image "..." }
         if (this.peek().value === 'meta' && this.peekAt(1)?.type === TokenType.LeftBrace) {
@@ -2236,11 +2311,19 @@ private parseElement(): ElementNode {
       const name = this.consumeIdentifier();
       let optional = this.check(TokenType.Question);
       if (optional) this.advance();
+      // Optional type annotation `: string` — consumed and ignored (NyxCode is dynamically typed)
+      if (this.check(TokenType.Colon)) {
+        this.advance(); // :
+        if (this.check(TokenType.Identifier)) this.advance(); // the type keyword (string, number, bool, etc.)
+      }
       let defaultValue: string | undefined;
-      // Check for default value: prop="value"
+      // Check for default value: prop="value" or prop=123
       if (this.check(TokenType.Equals)) {
         this.advance(); // consume =
-        defaultValue = this.consume(TokenType.String).value;
+        if (this.check(TokenType.String)) defaultValue = this.advance().value;
+        else if (this.check(TokenType.Number)) defaultValue = this.advance().value;
+        else defaultValue = this.advance().value;
+        optional = true;
       }
       props.push({ name, optional, defaultValue });
     }
