@@ -16,14 +16,288 @@
  */
 
 import * as fs from 'fs';
-import { readFileSync, writeFileSync, mkdirSync, watch as fsWatch, statSync } from 'fs';
-import { resolve, dirname, relative } from 'path';
+import { readFileSync, writeFileSync, mkdirSync, watch as fsWatch, statSync, readdirSync } from 'fs';
+import { resolve, dirname, relative, isAbsolute, join, extname, basename } from 'path';
 import { parse } from './index.js';
 import { Lexer } from './lexer.js';
 import { Parser } from './parser.js';
 import { Compiler } from './compiler.js';
 import { Validator, ValidationError } from './validator.js';
-import { Program, ComponentNode, UseStatement } from './ast.js';
+import { Program, ComponentNode, UseStatement, TopLevelNode, PageNode, LayoutNode, ThemeNode, StoreNode } from './ast.js';
+
+/**
+ * Multi-file import system (v0.21.0)
+ *
+ * `use "./path.nyx"` — single file relative import
+ * `use "./components/"` — directory import (all .nyx files, alphabetical)
+ * `use "@/shared/nav.nyx"` — @/ = project root (directory containing entry file)
+ *
+ * Security: local-only. No URLs, no absolute outside-project paths.
+ * Imports are merged at AST level. Circular imports skipped via visited Set.
+ * Duplicate definitions (pages, themes, components, layouts, stores) throw build errors.
+ */
+
+interface ImportResolveResult {
+  ast: Program;
+  sourceFiles: string[]; // absolute paths of every file touched (for watch mode)
+  errors: string[];
+}
+
+function resolveAllImports(entryPath: string): ImportResolveResult {
+  const entryAbs = resolve(entryPath);
+  const projectRoot = dirname(entryAbs);
+  const visited = new Set<string>();
+  const sourceFiles: string[] = [];
+  const errors: string[] = [];
+
+  // Global registries to detect duplicates during merge
+  const seenPages = new Map<string, string>();           // route -> file
+  const seenComponents = new Map<string, string>();      // name  -> file
+  const seenLayoutFile: { value: string | null } = { value: null };
+  const seenThemeFile: { value: string | null } = { value: null };
+  const mergedBody: TopLevelNode[] = [];
+
+  function resolveImportPath(rawPath: string, fromFile: string): string | null {
+    // Reject remote URLs
+    if (/^(https?:|ftp:|file:|\/\/)/i.test(rawPath)) {
+      errors.push(`[${relative(process.cwd(), fromFile)}] remote imports are not allowed: "${rawPath}"`);
+      return null;
+    }
+    let resolved: string;
+    if (rawPath.startsWith('@/')) {
+      resolved = resolve(projectRoot, rawPath.slice(2));
+    } else if (isAbsolute(rawPath)) {
+      // Allow absolute only if within projectRoot
+      resolved = rawPath;
+    } else {
+      resolved = resolve(dirname(fromFile), rawPath);
+    }
+    // Security: must be inside project root
+    const rel = relative(projectRoot, resolved);
+    if (rel.startsWith('..') || isAbsolute(rel)) {
+      errors.push(`[${relative(process.cwd(), fromFile)}] import path escapes project root: "${rawPath}"`);
+      return null;
+    }
+    return resolved;
+  }
+
+  function loadFile(absPath: string, fromFile: string, rawPath: string): void {
+    // Circular / already-visited: skip silently (like ES modules)
+    if (visited.has(absPath)) return;
+
+    // Directory import: alphabetical .nyx files
+    let stat: ReturnType<typeof statSync>;
+    try {
+      stat = statSync(absPath);
+    } catch {
+      errors.push(`[${relative(process.cwd(), fromFile)}] import not found: "${rawPath}" (resolved: ${relative(projectRoot, absPath)})`);
+      return;
+    }
+
+    if (stat.isDirectory()) {
+      let entries: string[];
+      try {
+        entries = readdirSync(absPath)
+          .filter(f => extname(f) === '.nyx')
+          .sort();
+      } catch {
+        errors.push(`[${relative(process.cwd(), fromFile)}] cannot read directory: "${rawPath}"`);
+        return;
+      }
+      for (const entry of entries) {
+        loadFile(join(absPath, entry), fromFile, join(rawPath, entry));
+      }
+      return;
+    }
+
+    // File import
+    visited.add(absPath);
+    sourceFiles.push(absPath);
+
+    let src: string;
+    try {
+      src = readFileSync(absPath, 'utf-8');
+    } catch {
+      errors.push(`[${relative(process.cwd(), fromFile)}] cannot read file: "${rawPath}"`);
+      return;
+    }
+
+    let imported: Program;
+    try {
+      imported = parse(src);
+    } catch (e: any) {
+      errors.push(`[${relative(process.cwd(), absPath)}] parse error: ${e.message || e}`);
+      return;
+    }
+
+    // Recurse into its imports first (depth-first, so dependencies are loaded before users)
+    for (const node of imported.body) {
+      if (node.type === 'Use') {
+        const subResolved = resolveImportPath((node as UseStatement).path, absPath);
+        if (subResolved !== null) {
+          loadFile(subResolved, absPath, (node as UseStatement).path);
+        }
+      }
+    }
+
+    // Merge non-Use nodes into global body, checking for duplicates
+    mergeNodes(imported.body, absPath);
+  }
+
+  function mergeNodes(nodes: TopLevelNode[], fromFile: string): void {
+    const fileRel = relative(projectRoot, fromFile);
+    for (const node of nodes) {
+      if (node.type === 'Use') continue; // already processed
+      if (node.type === 'Page') {
+        const route = (node as PageNode).path;
+        if (seenPages.has(route)) {
+          errors.push(`duplicate page "${route}" (already defined in ${seenPages.get(route)}, redefined in ${fileRel})`);
+          continue;
+        }
+        seenPages.set(route, fileRel);
+      } else if (node.type === 'Component') {
+        const name = (node as ComponentNode).name;
+        if (seenComponents.has(name)) {
+          errors.push(`duplicate component "${name}" (already defined in ${seenComponents.get(name)}, redefined in ${fileRel})`);
+          continue;
+        }
+        seenComponents.set(name, fileRel);
+      } else if (node.type === 'Layout') {
+        // Only error on cross-file duplicates (two files both defining a layout).
+        // Within-file is caught by the compiler's existing "only one layout per file" check.
+        if (seenLayoutFile.value !== null && seenLayoutFile.value !== fileRel) {
+          errors.push(`duplicate layout (already defined in ${seenLayoutFile.value}, redefined in ${fileRel})`);
+          continue;
+        }
+        seenLayoutFile.value = fileRel;
+      } else if (node.type === 'Theme') {
+        // Theme: multiple theme nodes in ONE file are legal (preset selection + overrides).
+        // But two DIFFERENT files both declaring theme is ambiguous — error.
+        if (seenThemeFile.value !== null && seenThemeFile.value !== fileRel) {
+          errors.push(`theme defined in multiple files (${seenThemeFile.value} and ${fileRel}) — consolidate into one file`);
+          continue;
+        }
+        seenThemeFile.value = fileRel;
+      }
+      mergedBody.push(node);
+    }
+  }
+
+  // Kick off with entry file
+  loadFile(entryAbs, entryAbs, relative(process.cwd(), entryAbs));
+
+  return {
+    ast: { type: 'Program', body: mergedBody, line: 1, col: 1 },
+    sourceFiles,
+    errors,
+  };
+}
+
+/**
+ * Flatten: concatenates all source files (entry + transitive imports) into a single .nyx source.
+ * Preserves comments and formatting because it works at SOURCE level, not AST level.
+ * Strips `use "./..."` lines that point to internal (resolvable) paths.
+ * Leaves remote/third-party `use` strings untouched (though we currently reject those anyway).
+ *
+ * Order: dependencies first (depth-first post-order), then entry file last.
+ * This means imported components are defined before pages that use them.
+ */
+function flattenToSource(entryPath: string): { source: string; errors: string[]; fileCount: number } {
+  const entryAbs = resolve(entryPath);
+  const projectRoot = dirname(entryAbs);
+  const visited = new Set<string>();
+  const errors: string[] = [];
+  const orderedFiles: string[] = []; // post-order: deepest dependencies first
+
+  function resolveInternalPath(rawPath: string, fromFile: string): string | null {
+    if (/^(https?:|ftp:|file:|\/\/)/i.test(rawPath)) return null;
+    let abs: string;
+    if (rawPath.startsWith('@/')) abs = resolve(projectRoot, rawPath.slice(2));
+    else if (isAbsolute(rawPath)) abs = rawPath;
+    else abs = resolve(dirname(fromFile), rawPath);
+    const rel = relative(projectRoot, abs);
+    if (rel.startsWith('..')) return null;
+    return abs;
+  }
+
+  function walk(absPath: string, fromFile: string, rawPath: string): void {
+    if (visited.has(absPath)) return;
+
+    let stat: ReturnType<typeof statSync>;
+    try {
+      stat = statSync(absPath);
+    } catch {
+      errors.push(`[${relative(process.cwd(), fromFile)}] cannot resolve "${rawPath}"`);
+      return;
+    }
+
+    if (stat.isDirectory()) {
+      let entries: string[];
+      try {
+        entries = readdirSync(absPath).filter(f => extname(f) === '.nyx').sort();
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        walk(join(absPath, entry), fromFile, join(rawPath, entry));
+      }
+      return;
+    }
+
+    visited.add(absPath);
+
+    let src: string;
+    try {
+      src = readFileSync(absPath, 'utf-8');
+    } catch {
+      errors.push(`cannot read ${relative(process.cwd(), absPath)}`);
+      return;
+    }
+
+    // Recurse into this file's imports first (depth-first)
+    let ast: Program;
+    try {
+      ast = parse(src);
+    } catch (e: any) {
+      errors.push(`[${relative(process.cwd(), absPath)}] parse error: ${e.message || e}`);
+      return;
+    }
+    for (const node of ast.body) {
+      if (node.type === 'Use') {
+        const sub = resolveInternalPath((node as UseStatement).path, absPath);
+        if (sub !== null) walk(sub, absPath, (node as UseStatement).path);
+      }
+    }
+
+    // Post-order: add AFTER dependencies
+    orderedFiles.push(absPath);
+  }
+
+  walk(entryAbs, entryAbs, relative(process.cwd(), entryAbs));
+
+  if (errors.length > 0) return { source: '', errors, fileCount: 0 };
+
+  // Regex that strips any line that is ONLY a `use "..."` import
+  //   Matches:    use "./foo.nyx"
+  //               use  './foo/'
+  //   Does NOT match:  use Nav(...)  (component invocation)
+  //                    NavBar x="y" use="y" (attribute)
+  const importLineRe = /^[ \t]*use[ \t]+["'][^"'\n]+["'][ \t]*;?[ \t]*(?:#[^\n]*)?$/gm;
+
+  const chunks: string[] = [];
+  for (const f of orderedFiles) {
+    const src = readFileSync(f, 'utf-8');
+    const rel = relative(projectRoot, f);
+    const cleaned = src.replace(importLineRe, '').replace(/\n{3,}/g, '\n\n').trimStart();
+    chunks.push(`# --- from: ${rel} ---\n${cleaned}`);
+  }
+
+  return {
+    source: chunks.join('\n\n') + '\n',
+    errors: [],
+    fileCount: orderedFiles.length,
+  };
+}
 import { DevServer } from './dev-server.js';
 import { ConfigNode, HookNode } from './ast.js';
 import { compileBackend } from './backend-compiler.js';
@@ -40,6 +314,7 @@ if (!command || (command !== 'dev' && !file) || (!file && command !== '--help'))
 
 Usage:
   nyx parse <file.nyx>              Parse file → AST (JSON)
+  nyx flatten <file.nyx>            Flatten multi-file project to single .nyx source
   nyx tokens <file.nyx>             Tokenize file → Token list
   nyx build <file.nyx>              Compile file → HTML output
   nyx watch <file.nyx>              Watch file & rebuild on change
@@ -106,38 +381,42 @@ try {
   const ast = parser.parse();
   console.log(JSON.stringify(ast, null, 2));
   console.log(`\n✅ Parsed ${ast.body.length} top-level nodes successfully.`);
-} else if (command === 'build') {
-    const ast = parse(source);
-
-    // Set up import resolver for `use` statements
-    const baseDir = dirname(filePath);
-    const resolveImport = (importPath: string): Program | null => {
-      try {
-        const resolved = resolve(baseDir, importPath);
-        const importSource = readFileSync(resolved, 'utf-8');
-        return parse(importSource);
-      } catch {
-        return null;
+} else if (command === 'flatten') {
+    // === Flatten ===
+    // Concatenate entry + all transitive imports into a single .nyx source (stdout).
+    // Output can be piped to a file: `nyx flatten app.nyx > flat.nyx`
+    //
+    // Works at SOURCE level — preserves comments and formatting.
+    // Import lines (`use "./..."`) are stripped. Non-internal `use` (component invocation) is kept.
+    const result = flattenToSource(filePath);
+    if (result.errors.length > 0) {
+      for (const err of result.errors) {
+        console.error(`\x1b[31m❌ Flatten: ${err}\x1b[0m`);
       }
-    };
+      process.exit(1);
+    }
+    // Prepend a header comment so output is obviously generated.
+    // Note: we operate at SOURCE level (not AST), so comments and formatting ARE preserved.
+    // Only `use "./..."` import lines are stripped; everything else passes through byte-for-byte.
+    const header = `# Flattened from ${relative(process.cwd(), filePath)} (${result.fileCount} file${result.fileCount !== 1 ? 's' : ''})\n# Generated by \`nyx flatten\`. Comments and formatting preserved.\n\n`;
+    process.stdout.write(header + result.source);
+    console.error(`\x1b[36mℹ️  Flattened ${result.fileCount} file${result.fileCount !== 1 ? 's' : ''} to stdout (${result.source.length} bytes).\x1b[0m`);
+} else if (command === 'build') {
+    // Resolve all imports recursively (merges into a single AST)
+    const resolved = resolveAllImports(filePath);
+    if (resolved.errors.length > 0) {
+      for (const err of resolved.errors) {
+        console.error(`\x1b[31m❌ Import error: ${err}\x1b[0m`);
+      }
+      console.error(`\n\x1b[31m${resolved.errors.length} import error(s). Compilation aborted.\x1b[0m`);
+      process.exit(1);
+    }
+    const ast = resolved.ast;
 
     // --- Validation pass ---
-    // Resolve imported component names for the validator
-    const importedComponents = new Set<string>();
-    const uses = ast.body.filter(n => n.type === 'Use');
-    for (const use of uses) {
-      const imported = resolveImport((use as any).path);
-      if (imported) {
-        for (const node of imported.body) {
-          if (node.type === 'Component') {
-            importedComponents.add((node as ComponentNode).name);
-          }
-        }
-      }
-    }
-
+    // All components are already in the merged AST, so no separate importedComponents set needed
     const validator = new Validator();
-    const validationResults = validator.validate(ast, importedComponents);
+    const validationResults = validator.validate(ast, new Set());
 
     const validationErrors = validationResults.filter(e => e.severity === 'error');
     const validationWarnings = validationResults.filter(e => e.severity === 'warning');
@@ -161,7 +440,6 @@ try {
     }
 
     const compiler = new Compiler({ pretty: true });
-    compiler.setImportResolver(resolveImport);
 
     // Count pages to determine output mode
     const pages = ast.body.filter((n: any) => n.type === 'Page');
@@ -265,58 +543,27 @@ try {
     // Uses Node's fs.watch — zero external dependencies.
     console.log(`\x1b[36m�\udc40 Watching ${relative(process.cwd(), filePath)}...\x1b[0m`);
 
-    // Collect all files to watch (main file + use-imported files)
-    function collectWatchFiles(mainPath: string): string[] {
-      const files = [mainPath];
-      try {
-        const src = readFileSync(mainPath, 'utf-8');
-        const ast = parse(src);
-        const baseDir = dirname(mainPath);
-        for (const node of ast.body) {
-          if (node.type === 'Use') {
-            const importPath = resolve(baseDir, (node as UseStatement).path);
-            try {
-              statSync(importPath);
-              files.push(importPath);
-            } catch {}
-          }
-        }
-      } catch {}
-      return files;
-    }
+    // Track files for watch (populated by doBuild)
+    let currentWatchFiles: string[] = [filePath];
 
     // Build function (returns success/failure info)
     function doBuild(): { ok: boolean; pages: number; bytes: number; ms: number } {
       const start = performance.now();
       try {
-        const src = readFileSync(filePath, 'utf-8');
-        const ast = parse(src);
-        const baseDir = dirname(filePath);
+        const resolved = resolveAllImports(filePath);
+        // Keep watch list up to date every rebuild
+        currentWatchFiles = resolved.sourceFiles.length > 0 ? resolved.sourceFiles : [filePath];
 
-        const resolveImport = (importPath: string): Program | null => {
-          try {
-            const resolved = resolve(baseDir, importPath);
-            const importSource = readFileSync(resolved, 'utf-8');
-            return parse(importSource);
-          } catch { return null; }
-        };
-
-        // Validation
-        const importedComponents = new Set<string>();
-        const uses = ast.body.filter(n => n.type === 'Use');
-        for (const use of uses) {
-          const imported = resolveImport((use as any).path);
-          if (imported) {
-            for (const node of imported.body) {
-              if (node.type === 'Component') {
-                importedComponents.add((node as ComponentNode).name);
-              }
-            }
+        if (resolved.errors.length > 0) {
+          for (const err of resolved.errors) {
+            console.error(`\x1b[31m❌ Import: ${err}\x1b[0m`);
           }
+          return { ok: false, pages: 0, bytes: 0, ms: performance.now() - start };
         }
+        const ast = resolved.ast;
 
         const validator = new Validator();
-        const validationResults = validator.validate(ast, importedComponents);
+        const validationResults = validator.validate(ast, new Set());
         const validationErrors = validationResults.filter(e => e.severity === 'error');
         const validationWarnings = validationResults.filter(e => e.severity === 'warning');
 
@@ -332,7 +579,6 @@ try {
         }
 
         const compiler = new Compiler({ pretty: true });
-        compiler.setImportResolver(resolveImport);
 
         const pages = ast.body.filter((n: any) => n.type === 'Page');
         const outDir = resolve('dist-site');
@@ -406,7 +652,7 @@ try {
       for (const w of activeWatchers) w.close();
       activeWatchers.length = 0;
 
-      const files = collectWatchFiles(filePath);
+      const files = currentWatchFiles;
       for (const f of files) {
         try {
           const watcher = fsWatch(f, { persistent: true }, (eventType) => {

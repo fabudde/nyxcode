@@ -1,0 +1,9 @@
+page /about/ {
+  use MainNav(current="about")
+  section {
+    style { p 4rem 2rem, max-w 900px, m "0 auto" }
+    h1 "About"
+    p "Loaded via directory import."
+  }
+  use SiteFooter
+}

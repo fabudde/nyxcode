@@ -1,0 +1,21 @@
+# v0.21.0 multi-file example
+# Build:    nyx build app.nyx
+# Flatten:  nyx flatten app.nyx > flat.nyx
+# Watch:    nyx watch app.nyx
+
+use "@/components/"
+use "@/pages/"
+
+theme {
+  colors {
+    bg #0a0e1a
+    text #e8ecf1
+    primary #8b5cf6
+    accent #ec4899
+  }
+}
+
+meta {
+  title "NyxCode Multi-File Demo"
+  description "Three pages, one nav, one footer — all split across files."
+}

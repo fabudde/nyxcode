@@ -1,3 +1,97 @@
+## v0.21.0 — "Modules" (2026-04-16)
+
+### Features
+
+#### Multi-file projects via extended `use` (#76)
+
+NyxCode is now a real module system. One-file remains the default; multi-file is opt-in.
+
+```nyx
+# Entry file (app.nyx)
+use "./theme/base.nyx"          # single file, relative
+use "./components/"             # directory — all .nyx files, alphabetical
+use "@/pages/"                  # @/ = project root (directory of entry file)
+
+meta {
+  title "My App"
+}
+```
+
+- **Single file import**: `use "./path/to/file.nyx"`
+- **Directory import**: `use "./components/"` — loads all `.nyx` files alphabetically
+- **Project-root alias**: `use "@/shared/nav.nyx"` — `@/` resolves to the directory containing the entry file
+- **Recursive imports**: imported files can themselves `use` other files; circular dependencies are skipped silently (ES-module style)
+- **All top-level nodes merge**: pages, components, themes, layouts, stores, APIs, tables, meta — everything from imported files ends up in the final AST
+- **Component instantiation is unchanged**: `use nav(current="home")` inside page bodies still works identically
+
+#### `nyxcode flatten` command
+
+For AI context windows, audits, or shipping a single-file artifact:
+
+```bash
+nyxcode flatten app.nyx > out.nyx
+```
+
+- Concatenates entry + all transitive imports into one `.nyx` source
+- Operates at **source level**, not AST level — **comments and formatting are preserved byte-for-byte**
+- Only `use "./..."` import lines are stripped; everything else passes through unchanged
+- Source-attribution headers mark which block came from which file:
+  ```nyx
+  # --- from: components/nav.nyx ---
+  component nav(current) { ... }
+
+  # --- from: pages/home.nyx ---
+  page / { ... }
+  ```
+- Dependencies are emitted before dependents (post-order), so imported components exist before pages that instantiate them
+- Flattened output is itself a valid `.nyx` file — `nyx build flat.nyx` produces identical output to the multi-file build
+
+### Security
+
+Imports are **local-only** by design:
+- Remote URLs (`http://`, `https://`, `ftp://`, `//`) are **rejected** with an explicit error
+- Paths that resolve outside the project root (via `..` or absolute paths) are **rejected**
+- No package manager, no CDN, no supply-chain surface
+
+This constraint is in the spec from day 1 (credit to Tyto 🦉 for pushing on it).
+
+### Error Handling
+
+- **Duplicate page routes** across files: build error naming both files
+- **Duplicate component names** across files: build error naming both files
+- **Duplicate layout** across files: build error
+- **Theme split across files**: build error (consolidate into one file)
+- **Missing import file**: build error with both the importing file and the requested path
+- **Path escapes project root**: build error
+- **Remote URL imports**: build error
+- **Circular imports**: silent skip on second visit (no infinite loop)
+
+### Watch Mode
+
+`nyx watch entry.nyx` now tracks **all** imported files recursively. Change any file anywhere in the dependency tree and the site rebuilds. Imports discovered during a rebuild are added to the watch set automatically.
+
+### Architecture Notes
+
+- Import resolution happens at the CLI level, **before** the compiler runs. The compiler itself sees a single merged AST and doesn't know multi-file exists.
+- This made the implementation cleaner than a compiler-internal import resolver would have been, and kept `compile()` / `compileMultiFile()` signatures unchanged.
+- `Compiler.setImportResolver()` is now a no-op (kept for API compatibility; scheduled for removal in v0.22).
+
+### Migration
+
+Zero breaking changes. All existing single-file NyxCode projects continue to build identically. Multi-file is opt-in; you only encounter it when you write a `use "./path.nyx"` statement.
+
+### Contributors
+
+- Kiro 🐺 (issue #76, consolidated spec, syntax vote)
+- Tyto 🦉 (security constraint, source-attribution header format, syntax vote)
+- ShellGames-Nyx 🦞 (scope correction, error semantics)
+- Discord-Nyx 🦞 (implementation, `use` extension approach, source-level flatten)
+- Fabian 🐻 (direction, keyword decision delegation)
+
+Closes #76
+
+---
+
 ## v0.20.0 — "Components, Properly" (2026-04-16)
 
 ### Features

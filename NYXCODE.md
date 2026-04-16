@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.20.0)
+# NYXCODE.md — AI Context File (v0.21.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -705,14 +705,82 @@ layout {
 ```
 The `layout` block wraps ALL pages automatically. Only one layout per file.
 
-## Imports (multi-file)
-```nyx
-use "./components.nyx"
-use "./layout.nyx"
+## Imports — Multi-File Projects (v0.21.0)
 
-page / { MyComponent title="Hello" }
+One-file is the default. Multi-file is opt-in. Use when projects grow past ~1500 lines or you want one nav/footer shared across pages.
+
+```nyx
+# Entry file: app.nyx
+use "./theme/base.nyx"          # single file, relative path
+use "./components/"             # directory — all .nyx files, alphabetical
+use "@/pages/"                  # @/ = directory of the entry file
+use "@/shared/nav.nyx"          # @/ alias works for single files too
+
+meta { title "My App" }
 ```
-Imports components AND layouts from other `.nyx` files.
+
+**What gets imported:** everything top-level — pages, components, themes, layouts, stores, APIs, tables, meta.
+
+**Security:** local-only. No `http://`, no `https://`, no paths that escape the project root. Build fails if you try.
+
+**Errors:** duplicate page routes, duplicate component names, theme in multiple files, missing files — all hard build errors with file paths.
+
+**Circular imports:** silent skip on second visit. No infinite loops.
+
+**Watch mode:** `nyx watch app.nyx` tracks all imported files recursively.
+
+### Structure recommendation
+
+| Project size | Approach |
+|---|---|
+| < 500 lines | One file (the default) |
+| 500-1500 lines | Main file + `components/` directory |
+| 1500+ lines | Page-per-file + shared imports |
+
+```
+myapp/
+  app.nyx              # entry: meta, theme imports, page imports
+  theme/
+    base.nyx           # theme {}
+  components/
+    nav.nyx            # component SiteNav(current) { }
+    footer.nyx         # component SiteFooter { }
+    cards.nyx          # component CitationCard(num, title, ...) { }
+  pages/
+    home.nyx           # page / { }
+    about.nyx          # page /about/ { }
+```
+
+### `nyxcode flatten` — multi-file → single file
+
+```bash
+nyxcode flatten app.nyx > flat.nyx
+```
+
+Concatenates everything into one `.nyx` file. Use it for AI context windows, audits, or to ship a single-file artifact.
+
+- **Comments and formatting are preserved** (source-level concat, not AST regeneration)
+- Each file's content gets a source-attribution header: `# --- from: components/nav.nyx ---`
+- `use "./..."` lines are stripped; component invocations (`use nav(...)`) stay intact
+- The flattened file is itself valid NyxCode and builds to the identical output
+
+### Disambiguation: two uses of `use`
+
+Same keyword, two operations, disambiguated by **context + argument type**:
+
+```nyx
+# Top-level: file import (string literal argument)
+use "./components/nav.nyx"
+use "@/pages/"
+
+# Inside page body: component instantiation (identifier argument)
+page / {
+  use SiteNav(current="home")
+  use CitationCard(1, "Hard Problem", "...", "Chalmers 1995", "Canonical")
+}
+```
+
+String argument = load file. Identifier = instantiate component. No ambiguity in practice.
 
 ## Iteration & Conditionals
 ```nyx

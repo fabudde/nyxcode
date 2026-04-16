@@ -1,0 +1,9 @@
+page / {
+  use MainNav(current="home")
+  section {
+    style { p 4rem 2rem, max-w 900px, m "0 auto" }
+    h1 "Welcome to v0.21.0"
+    p "Multi-file NyxCode with module system."
+  }
+  use SiteFooter
+}

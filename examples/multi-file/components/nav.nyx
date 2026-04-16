@@ -1,0 +1,8 @@
+component MainNav(current) {
+  nav {
+    style { d flex, gap 2rem, p 1.5rem, bg #111 }
+    a "Home" href="/" class="${current == 'home' ? 'active' : ''}"
+    a "Docs" href="/docs/" class="${current == 'docs' ? 'active' : ''}"
+    a "About" href="/about/" class="${current == 'about' ? 'active' : ''}"
+  }
+}

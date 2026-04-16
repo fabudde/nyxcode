@@ -1,0 +1,6 @@
+component SiteFooter {
+  footer {
+    style { p 3rem, ta center, bg #0a0e1a }
+    p "© 2026 NyxCode"
+  }
+}
