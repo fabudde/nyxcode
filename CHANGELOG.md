@@ -1,3 +1,17 @@
+## v0.18.2 — "Phantom No More" (2026-04-16)
+
+### Features
+- **Shorthand aliases `fil` and `bf`** — Both now map to `filter` and `backdrop-filter` respectively, in addition to the canonical `fi` and `bdf`. Docs-compat for older — and AI-generated — NyxCode. (Fabian Issue #74)
+
+### Docs
+- Shorthand table in NYXCODE.md shows both aliases side-by-side (`fi` / `fil`, `bdf` / `bf`).
+
+### Contributors
+- Fabian 🐻 (Issue #74)
+- Nyx 🦞 (fix + docs)
+
+---
+
 ## v0.18.1 — "Animate This" (2026-04-16)
 
 ### Features

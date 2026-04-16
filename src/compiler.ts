@@ -2497,7 +2497,9 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
       'tr': 'transition',
       'anim': 'animation',
       'fi': 'filter',
+      'fil': 'filter',            // alias (docs compat, #74)
       'bdf': 'backdrop-filter',
+      'bf': 'backdrop-filter',    // alias (docs compat, #74)
       
       // Legacy (keep working)
       'text': 'color',
