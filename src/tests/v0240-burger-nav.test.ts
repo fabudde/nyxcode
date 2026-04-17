@@ -180,3 +180,71 @@ describe('v0.24.0: nav burger — HTML escaping (security)', () => {
     assert.ok(!/<nav aria-label="Nav & "menu""/.test(html));
   });
 });
+
+describe('v0.24.0: nav burger — body scroll lock (Issue #98, iOS)', () => {
+  test('emits CSS-only scroll-lock on html+body when burger is open', () => {
+    const { css } = compile(`
+      page / { nav burger { a "Home" href="/" } }
+    `);
+    // Must lock both html and body via :has() on the open burger
+    assert.match(
+      css,
+      /html:has\(\.nx-burger-bp-768\[open\]\),body:has\(\.nx-burger-bp-768\[open\]\)\{overflow:hidden;overscroll-behavior:contain\}/,
+      'expected html+body scroll-lock selector with overflow:hidden',
+    );
+  });
+
+  test('scroll-lock lives inside the mobile media query (desktop unaffected)', () => {
+    const { css } = compile(`
+      page / { nav burger { a "Home" href="/" } }
+    `);
+    // The scroll-lock rule must be nested inside the @media(max-width:768px) block,
+    // not emitted at the top level. We verify this by checking the substring
+    // between the @media opener and its matching close brace.
+    const mq = css.match(/@media\(max-width:768px\)\{([^]*?)\}(?!\})/);
+    // Fallback: just find the @media block and look for the lock rule within.
+    const hasLockInMq = /@media\(max-width:768px\)\{[^@]*html:has\(\.nx-burger-bp-768\[open\]\)/.test(
+      css,
+    );
+    assert.ok(hasLockInMq, 'scroll-lock must be inside the @media(max-width:...) block');
+    // And it must NOT appear outside a media query (no top-level overflow:hidden on body from us).
+    const outside = css.replace(/@media\(max-width:\d+px\)\{[^]*?\}(?=@|$)/g, '');
+    assert.ok(
+      !/body:has\(\.nx-burger/.test(outside),
+      'scroll-lock must not leak outside the mobile media query',
+    );
+  });
+
+  test('NO JavaScript is emitted for scroll-lock (zero-JS promise)', () => {
+    const { html, css } = compile(`
+      page / { nav burger { a "Home" href="/" } }
+    `);
+    // Hard constraint: the compiler must never emit <script> tags or inline handlers
+    assert.ok(!/<script\b/i.test(html), 'no <script> tags allowed');
+    assert.ok(!/\bon\w+\s*=/.test(html), 'no inline event handlers allowed');
+    assert.ok(!/<script\b/i.test(css), 'no scripts in CSS output');
+  });
+
+  test('scroll-lock uses custom breakpoint when one is provided', () => {
+    const { css } = compile(`
+      theme { breakpoints { sm: 480px, md: 768px } }
+      page / { nav burger=sm { a "Home" href="/" } }
+    `);
+    assert.match(
+      css,
+      /@media\(max-width:480px\)\{[^@]*html:has\(\.nx-burger-bp-480\[open\]\),body:has\(\.nx-burger-bp-480\[open\]\)\{overflow:hidden;overscroll-behavior:contain\}/,
+    );
+  });
+
+  test('multiple burgers at different breakpoints each get their own lock rule', () => {
+    const { css } = compile(`
+      theme { breakpoints { sm: 480px, md: 768px } }
+      page / {
+        nav burger=sm { a "H" href="/" }
+        nav burger=md { a "H" href="/" }
+      }
+    `);
+    assert.match(css, /body:has\(\.nx-burger-bp-480\[open\]\)/);
+    assert.match(css, /body:has\(\.nx-burger-bp-768\[open\]\)/);
+  });
+});

@@ -390,7 +390,7 @@ nav burger {
 ### Known limits
 
 - **No Escape-to-close.** `<details>` does not close on <kbd>Esc</kbd> natively. This is a deliberate trade-off to keep the zero-JS promise. If you need Esc-close, wrap the element yourself.
-- **No body-scroll-lock.** Opening the burger on iOS may let background content scroll underneath. Tracked in [Issue #98](https://github.com/fabudde/nyxcode/issues/98) for future CSS-only exploration.
+- **Body-scroll-lock (v0.24.1).** When the burger is open on mobile, `html` and `body` get `overflow:hidden` + `overscroll-behavior:contain` via a `body:has(.nx-burger[open])` rule — CSS-only, no JavaScript. This prevents iOS Safari rubber-band scrolling. Only active inside the mobile `@media` query.
 - **`icon=` is a compile-time constant** — never bind it to user input. The parser enforces this by accepting string literals only.
 
 ## Figma / W3C DTCG Token Import (v0.23.5)
@@ -500,7 +500,17 @@ page / {
 
 ### Security note
 
-Figma JSON is **third-party input**. The v0.23.5 importer passes token values through with minimal transformation — this means you should only import tokens from trusted sources. Input-validation (per-type CSS value whitelisting) is tracked for v0.24.
+Figma JSON is **third-party input**. Since v0.24.1, the importer validates every token value against per-type allowlists before emitting it:
+
+| Token type | Allowed patterns | Rejected examples |
+|------------|-----------------|-------------------|
+| Color | hex, `rgb()`, `hsl()`, CSS named colors | `javascript:`, `url()`, `expression()` |
+| Spacing/Radius | `<number><unit>` (px, rem, em, %, vw, vh…) | `calc()`, `url()`, `expression()` |
+| Font-family | Alphanumeric + spaces + hyphens + quotes | `url()`, backslashes, angle brackets |
+| Shadow | Structured: offsets + blur + spread + color | Free-form strings, `javascript:` |
+| Border | `<width> <style> <color>` | Anything with `url()` or script vectors |
+
+Invalid tokens are **skipped with a warning** — they never reach the output. A belt-and-suspenders `hasDangerousSubstring()` guard rejects `javascript:`, `data:`, `expression(`, `@import`, control chars etc. before per-type validation even runs.
 
 ## CSS Functions (v0.17.0)
 ```nyx

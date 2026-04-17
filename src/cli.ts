@@ -16,8 +16,128 @@
  */
 
 import * as fs from 'fs';
-import { readFileSync, writeFileSync, mkdirSync, watch as fsWatch, statSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, watch as fsWatch, statSync, readdirSync, realpathSync, openSync, fstatSync, closeSync } from 'fs';
 import { resolve, dirname, relative, isAbsolute, join, extname, basename } from 'path';
+
+/**
+ * v0.24.1 (Issue #92) — TOCTOU-safe file read for imports.
+ *
+ * The previous implementation had two gaps:
+ *   1. `resolve()` does NOT follow symlinks. A symlink at `./leak.nyx` pointing
+ *      to `/etc/passwd` passed the projectRoot check (the symlink path itself
+ *      was in-project) but the target was outside.
+ *   2. `statSync()` and `readFileSync()` used *separate* path lookups. Between
+ *      them, the underlying file could be swapped.
+ *
+ * This helper closes both:
+ *   - realpath the target → canonical, symlink-free. Recheck bounds against
+ *     realpath(projectRoot).
+ *   - Open the canonical path ONCE. Everything downstream (fstat, read) uses
+ *     the same file descriptor, which is pinned to a single inode.
+ *   - O_NOFOLLOW on the leaf: if between realpath() and openSync() an attacker
+ *     swaps the leaf for a symlink, the open refuses.
+ *
+ * Directories: realpath is still performed (so symlinked dirs can't escape),
+ * but readdir is used instead of open (not all platforms allow openSync on dirs).
+ *
+ * Callers must treat the returned `realPath` as canonical (used for visited
+ * sets, error messages, etc.) — never re-resolve from the raw path after this.
+ */
+type SafeLoadResult =
+  | { kind: 'file'; content: string; realPath: string }
+  | { kind: 'dir'; entries: string[]; realPath: string }
+  | { kind: 'escape'; realPath: string }
+  | { kind: 'missing' }
+  | { kind: 'error'; error: string };
+
+function safeLoad(absPath: string, projectRootReal: string): SafeLoadResult {
+  // 1. Canonicalize. This dereferences every symlink in the path.
+  let realPath: string;
+  try {
+    realPath = realpathSync(absPath);
+  } catch (e: any) {
+    if (e && e.code === 'ENOENT') return { kind: 'missing' };
+    return { kind: 'error', error: String((e && e.message) || e) };
+  }
+
+  // 2. Bounds-check the CANONICAL path, not the raw one. This is what catches
+  //    symlinks that point outside the project.
+  const rel = relative(projectRootReal, realPath);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    return { kind: 'escape', realPath };
+  }
+
+  // 3. Distinguish file vs. directory via stat on the realPath. Because
+  //    realPath is symlink-free, lstat and stat are equivalent here. We also
+  //    reject non-regular non-directory entries (FIFO, socket, device) up
+  //    front — some of those (FIFO on Linux) would BLOCK openSync() in a
+  //    readerless state, turning a supposed security check into a DoS.
+  let preStat: ReturnType<typeof statSync>;
+  try {
+    preStat = statSync(realPath);
+  } catch (e: any) {
+    if (e && e.code === 'ENOENT') return { kind: 'missing' };
+    return { kind: 'error', error: String((e && e.message) || e) };
+  }
+
+  if (preStat.isDirectory()) {
+    try {
+      const entries = readdirSync(realPath).filter(f => extname(f) === '.nyx').sort();
+      return { kind: 'dir', entries, realPath };
+    } catch (e: any) {
+      return { kind: 'error', error: String((e && e.message) || e) };
+    }
+  }
+
+  if (!preStat.isFile()) {
+    return { kind: 'error', error: 'not a regular file (FIFO, socket, device refused)' };
+  }
+
+  // 4. Open the canonical path ONCE. Flags used:
+  //      O_RDONLY    — obviously.
+  //      O_NOFOLLOW  — closes the tiny window where the leaf could be swapped
+  //                    for a symlink between our realpath() and this open.
+  //      O_NONBLOCK  — belt-and-braces: if between preStat and this open an
+  //                    attacker swaps the regular file for a FIFO, O_NONBLOCK
+  //                    prevents openSync() from hanging waiting for a writer.
+  //                    fstat below will then reject it.
+  //    Constants can be undefined on some platforms → fall back to 0.
+  const O_NOFOLLOW = (fs.constants as any).O_NOFOLLOW ?? 0;
+  const O_NONBLOCK = (fs.constants as any).O_NONBLOCK ?? 0;
+  const flags = fs.constants.O_RDONLY | O_NOFOLLOW | O_NONBLOCK;
+  let fd: number;
+  try {
+    fd = openSync(realPath, flags);
+  } catch (e: any) {
+    // ELOOP = attacker swapped in a symlink after our realpath() succeeded.
+    if (e && (e.code === 'ELOOP' || e.code === 'EMLINK')) {
+      return { kind: 'error', error: 'path changed to symlink between check and open (TOCTOU)' };
+    }
+    if (e && e.code === 'ENOENT') return { kind: 'missing' };
+    return { kind: 'error', error: String((e && e.message) || e) };
+  }
+
+  try {
+    // 5. fstat on the SAME fd — reconfirms the inode is a regular file after
+    //    open (catches a FIFO that was swapped in between preStat and open,
+    //    which O_NONBLOCK let us survive instead of hanging).
+    const st = fstatSync(fd);
+    if (!st.isFile()) {
+      return { kind: 'error', error: 'not a regular file after open (inode changed)' };
+    }
+    // Inode-match check: if the inode we stat'd up front differs from the one
+    // we actually opened, something swapped under us. Bail.
+    if (st.ino !== preStat.ino || st.dev !== preStat.dev) {
+      return { kind: 'error', error: 'inode changed between check and open (TOCTOU)' };
+    }
+    // 6. readFileSync with an fd reads from the SAME inode we just statted.
+    //    No second path lookup. This is the atomic leg.
+    const content = readFileSync(fd, 'utf-8');
+    return { kind: 'file', content, realPath };
+  } finally {
+    try { closeSync(fd); } catch { /* best-effort */ }
+  }
+}
 import { parse } from './index.js';
 import { Lexer } from './lexer.js';
 import { Parser } from './parser.js';
@@ -71,6 +191,14 @@ interface ImportResolveResult {
 function resolveAllImports(entryPath: string): ImportResolveResult {
   const entryAbs = resolve(entryPath);
   const projectRoot = dirname(entryAbs);
+  // v0.24.1 (#92): realpath the project root up-front, so symlink-based
+  // escapes are caught by a STRING compare against the canonical root.
+  let projectRootReal: string;
+  try {
+    projectRootReal = realpathSync(projectRoot);
+  } catch {
+    projectRootReal = projectRoot;
+  }
   const visited = new Set<string>();
   const sourceFiles: string[] = [];
   const errors: string[] = [];
@@ -111,9 +239,15 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
     } else {
       resolved = resolve(dirname(fromFile), rawPath);
     }
-    // Security: must be inside project root
+    // Security (string-based first pass): must be inside project root. Check
+    // against BOTH projectRoot and projectRootReal because `fromFile` may have
+    // been realpath'd by safeLoad (v0.24.1) and therefore live under
+    // projectRootReal rather than projectRoot.
     const rel = relative(projectRoot, resolved);
-    if (rel.startsWith('..') || isAbsolute(rel)) {
+    const relReal = relative(projectRootReal, resolved);
+    const escapes = (rel.startsWith('..') || isAbsolute(rel)) &&
+                    (relReal.startsWith('..') || isAbsolute(relReal));
+    if (escapes) {
       errors.push(`[${relative(process.cwd(), fromFile)}] import path escapes project root: "${rawPath}"`);
       return null;
     }
@@ -121,45 +255,45 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
   }
 
   function loadFile(absPath: string, fromFile: string, rawPath: string): void {
-    // Circular / already-visited: skip silently (like ES modules)
+    // Circular / already-visited (early check on pre-realpath path).
     if (visited.has(absPath)) return;
 
-    // Directory import: alphabetical .nyx files
-    let stat: ReturnType<typeof statSync>;
-    try {
-      stat = statSync(absPath);
-    } catch {
+    // v0.24.1 (#92): atomic, TOCTOU-safe load. All downstream work uses the
+    // canonical path from the same syscall sequence — no second resolve.
+    const loaded = safeLoad(absPath, projectRootReal);
+
+    if (loaded.kind === 'missing') {
       errors.push(`[${relative(process.cwd(), fromFile)}] import not found: "${rawPath}" (resolved: ${relative(projectRoot, absPath)})`);
       return;
     }
+    if (loaded.kind === 'escape') {
+      errors.push(`[${relative(process.cwd(), fromFile)}] import path escapes project root via symlink: "${rawPath}" (resolved: ${loaded.realPath})`);
+      return;
+    }
+    if (loaded.kind === 'error') {
+      errors.push(`[${relative(process.cwd(), fromFile)}] cannot read: "${rawPath}" (${loaded.error})`);
+      return;
+    }
 
-    if (stat.isDirectory()) {
-      let entries: string[];
-      try {
-        entries = readdirSync(absPath)
-          .filter(f => extname(f) === '.nyx')
-          .sort();
-      } catch {
-        errors.push(`[${relative(process.cwd(), fromFile)}] cannot read directory: "${rawPath}"`);
-        return;
-      }
-      for (const entry of entries) {
-        loadFile(join(absPath, entry), fromFile, join(rawPath, entry));
+    if (loaded.kind === 'dir') {
+      // Record the realpath in visited so a symlink loop back to the same
+      // directory can't re-enter.
+      if (visited.has(loaded.realPath)) return;
+      for (const entry of loaded.entries) {
+        loadFile(join(loaded.realPath, entry), fromFile, join(rawPath, entry));
       }
       return;
     }
 
-    // File import
+    // File import — use the canonical realPath for visited + sourceFiles so
+    // the same file reached via two different symlink paths only loads once.
+    if (visited.has(loaded.realPath)) return;
     visited.add(absPath);
-    sourceFiles.push(absPath);
+    visited.add(loaded.realPath);
+    sourceFiles.push(loaded.realPath);
 
-    let src: string;
-    try {
-      src = readFileSync(absPath, 'utf-8');
-    } catch {
-      errors.push(`[${relative(process.cwd(), fromFile)}] cannot read file: "${rawPath}"`);
-      return;
-    }
+    const src = loaded.content;
+    const absReal = loaded.realPath;
 
     let imported: Program;
     try {
@@ -169,27 +303,29 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
       return;
     }
 
-    // Recurse into its imports first (depth-first, so dependencies are loaded before users)
+    // Recurse into its imports first (depth-first, so dependencies are loaded before users).
+    // IMPORTANT: resolve child paths relative to the REAL path of this file — if we used the
+    // pre-realpath absPath, a nested symlink could sneak `../` escapes past our bounds check.
     for (const node of imported.body) {
       if (node.type === 'Use') {
-        const subResolved = resolveImportPath((node as UseStatement).path, absPath);
+        const subResolved = resolveImportPath((node as UseStatement).path, absReal);
         if (subResolved !== null) {
-          loadFile(subResolved, absPath, (node as UseStatement).path);
+          loadFile(subResolved, absReal, (node as UseStatement).path);
         }
       }
       // v0.23.0 — also follow `@theme extends "./path.nyx"` as an implicit import
       // so users do not have to write a separate `use` line. Same security rules apply.
       if (node.type === 'Theme' && (node as any).extends) {
         const extPath = (node as any).extends;
-        const subResolved = resolveImportPath(extPath, absPath);
+        const subResolved = resolveImportPath(extPath, absReal);
         if (subResolved !== null) {
-          loadFile(subResolved, absPath, extPath);
+          loadFile(subResolved, absReal, extPath);
         }
       }
     }
 
     // Merge non-Use nodes into global body, checking for duplicates
-    mergeNodes(imported.body, absPath);
+    mergeNodes(imported.body, absReal);
   }
 
   function mergeNodes(nodes: TopLevelNode[], fromFile: string): void {
@@ -261,72 +397,82 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
 function flattenToSource(entryPath: string): { source: string; errors: string[]; fileCount: number } {
   const entryAbs = resolve(entryPath);
   const projectRoot = dirname(entryAbs);
+  let projectRootReal: string;
+  try { projectRootReal = realpathSync(projectRoot); } catch { projectRootReal = projectRoot; }
   const visited = new Set<string>();
   const errors: string[] = [];
   const orderedFiles: string[] = []; // post-order: deepest dependencies first
+  // v0.24.1 (#92): cache file contents read during walk so the final flatten
+  // pass doesn't do a second, un-audited readFileSync — that was yet another
+  // TOCTOU gap. Key = realPath.
+  const contentCache = new Map<string, string>();
 
   function resolveInternalPath(rawPath: string, fromFile: string): string | null {
-    if (/^(https?:|ftp:|file:|\/\/)/i.test(rawPath)) return null;
+    // v0.24.1 (#92): align with resolveAllImports — allowlist, not denylist.
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]+:/.test(rawPath) || rawPath.startsWith('//')) return null;
     let abs: string;
     if (rawPath.startsWith('@/')) abs = resolve(projectRoot, rawPath.slice(2));
     else if (isAbsolute(rawPath)) abs = rawPath;
     else abs = resolve(dirname(fromFile), rawPath);
     const rel = relative(projectRoot, abs);
-    if (rel.startsWith('..')) return null;
+    const relReal = relative(projectRootReal, abs);
+    if ((rel.startsWith('..') || isAbsolute(rel)) &&
+        (relReal.startsWith('..') || isAbsolute(relReal))) return null;
     return abs;
   }
 
   function walk(absPath: string, fromFile: string, rawPath: string): void {
     if (visited.has(absPath)) return;
 
-    let stat: ReturnType<typeof statSync>;
-    try {
-      stat = statSync(absPath);
-    } catch {
+    // v0.24.1 (#92): TOCTOU-safe load — same helper as resolveAllImports.
+    const loaded = safeLoad(absPath, projectRootReal);
+
+    if (loaded.kind === 'missing') {
       errors.push(`[${relative(process.cwd(), fromFile)}] cannot resolve "${rawPath}"`);
       return;
     }
+    if (loaded.kind === 'escape') {
+      errors.push(`[${relative(process.cwd(), fromFile)}] import path escapes project root via symlink: "${rawPath}"`);
+      return;
+    }
+    if (loaded.kind === 'error') {
+      errors.push(`cannot read ${relative(process.cwd(), absPath)} (${loaded.error})`);
+      return;
+    }
 
-    if (stat.isDirectory()) {
-      let entries: string[];
-      try {
-        entries = readdirSync(absPath).filter(f => extname(f) === '.nyx').sort();
-      } catch {
-        return;
-      }
-      for (const entry of entries) {
-        walk(join(absPath, entry), fromFile, join(rawPath, entry));
+    if (loaded.kind === 'dir') {
+      if (visited.has(loaded.realPath)) return;
+      for (const entry of loaded.entries) {
+        walk(join(loaded.realPath, entry), fromFile, join(rawPath, entry));
       }
       return;
     }
 
+    if (visited.has(loaded.realPath)) return;
     visited.add(absPath);
-
-    let src: string;
-    try {
-      src = readFileSync(absPath, 'utf-8');
-    } catch {
-      errors.push(`cannot read ${relative(process.cwd(), absPath)}`);
-      return;
-    }
+    visited.add(loaded.realPath);
+    const src = loaded.content;
+    const absReal = loaded.realPath;
+    contentCache.set(absReal, src);
 
     // Recurse into this file's imports first (depth-first)
     let ast: Program;
     try {
       ast = parse(src);
     } catch (e: any) {
-      errors.push(decorateError(absPath, src, `parse error: ${e.message || e}`));
+      errors.push(decorateError(absReal, src, `parse error: ${e.message || e}`));
       return;
     }
     for (const node of ast.body) {
       if (node.type === 'Use') {
-        const sub = resolveInternalPath((node as UseStatement).path, absPath);
-        if (sub !== null) walk(sub, absPath, (node as UseStatement).path);
+        const sub = resolveInternalPath((node as UseStatement).path, absReal);
+        if (sub !== null) walk(sub, absReal, (node as UseStatement).path);
       }
     }
 
-    // Post-order: add AFTER dependencies
-    orderedFiles.push(absPath);
+    // Post-order: add AFTER dependencies — use realPath so the later
+    // readFileSync in the flatten pass sees the same canonical file.
+    orderedFiles.push(absReal);
   }
 
   walk(entryAbs, entryAbs, relative(process.cwd(), entryAbs));
@@ -342,7 +488,13 @@ function flattenToSource(entryPath: string): { source: string; errors: string[];
 
   const chunks: string[] = [];
   for (const f of orderedFiles) {
-    const src = readFileSync(f, 'utf-8');
+    // Use the content we already verified and read atomically during walk().
+    // Never re-open by path here — that would reintroduce the TOCTOU window.
+    const src = contentCache.get(f);
+    if (src === undefined) {
+      errors.push(`internal error: no cached content for ${relative(process.cwd(), f)}`);
+      continue;
+    }
     const rel = relative(projectRoot, f);
     const cleaned = src.replace(importLineRe, '').replace(/\n{3,}/g, '\n\n').trimStart();
     chunks.push(`# --- from: ${rel} ---\n${cleaned}`);

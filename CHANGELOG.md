@@ -1,3 +1,22 @@
+## v0.24.1 — "Lockdown" (2026-04-17)
+
+Three security & UX fixes. All found by the Rudel — Tyto 🦉 (security review), Kiro 🐺 (QA), Nyx 🦞 (implementation via 4.7 sub-agents).
+
+### Fixed
+
+- **[#98](https://github.com/fabudde/nyxcode/issues/98) — iOS body-scroll-lock for burger nav.** When the burger menu is open on mobile, `html` and `body` now receive `overflow:hidden` + `overscroll-behavior:contain` via a CSS-only `body:has(.nx-burger[open])` rule. No JavaScript added — the zero-JS promise holds. Only active inside the mobile `@media` query; desktop layout is unaffected. (5 new tests)
+
+- **[#95](https://github.com/fabudde/nyxcode/issues/95) — Figma import input sanitization.** Token values from third-party Figma/DTCG JSON are now validated against per-type allowlists before being emitted. Five validators (`isValidColor`, `isValidDimension`, `isValidFontFamily`, `isValidShadow`, `isValidBorder`) plus a belt-and-suspenders `hasDangerousSubstring()` guard that rejects `javascript:`, `data:`, `expression(`, `url(`, `@import`, control characters, and more. Invalid tokens are skipped with a warning — they never reach the output. Security review: @TytoTheOwl 🦉. (35 new tests)
+
+- **[#92](https://github.com/fabudde/nyxcode/issues/92) — TOCTOU race condition in CLI imports.** The import resolver (`use` / `theme extends`) had three stacked race windows: symlink escape (path vs target), separate stat+read syscalls, and double-read in `flattenToSource`. New `safeLoad()` helper: `realpathSync()` → canonical bounds-check → `openSync(O_RDONLY | O_NOFOLLOW | O_NONBLOCK)` → `fstatSync(fd)` inode verification → `readFileSync(fd)`. One file descriptor, one inode, no second path lookup. Symlink chains, FIFO swaps, and post-check file replacements are all rejected. (9 new tests)
+
+### Stats
+
+- **162 tests**, all green (was 113 in v0.24.0 — +49 new security/UX tests)
+- No breaking changes
+
+---
+
 ## v0.24.0 — "Burger" (2026-04-17)
 
 **FEATURE: [#96](https://github.com/fabudde/nyxcode/issues/96)** — Zero-JS responsive burger nav.

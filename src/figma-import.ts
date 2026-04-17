@@ -39,6 +39,278 @@ export interface ImportResult {
   warnings: string[];
 }
 
+// ---------------------------------------------------------------------------
+// SECURITY: Input sanitization (Issue #95, Tyto 🦉 review 2026-04-17)
+//
+// External token files are untrusted. A malicious Figma/DTCG export could try
+// to inject CSS payloads like `url(javascript:alert(1))`, `expression(...)`,
+// or `<script>` fragments via font-family names. We validate every value with
+// a strict per-type allowlist. Invalid tokens are SKIPPED (not rejected as a
+// whole file) with a warning.
+// ---------------------------------------------------------------------------
+
+/** CSS named colors (CSS Color Module Level 4). */
+const CSS_NAMED_COLORS: ReadonlySet<string> = new Set([
+  'aliceblue','antiquewhite','aqua','aquamarine','azure','beige','bisque','black',
+  'blanchedalmond','blue','blueviolet','brown','burlywood','cadetblue','chartreuse',
+  'chocolate','coral','cornflowerblue','cornsilk','crimson','cyan','darkblue',
+  'darkcyan','darkgoldenrod','darkgray','darkgreen','darkgrey','darkkhaki',
+  'darkmagenta','darkolivegreen','darkorange','darkorchid','darkred','darksalmon',
+  'darkseagreen','darkslateblue','darkslategray','darkslategrey','darkturquoise',
+  'darkviolet','deeppink','deepskyblue','dimgray','dimgrey','dodgerblue','firebrick',
+  'floralwhite','forestgreen','fuchsia','gainsboro','ghostwhite','gold','goldenrod',
+  'gray','green','greenyellow','grey','honeydew','hotpink','indianred','indigo',
+  'ivory','khaki','lavender','lavenderblush','lawngreen','lemonchiffon','lightblue',
+  'lightcoral','lightcyan','lightgoldenrodyellow','lightgray','lightgreen','lightgrey',
+  'lightpink','lightsalmon','lightseagreen','lightskyblue','lightslategray',
+  'lightslategrey','lightsteelblue','lightyellow','lime','limegreen','linen','magenta',
+  'maroon','mediumaquamarine','mediumblue','mediumorchid','mediumpurple',
+  'mediumseagreen','mediumslateblue','mediumspringgreen','mediumturquoise',
+  'mediumvioletred','midnightblue','mintcream','mistyrose','moccasin','navajowhite',
+  'navy','oldlace','olive','olivedrab','orange','orangered','orchid','palegoldenrod',
+  'palegreen','paleturquoise','palevioletred','papayawhip','peachpuff','peru','pink',
+  'plum','powderblue','purple','rebeccapurple','red','rosybrown','royalblue',
+  'saddlebrown','salmon','sandybrown','seagreen','seashell','sienna','silver',
+  'skyblue','slateblue','slategray','slategrey','snow','springgreen','steelblue',
+  'tan','teal','thistle','tomato','turquoise','violet','wheat','white','whitesmoke',
+  'yellow','yellowgreen',
+  // Special keywords accepted in color positions
+  'transparent','currentcolor',
+]);
+
+/** Allowed CSS dimension units (lengths + viewport + relative). */
+const ALLOWED_UNITS: ReadonlySet<string> = new Set([
+  'px','rem','em','%','vw','vh','ch','lh','cap',
+]);
+
+/** Allowed CSS border styles. */
+const ALLOWED_BORDER_STYLES: ReadonlySet<string> = new Set([
+  'none','hidden','dotted','dashed','solid','double','groove','ridge','inset','outset',
+]);
+
+/**
+ * Detect obviously dangerous substrings that must never appear in any value,
+ * regardless of section. Used as a belt-and-suspenders check alongside the
+ * per-type allowlists.
+ */
+function hasDangerousSubstring(s: string): boolean {
+  const lower = s.toLowerCase();
+  if (/[<>\\`\x00-\x1f]/.test(s)) return true;
+  if (lower.includes('javascript:')) return true;
+  if (lower.includes('data:')) return true;
+  if (lower.includes('vbscript:')) return true;
+  if (lower.includes('expression(')) return true;
+  if (lower.includes('url(')) return true;
+  if (lower.includes('@import')) return true;
+  if (lower.includes('/*') || lower.includes('*/')) return true;
+  // CSS var() is not a literal value — we emit our own var() wrappers in the
+  // compiler; a token value containing var() would be a forwarding reference
+  // that bypasses our theme system.
+  if (/\bvar\s*\(/i.test(s)) return true;
+  return false;
+}
+
+/**
+ * Validate a single color value. Allowed:
+ *   - #rgb, #rgba, #rrggbb, #rrggbbaa hex
+ *   - rgb(...) / rgba(...) / hsl(...) / hsla(...) with numeric args only
+ *   - CSS named colors (+ transparent, currentColor)
+ */
+export function isValidColor(raw: string): boolean {
+  if (typeof raw !== 'string') return false;
+  const s = raw.trim();
+  if (!s) return false;
+  if (hasDangerousSubstring(s)) return false;
+
+  // Hex: #rgb | #rgba | #rrggbb | #rrggbbaa
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s)) {
+    return true;
+  }
+
+  // rgb()/rgba()/hsl()/hsla() — args: numbers, percentages, commas, spaces,
+  // slashes (for modern `rgb(r g b / a)` syntax), dots. Nothing else.
+  const fnMatch = /^(rgb|rgba|hsl|hsla)\s*\(([^)]*)\)$/i.exec(s);
+  if (fnMatch) {
+    const args = fnMatch[2] ?? '';
+    // No nested parens, no letters other than whitespace-safe; allow digits,
+    // commas, spaces, dots, percent, minus, slash.
+    if (/[^0-9,.\s%\-\/]/.test(args)) return false;
+    return true;
+  }
+
+  // Named color
+  if (CSS_NAMED_COLORS.has(s.toLowerCase())) return true;
+
+  return false;
+}
+
+/**
+ * Validate a single CSS dimension value: `0` or `<number><unit>`.
+ * Rejects calc(), url(), expression(), var(), arithmetic, anything else.
+ */
+export function isValidDimension(raw: string): boolean {
+  if (typeof raw !== 'string') return false;
+  const s = raw.trim();
+  if (!s) return false;
+  if (hasDangerousSubstring(s)) return false;
+
+  // Bare zero
+  if (s === '0') return true;
+
+  // <number><unit> — optional sign, optional decimal, unit required
+  const m = /^(-?\d+(?:\.\d+)?|-?\.\d+)([a-zA-Z%]+)$/.exec(s);
+  if (!m) return false;
+  const unit = (m[2] ?? '').toLowerCase();
+  return ALLOWED_UNITS.has(unit);
+}
+
+/**
+ * Validate a font-family stack. Each family must be simple identifiers or
+ * quoted strings with only safe characters.
+ *
+ * Allowed characters inside a family name: a-zA-Z0-9, space, hyphen.
+ * Quotes (single or double) are permitted as wrappers.
+ * Multiple families are separated by commas.
+ */
+export function isValidFontFamily(raw: string): boolean {
+  if (typeof raw !== 'string') return false;
+  const s = raw.trim();
+  if (!s) return false;
+  if (hasDangerousSubstring(s)) return false;
+
+  // Split on commas not inside quotes. Good enough for our constrained grammar.
+  const parts = splitFontFamilies(s);
+  if (parts.length === 0) return false;
+  for (const part of parts) {
+    const p = part.trim();
+    if (!p) return false;
+    // Strip matching surrounding quotes
+    let inner = p;
+    if ((p.startsWith('"') && p.endsWith('"')) || (p.startsWith("'") && p.endsWith("'"))) {
+      inner = p.slice(1, -1);
+    }
+    // Inner must be a-zA-Z0-9, space, hyphen only. No quotes, no parens, no
+    // backslashes, no digits-only garbage in the middle.
+    if (!/^[a-zA-Z][a-zA-Z0-9\s-]*$/.test(inner)) return false;
+  }
+  return true;
+}
+
+function splitFontFamilies(s: string): string[] {
+  const out: string[] = [];
+  let buf = '';
+  let quote: string | null = null;
+  for (const ch of s) {
+    if (quote) {
+      buf += ch;
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      buf += ch;
+      continue;
+    }
+    if (ch === ',') {
+      out.push(buf);
+      buf = '';
+      continue;
+    }
+    buf += ch;
+  }
+  if (buf) out.push(buf);
+  return out;
+}
+
+/**
+ * Validate a shadow string: `[<dimension> <dimension> <dimension> (<dimension>)? <color>]`
+ * with optional leading `inset`. We re-parse the composed string to ensure
+ * no free-form text ever reaches the output.
+ */
+export function isValidShadow(raw: string): boolean {
+  if (typeof raw !== 'string') return false;
+  const s = raw.trim();
+  if (!s) return false;
+  if (hasDangerousSubstring(s)) return false;
+
+  // Tokenize: split on top-level whitespace, but keep fn-call groups (e.g.
+  // `rgba(0, 0, 0, 0.1)`) as one token.
+  const tokens = splitShadowTokens(s);
+  if (tokens.length < 3) return false;
+
+  // Optional leading `inset`
+  let i = 0;
+  if (tokens[i]?.toLowerCase() === 'inset') i++;
+
+  // offsetX, offsetY required
+  if (!isValidDimension(tokens[i++] ?? '')) return false;
+  if (!isValidDimension(tokens[i++] ?? '')) return false;
+
+  // Remaining tokens: 0-2 dimensions (blur, spread), then a final color.
+  // Color is always last.
+  const remaining = tokens.slice(i);
+  if (remaining.length === 0 || remaining.length > 3) return false;
+
+  const colorTok = remaining[remaining.length - 1]!;
+  if (!isValidColor(colorTok)) return false;
+
+  for (let j = 0; j < remaining.length - 1; j++) {
+    if (!isValidDimension(remaining[j]!)) return false;
+  }
+  return true;
+}
+
+function splitShadowTokens(s: string): string[] {
+  const out: string[] = [];
+  let buf = '';
+  let depth = 0;
+  for (const ch of s) {
+    if (ch === '(') {
+      depth++;
+      buf += ch;
+      continue;
+    }
+    if (ch === ')') {
+      depth--;
+      buf += ch;
+      continue;
+    }
+    if (depth === 0 && /\s/.test(ch)) {
+      if (buf) {
+        out.push(buf);
+        buf = '';
+      }
+      continue;
+    }
+    buf += ch;
+  }
+  if (buf) out.push(buf);
+  return out;
+}
+
+/**
+ * Validate a CSS border shorthand: `<width> <style> <color>` (each part
+ * validated with its own allowlist). Order-tolerant.
+ */
+export function isValidBorder(raw: string): boolean {
+  if (typeof raw !== 'string') return false;
+  const s = raw.trim();
+  if (!s) return false;
+  if (hasDangerousSubstring(s)) return false;
+
+  const tokens = splitShadowTokens(s);
+  if (tokens.length !== 3) return false;
+
+  let widthOk = false, styleOk = false, colorOk = false;
+  for (const tok of tokens) {
+    if (!widthOk && isValidDimension(tok)) { widthOk = true; continue; }
+    if (!styleOk && ALLOWED_BORDER_STYLES.has(tok.toLowerCase())) { styleOk = true; continue; }
+    if (!colorOk && isValidColor(tok)) { colorOk = true; continue; }
+    return false;
+  }
+  return widthOk && styleOk && colorOk;
+}
+
 type Section = 'colors' | 'spacing' | 'radius' | 'fonts' | 'shadows';
 
 interface NormalizedToken {
@@ -196,6 +468,33 @@ function walk(
         formatted = formatShadow(rawValue);
         break;
     }
+
+    // --- SECURITY GATE (Issue #95) ----------------------------------------
+    // Validate the formatted output against a per-section allowlist. A single
+    // bad token is skipped with a warning — we never abort the whole import.
+    let securityOk = false;
+    switch (section) {
+      case 'colors':
+        securityOk = isValidColor(formatted);
+        break;
+      case 'spacing':
+      case 'radius':
+        securityOk = isValidDimension(formatted);
+        break;
+      case 'fonts':
+        securityOk = isValidFontFamily(formatted);
+        break;
+      case 'shadows':
+        securityOk = isValidShadow(formatted);
+        break;
+    }
+    if (!securityOk) {
+      warnings.push(
+        `Skipped token "${pathStack.join('.')}" — value failed ${section} validation (possible injection): ${JSON.stringify(formatted).slice(0, 80)}`,
+      );
+      return;
+    }
+    // ---------------------------------------------------------------------
 
     const skipFirst =
       pathStack.length > 1 &&

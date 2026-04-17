@@ -952,12 +952,19 @@ export class Compiler {
         `.nx-burger[open] .nx-burger-open{display:inline}`;
       this.css.push(baseCss);
 
-      // Responsive: below breakpoint, show summary, hide nav unless open
+      // Responsive: below breakpoint, show summary, hide nav unless open.
+      // Body-scroll-lock (Issue #98): when the burger is open at mobile sizes,
+      // lock scroll on html+body so the background doesn't scroll on iOS Safari.
+      // Zero-JS — pure CSS via `:has()` (95%+ browser support, required for iOS 15.4+).
+      // Both `html` and `body` get `overflow:hidden` because iOS Safari needs html
+      // locked to fully stop rubber-band scrolling; `overscroll-behavior:contain`
+      // prevents scroll-chaining into the body when the nav itself overflows.
       const respCss =
         `@media(max-width:${breakpointPx}px){` +
         `.${bpKey}>summary{display:inline-block;padding:.5rem 1rem}` +
         `.${bpKey}>nav{display:none;flex-direction:column;gap:1rem;padding:1rem}` +
         `.${bpKey}[open]>nav{display:flex}` +
+        `html:has(.${bpKey}[open]),body:has(.${bpKey}[open]){overflow:hidden;overscroll-behavior:contain}` +
         `}`;
       this.css.push(respCss);
     }
