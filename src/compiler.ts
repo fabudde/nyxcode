@@ -16,7 +16,7 @@ import {
   FormStatement, AuthStatement, ElementNode, Expression, ScriptStatement,
   StyleProperty, ResponsiveBlock, Attribute, PseudoElementBlock,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
-  HeadStatement, AnimateStatement, LayoutNode, StoreNode,
+  HeadStatement, AnimateStatement, LayoutNode, StoreNode, KeyframesNode,
 } from './ast.js';
 
 import { readFileSync } from 'fs';
@@ -81,6 +81,9 @@ export class Compiler {
   private presets: Map<string, string> = new Map(); // preset name → CSS class name
   private scripts: string[] = [];
   private animations: string[] = [];
+  // v0.25.0 #110 — top-level `keyframes name { ... }` blocks. Shared across all pages
+  // (NOT reset per-page) because the syntax is a program-level declaration.
+  private topLevelKeyframes: Map<string, string> = new Map(); // name -> complete @keyframes CSS block
   private footnotesStyleInjected: boolean = false;
   private svgDepth: number = 0;  // Tracks nesting inside <svg> so SVG-specific tags (text, title) aren't remapped to HTML (#62)
   private styleCache: Map<string, string> = new Map(); // hash -> className for dedup
@@ -163,6 +166,13 @@ export class Compiler {
     for (const theme of regularThemeNodes) this.compileTheme(theme);
     // Save all theme-related head injections (light :root, dark mode, Google Fonts)
     const themeHeadInjections = [...this.headInjections];
+
+    // v0.25.0 #110 — process top-level `keyframes name { ... }` blocks.
+    // Placed after themes so theme tokens resolve inside keyframe values, and
+    // before pages so they appear in the CSS output ahead of page styles.
+    for (const node of program.body) {
+      if (node.type === 'Keyframes') this.processTopLevelKeyframes(node as KeyframesNode);
+    }
 
     // Process preset blocks
     for (const node of program.body) {
@@ -317,6 +327,11 @@ export class Compiler {
     }
     for (const node of program.body) {
       if (node.type === 'Theme' && !(node as any).name) this.compileTheme(node);
+    }
+
+    // v0.25.0 #110 — top-level `keyframes name { ... }` blocks (after themes, before styles).
+    for (const node of program.body) {
+      if (node.type === 'Keyframes') this.processTopLevelKeyframes(node as KeyframesNode);
     }
 
     // Process preset blocks
@@ -508,7 +523,8 @@ export class Compiler {
     // Issue #97: dedupe singleton meta tags so page-level `meta {}` overrides site-level.
     const dedupedInjections = this.dedupeHeadInjections(this.headInjections);
     const headExtra = dedupedInjections.length > 0 ? '\n  ' + dedupedInjections.join('\n  ') : '';
-    const animCSS = this.animations.length > 0 ? '\n    ' + this.animations.join('\n    ') : '';
+    const topLevelKfCSS = this.topLevelKeyframes.size > 0 ? '\n    ' + [...this.topLevelKeyframes.values()].join('\n    ').trimEnd() : '';
+    const animCSS = (this.animations.length > 0 ? '\n    ' + this.animations.join('\n    ') : '') + topLevelKfCSS;
     const elementDefaults = this.buildElementDefaults();
 
     // Dedup defaults against user-provided meta {} tags
@@ -1111,6 +1127,18 @@ export class Compiler {
     }
     css += `  }\n}\n`;
     return css;
+  }
+
+  /**
+   * Register a top-level `keyframes name { ... }` block (v0.25.0 #110).
+   * Throws on duplicate names across the whole program.
+   */
+  private processTopLevelKeyframes(node: KeyframesNode): void {
+    if (this.topLevelKeyframes.has(node.name)) {
+      throw new Error(`[NyxCode Compiler Error] Duplicate keyframes name '${node.name}' at line ${node.line}:${node.col}. Each keyframes block must have a unique name.`);
+    }
+    const css = this.buildKeyframesCSS(node.name, node.steps);
+    this.topLevelKeyframes.set(node.name, css);
   }
 
   /** Build `@keyframes NAME { 0% { ... } 50% { ... } }` CSS with shorthand + theme resolution. */
@@ -1911,6 +1939,37 @@ export class Compiler {
       }
       css += '}';
     }
+    // v0.25.0 (#109): native `theme { body { ... } }` block emits a real `body { }` CSS rule.
+    // Goes AFTER :root (so vars are available) and BEFORE page-specific styles (page can override).
+    if (theme.body && theme.body.length > 0) {
+      const bodyProps = theme.body.map((s: any) => {
+        const prop = this.mapCSSProperty(s.name);
+        return prop + ': ' + this.resolveThemeValue(prop, s.value);
+      }).join('; ');
+      css += 'body{' + bodyProps + '}';
+    }
+    // v0.25.0 (#111): native `theme { selection { ... } }` block emits a real `::selection { }` CSS rule.
+    // Goes AFTER :root + body so theme vars are available and page styles can still override.
+    if (theme.selection && theme.selection.length > 0) {
+      const selProps = theme.selection.map((s: any) => {
+        const prop = this.mapCSSProperty(s.name);
+        return prop + ': ' + this.resolveThemeValue(prop, s.value);
+      }).join('; ');
+      css += '::selection{' + selProps + '}';
+    }
+    // v0.25.0 (#112): native `theme { defaults { a { ... } pre { ... } } }` emits element
+    // default styles wrapped in `:where()` for zero specificity, so local element styles
+    // always override defaults without needing !important.
+    if (theme.defaults && theme.defaults.length > 0) {
+      for (const def of theme.defaults) {
+        if (!def.properties || def.properties.length === 0) continue;
+        const props = def.properties.map((p: any) => {
+          const prop = this.mapCSSProperty(p.name);
+          return prop + ': ' + this.resolveThemeValue(prop, p.value);
+        }).join('; ');
+        css += ':where(' + def.element + '){' + props + '}';
+      }
+    }
     if (fontCSS) css += fontCSS;
     if (css) {
       this.headInjections.push('<style>' + css + '</style>');
@@ -2680,7 +2739,8 @@ export class Compiler {
     // Issue #97: dedupe singleton meta tags so page-level `meta {}` overrides site-level.
     const dedupedInjections = this.dedupeHeadInjections(this.headInjections);
     const headExtra = dedupedInjections.length > 0 ? '\n  ' + dedupedInjections.join('\n  ') : '';
-    const animCSS = this.animations.length > 0 ? '\n    ' + this.animations.join('\n    ') : '';
+    const topLevelKfCSS = this.topLevelKeyframes.size > 0 ? '\n    ' + [...this.topLevelKeyframes.values()].join('\n    ').trimEnd() : '';
+    const animCSS = (this.animations.length > 0 ? '\n    ' + this.animations.join('\n    ') : '') + topLevelKfCSS;
     const elementDefaults = this.buildElementDefaults();
 
     const hasViewport = /<meta[^>]+name=["']viewport["']/i.test(headExtra);

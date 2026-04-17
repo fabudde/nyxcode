@@ -19,7 +19,14 @@ export interface Program extends BaseNode {
 }
 
 export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode | ConfigNode | HookNode | MiddlewareNode | FootnotesStatement
-  | PresetNode | HeadStatement;
+  | PresetNode | HeadStatement | KeyframesNode;
+
+/** `keyframes name { 0% { ... } 50% { ... } 100% { ... } }` — top-level @keyframes definition (v0.25.0 #110) */
+export interface KeyframesNode extends BaseNode {
+  type: 'Keyframes';
+  name: string;
+  steps: Array<{ selector: string; properties: StyleProperty[] }>;
+}
 
 /** `page /path { ... }` */
 export interface PageNode extends BaseNode {
@@ -76,6 +83,12 @@ export interface ThemeNode extends BaseNode {
   preset?: string;       // v0.17.0 — `@theme "brutalist"` (preset name)
   name?: string;         // v0.23.0 — `@theme "brand-base" { ... }` (named theme, extractable as base)
   extends?: string;      // v0.23.0 — `@theme extends "./themes/base.nyx" { ... }` (inherits from named theme at path, token-merge only, not style-inheritance)
+  /** v0.25.0 — `theme { body { bg #000; c #fff } }` — native body-level styles (#109) */
+  body?: Array<{ name: string; value: string }>;
+  /** v0.25.0 — `theme { selection { bg pink; c white } }` — native ::selection styles (#111) */
+  selection?: Array<{ name: string; value: string }>;
+  /** v0.25.0 — `theme { defaults { a { c #9b8ec4 } pre { font-family ... } } }` — element default styles wrapped in :where() for zero specificity (#112) */
+  defaults?: Array<{ element: string; properties: Array<{ name: string; value: string }> }>;
 }
 
 /** `security { ... }` */

@@ -1,3 +1,21 @@
+## v0.25.0 — "Multi-Value" (2026-04-17)
+
+Bug #115: multi-value CSS functions on a single line finally work.
+
+### Fixed
+
+- **[#115](https://github.com/fabudde/nyxcode/issues/115) — Multi-value CSS functions broke.** Two independent problems collided:
+  1. Shorthand property names (`bg`, `tf`, `fi`, `bdf`, `tr`, `anim`, `bgi`, `gtc`, `gtr`, …) weren't in `COMMA_VALUE_PROPERTIES`, so a comma at paren-depth 0 was treated as a property separator. `bg radial-gradient(...), radial-gradient(...)` became `background: ...; radial-gradient: (...)`.
+  2. Inside parens the parser glued consecutive identifier/number tokens together with no whitespace, so `radial-gradient(ellipse at 15% 10%, …)` came out as `radial-gradient(ellipseat15%10%, …)`.
+  Both are fixed. Adjacent identifier/number tokens inside function calls now join with a single space (while `--custom-prop`, unary `-`, and binary `-` spacing rules are preserved). Multiple stacked gradients, multiple box-shadows, chained filters, chained transforms — all parse correctly now.
+
+### Stats
+
+- **14 new tests** in `v0250-multi-value.test.ts` (263 passing overall)
+- No breaking changes — pure bugfix
+
+---
+
 ## v0.24.4 — "Tyto's Eyes" (2026-04-17)
 
 Two more issues from Tyto's eagle-eyed QA.

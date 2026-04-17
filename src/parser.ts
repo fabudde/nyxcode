@@ -23,7 +23,7 @@ import {
   ThemeSection, ValidateStatement, ValidateField, RespondStatement,
   LimitStatement, QueryStatement, ResponsiveBlock, SecurityNode, SecurityRule,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
-  HeadStatement, AnimateStatement, PseudoElementBlock, LayoutNode,
+  HeadStatement, AnimateStatement, PseudoElementBlock, LayoutNode, KeyframesNode,
   ScriptStatement, FormAction, ConfigNode, EnvVar, HookNode, MiddlewareNode,
 } from './ast.js';
 
@@ -111,6 +111,7 @@ export class Parser {
       case TokenType.Use: return this.parseUse() as any;
       case TokenType.Layout: return this.parseLayout();
       case TokenType.Preset: return this.parsePreset() as any;
+      case TokenType.Keyframes: return this.parseTopLevelKeyframes() as any;
       case TokenType.Identifier:
         if (token.value === 'middleware') return this.parseMiddleware();
         if (token.value === 'meta') return this.parseMeta() as any;
@@ -497,9 +498,88 @@ export class Parser {
     this.consume(TokenType.LeftBrace);
 
     const sections: ThemeSection[] = [];
+    let bodyStyles: Array<{ name: string; value: string }> | undefined;
+    let selectionStyles: Array<{ name: string; value: string }> | undefined;
+    let defaultsList: Array<{ element: string; properties: Array<{ name: string; value: string }> }> | undefined;
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       const sectionName = this.consumeIdentifier();
       this.consume(TokenType.LeftBrace);
+
+      // v0.25.0 — `defaults { a { c #9b8ec4; td none } pre { ... } }` (#112)
+      // Each sub-block is an element name; properties are parsed as native CSS
+      // (preserving quoted strings for font-family stacks, commas for font stacks,
+      // semicolons as property separators) and emitted by the compiler wrapped
+      // in `:where(el) { ... }` so specificity stays at 0.
+      if (sectionName === 'defaults') {
+        const defs: Array<{ element: string; properties: Array<{ name: string; value: string }> }> = [];
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          if (this.peek().type !== TokenType.Identifier) break;
+          // Eat stray leading semicolons between element blocks
+          if (this.peek().value === ';') { this.advance(); continue; }
+          const element = this.advance().value;
+          this.consume(TokenType.LeftBrace);
+          const props: Array<{ name: string; value: string }> = [];
+          while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            if (this.peek().type !== TokenType.Identifier) break;
+            // Eat stray leading semicolons (lexed as Identifier ";")
+            if (this.peek().value === ';') { this.advance(); continue; }
+            let prop = this.advance().value;
+            // Vendor prefix rescue: `-webkit-foo` lexes as `-` + ident + ...
+            if (prop === '-' && this.check(TokenType.Identifier)) {
+              prop = '-' + this.advance().value;
+            }
+            // Glue subsequent `-ident` pairs (font-family, -webkit-font-smoothing, ...)
+            while (this.peek()?.value === '-' && this.peekAt(1)?.type === TokenType.Identifier) {
+              this.advance();
+              prop = prop + '-' + this.advance().value;
+            }
+            // Optional colon (CSS habit)
+            if (this.check(TokenType.Colon)) this.advance();
+            const value = this.collectDefaultsValue();
+            // Trailing `;` (lexed as Identifier ";")
+            if (this.check(TokenType.Identifier) && this.peek().value === ';') this.advance();
+            if (value) props.push({ name: prop, value });
+          }
+          this.consume(TokenType.RightBrace);
+          if (props.length > 0) defs.push({ element, properties: props });
+        }
+        this.consume(TokenType.RightBrace);
+        defaultsList = (defaultsList || []).concat(defs);
+        continue;
+      }
+
+      // v0.25.0 — `body { ... }` / `selection { ... }` sections: parse as native CSS properties.
+      // `body`      → emits a real `body { }` rule (#109).
+      // `selection` → emits a real `::selection { }` rule (#111).
+      if (sectionName === 'body' || sectionName === 'selection') {
+        const styles: Array<{ name: string; value: string }> = [];
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          if (this.peek().type !== TokenType.Identifier) break;
+          let prop = this.advance().value;
+          // Handle vendor prefixes: `-webkit-font-smoothing` lexes as `-` + ident + ...
+          if (prop === '-' && this.check(TokenType.Identifier)) {
+            prop = '-' + this.advance().value;
+          }
+          // Glue subsequent `-ident` pairs onto the property name (font-family, -webkit-font-smoothing, etc.)
+          while (this.peek()?.value === '-' && this.peekAt(1)?.type === TokenType.Identifier) {
+            this.advance(); // consume '-'
+            prop = prop + '-' + this.advance().value;
+          }
+          // Skip optional colon (CSS habit: `bg: #000`)
+          if (this.check(TokenType.Colon)) this.advance();
+          const value = this.collectCSSValue();
+          // Skip optional trailing semicolon (lexed as Identifier ";")
+          if (this.check(TokenType.Identifier) && this.peek().value === ';') this.advance();
+          if (value) styles.push({ name: prop, value });
+        }
+        this.consume(TokenType.RightBrace);
+        if (sectionName === 'body') {
+          bodyStyles = (bodyStyles || []).concat(styles);
+        } else {
+          selectionStyles = (selectionStyles || []).concat(styles);
+        }
+        continue;
+      }
 
       const entries: Record<string, string> = {};
       const fontsMeta: Record<string, { family: string; source: 'google' | 'local' | 'stack'; localPath?: string }> = {};
@@ -713,6 +793,9 @@ export class Parser {
     if (mode) node.mode = mode;
     if (themeName) node.name = themeName;
     if (themeExtends) node.extends = themeExtends;
+    if (bodyStyles && bodyStyles.length > 0) node.body = bodyStyles;
+    if (selectionStyles && selectionStyles.length > 0) node.selection = selectionStyles;
+    if (defaultsList && defaultsList.length > 0) node.defaults = defaultsList;
     if (node.mode && (node.name || node.extends)) {
       throw this.error('`@theme dark` cannot be combined with `as` or `extends`. Dark mode is a per-theme variant; declare it separately.');
     }
@@ -982,6 +1065,57 @@ export class Parser {
       }
     }
     return { type: 'Animate', name, content: content.trim(), line: start.line, col: start.col };
+  }
+
+  /**
+   * Parse top-level `keyframes name { 0%, 100% { ... } 50% { ... } }` block (v0.25.0 #110).
+   *
+   * Structured parse — each step's properties go through `parseStyleProperty` so
+   * they support CSS shorthand mappings (`tf`, `bg`, `c`, `op`, etc.) and theme tokens.
+   *
+   * Selector handling: `0%`, `100%`, `from`, `to`, or comma-separated lists like `0%, 100%`.
+   * The lexer may emit `0%` as one Number token (its unit-handling treats `%` as a unit)
+   * OR emit `0` + `%` as two tokens — we handle both shapes.
+   */
+  private parseTopLevelKeyframes(): KeyframesNode {
+    const start = this.consume(TokenType.Keyframes);
+    const name = this.consumeIdentifier();
+    this.consume(TokenType.LeftBrace);
+
+    const steps: Array<{ selector: string; properties: StyleProperty[] }> = [];
+
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      // Parse selector list until the next `{`.
+      const selectorParts: string[] = [];
+      while (!this.check(TokenType.LeftBrace) && !this.isAtEnd()) {
+        const t = this.advance();
+        if (t.type === TokenType.Comma) {
+          selectorParts.push(',');
+        } else if (t.value === '%') {
+          // Attach `%` directly to the previous token (handles `0 %` → `0%`).
+          if (selectorParts.length > 0) {
+            selectorParts[selectorParts.length - 1] = selectorParts[selectorParts.length - 1] + '%';
+          } else {
+            selectorParts.push('%');
+          }
+        } else {
+          selectorParts.push(t.value);
+        }
+      }
+      const selector = selectorParts.join(' ').replace(/\s*,\s*/g, ', ').trim();
+
+      this.consume(TokenType.LeftBrace);
+      const stepProps: StyleProperty[] = [];
+      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+        stepProps.push(this.parseStyleProperty());
+      }
+      this.consume(TokenType.RightBrace);
+
+      steps.push({ selector, properties: stepProps });
+    }
+    this.consume(TokenType.RightBrace);
+
+    return { type: 'Keyframes', name, steps, line: start.line, col: start.col };
   }
 
   // --- Body parsing (statements inside { }) ---
@@ -1510,7 +1644,7 @@ export class Parser {
     'columns', 'col-gap', 'col-count', 'col-rule', 'hyphens', 'ww',
     // Grid areas + container (#55, #56)
     'areas', 'area', 'container', 'container-name',
-    'obf', 'obp', 'bf', 'fil', 'mix', 'si', 'sa',
+    'obf', 'obp', 'bf', 'bdf', 'fil', 'mix', 'si', 'sa',
     'ji', 'js', 'oc', 'ow', 'o', 't', 'l', 'b',
   ]);
 
@@ -1520,10 +1654,18 @@ export class Parser {
    * consumed as part of the value instead of ending the property.
    */
   private static COMMA_VALUE_PROPERTIES = new Set([
+    // Full CSS property names
     'font-family', 'font', 'transition', 'animation', 'background',
     'background-image', 'shadow', 'box-shadow', 'text-shadow',
     'grid-template-columns', 'grid-template-rows', 'grid-template-areas',
     'transform', 'filter', 'backdrop-filter',
+    // v0.25.0 — Bug #115: Shorthands whose values can span multiple
+    // comma-separated parts (e.g., two gradients, multiple shadows).
+    // Without these, `bg radial-gradient(...), radial-gradient(...)` was
+    // split on the top-level comma and the second gradient became its own
+    // (invalid) property declaration.
+    'bg', 'bgi', 'tshadow', 'ff', 'tr', 'tf', 'anim',
+    'fi', 'fil', 'bdf', 'bf', 'gtc', 'gtr',
   ]);
 
   /**
@@ -1672,7 +1814,20 @@ export class Parser {
               !value.endsWith('(') && !value.endsWith(', ') && !value.endsWith(',')) {
             value += ' ' + tok.value + ' ';
           } else {
-            value += tok.value;
+            // v0.25.0 — Bug #115: Inside parens, consecutive value tokens like
+            // identifiers and numbers were glued together with no separator,
+            // so `radial-gradient(ellipse at 15% 10%, ...)` came out as
+            // `radial-gradient(ellipseat15%10%, ...)`. Insert a space between
+            // adjacent identifier/number tokens; keep things tight after `(`,
+            // after a `, ` separator, or when attaching a unit/sign.
+            const needsSpace =
+              value.length > 0 &&
+              !value.endsWith('(') &&
+              !value.endsWith(' ') &&
+              !value.endsWith('-') &&
+              !value.endsWith('+') &&
+              (tok.type === TokenType.Identifier || tok.type === TokenType.Number);
+            value += (needsSpace ? ' ' : '') + tok.value;
           }
         }
         continue;
@@ -1736,8 +1891,13 @@ export class Parser {
               break;
             }
           }
-          // Not a CSS property after comma — comma is part of the value
-          value += this.advance().value + ' ';
+          // Not a CSS property after comma — comma is part of the value.
+          // v0.25.0 — Bug #115: Only append the comma here; the default token
+          // handlers below insert a single leading space before the next token
+          // (identifier/number/function name). Adding an extra ' ' here too
+          // produced a double space: `rgba(...),  0 4px ...`.
+          this.advance();
+          value += ',';
           continue;
         } else {
           // Normal property: comma is always a separator
@@ -1929,6 +2089,70 @@ export class Parser {
       'ellipsis',
     ]);
     return CSS_VALUES.has(name);
+  }
+
+  /**
+   * Collects a CSS value inside a `theme { defaults { el { ... } } }` property.
+   * Stops at: `;` (Identifier token), `}`, a new Identifier on a later line, or EOF.
+   * Preserves quoted strings for font-family stacks, keeps commas for stacks,
+   * and handles nested parens. Used by #112 element defaults.
+   */
+  private collectDefaultsValue(): string {
+    type Part = { kind: 'token' | 'string'; value: string };
+    const parts: Part[] = [];
+    let parenDepth = 0;
+    let lastLine = this.peek().line;
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      const next = this.peek();
+      if (next.type === TokenType.LeftParen) { parenDepth++; this.advance(); parts.push({ kind: 'token', value: '(' }); lastLine = next.line; continue; }
+      if (next.type === TokenType.RightParen) { parenDepth = Math.max(0, parenDepth - 1); this.advance(); parts.push({ kind: 'token', value: ')' }); lastLine = next.line; continue; }
+      if (parenDepth > 0) {
+        if (next.type === TokenType.String) { this.advance(); parts.push({ kind: 'string', value: next.value }); lastLine = next.line; continue; }
+        parts.push({ kind: 'token', value: this.advance().value });
+        lastLine = next.line;
+        continue;
+      }
+      // Semicolon terminates the value (lexed as Identifier ";")
+      if (next.type === TokenType.Identifier && next.value === ';') break;
+      // Commas are part of the value (font stacks etc.)
+      if (next.type === TokenType.Comma) {
+        this.advance();
+        parts.push({ kind: 'token', value: ',' });
+        lastLine = next.line;
+        continue;
+      }
+      if (next.type === TokenType.String) {
+        // New-line string after a value break = new property? Keep simple: a string
+        // in this context is always value continuation (font-family "Inter").
+        this.advance();
+        parts.push({ kind: 'string', value: next.value });
+        lastLine = next.line;
+        continue;
+      }
+      if (next.type === TokenType.Identifier && parts.length > 0) {
+        const after = this.tokens[this.pos + 1];
+        if (after && after.type === TokenType.LeftParen) { /* function call, continue */ }
+        else if (this.isCSSValueKeyword(next.value)) { /* value keyword, continue */ }
+        else if (parts[parts.length - 1].value === ',') { /* stack continuation */ }
+        else if (next.line === lastLine) { /* same line, continue */ }
+        else break; // new line + bare identifier = next property name
+      }
+      parts.push({ kind: 'token', value: this.advance().value });
+      lastLine = next.line;
+    }
+    let result = '';
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      const pv = p.kind === 'string' ? '"' + p.value + '"' : p.value;
+      if (i > 0) {
+        const prev = parts[i - 1];
+        const prevV = prev.kind === 'string' ? '"' + prev.value + '"' : prev.value;
+        const noSpace = pv === ')' || pv === ',' || pv === '(' || prevV === '(' || prevV === '-' || prevV === '--';
+        if (!noSpace) result += ' ';
+      }
+      result += pv;
+    }
+    return result.trim();
   }
 
   private collectCSSValue(): string {

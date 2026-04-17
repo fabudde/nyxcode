@@ -45,6 +45,7 @@ export enum TokenType {
   Config = 'Config',
   Before = 'Before',
   After = 'After',
+  Keyframes = 'Keyframes',
 
   // Operators & Punctuation
   LeftBrace = 'LeftBrace',       // {
@@ -113,6 +114,7 @@ export const KEYWORDS: Record<string, TokenType> = {
   config: TokenType.Config,
   before: TokenType.Before,
   after: TokenType.After,
+  keyframes: TokenType.Keyframes,
 };
 
 export interface Token {
