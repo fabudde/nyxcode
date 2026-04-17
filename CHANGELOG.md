@@ -1,3 +1,79 @@
+## v0.24.0 — "Burger" (2026-04-17)
+
+**FEATURE: [#96](https://github.com/fabudde/nyxcode/issues/96)** — Zero-JS responsive burger nav.
+
+### Syntax
+
+```nyx
+nav burger {
+  a "Home"  href="/"
+  a "About" href="/about"
+}
+```
+
+### What it does
+
+One attribute turns any `<nav>` into a responsive collapsible menu using native HTML `<details>`/`<summary>`. Above the configured breakpoint, the nav renders as a normal link row. Below it, a toggle button expands/collapses the nav. Zero JavaScript, full keyboard and screen-reader support.
+
+### Options
+
+| Attribute                   | Default            | Purpose                                                |
+|-----------------------------|--------------------|--------------------------------------------------------|
+| `burger`                    | `768px` breakpoint | Bare flag enables the collapsible behavior.            |
+| `burger=<breakpoint-token>` | —                  | Use a theme breakpoint token (`sm`, `md`, `lg`, ...).  |
+| `icon="..."`                | `Menu`             | Closed-state label.                                    |
+| `open-label="..."`          | `Close`            | Open-state label.                                      |
+| `aria-label="..."`          | `Main navigation`  | Inner `<nav>` `aria-label`.                            |
+| `summary-aria-label="..."`  | `Toggle menu`      | `<summary>` `aria-label`.                              |
+
+### State-correct accessibility (Tyto 🦉 catch)
+
+The `<summary>` emits two sibling spans toggled via CSS `[open]`:
+
+```html
+<summary aria-label="Toggle menu">
+  <span class="nx-burger-closed">Menu</span>
+  <span class="nx-burger-open" aria-hidden="true">Close</span>
+</summary>
+```
+
+`aria-label` stays state-neutral; the visible label flips on open/close without JS. The earlier `aria-label="Open menu"` design would have lied to screen readers after the first toggle — this version doesn't.
+
+### Did-you-mean errors for breakpoints
+
+Unknown breakpoint tokens raise a v0.23.3-style suggestion:
+
+```
+nav burger: unknown breakpoint 'xl'. Did you mean 'lg'?
+```
+
+Missing `theme.breakpoints.<token>` raises a hard error telling you to define it or use the default bare `burger` attribute (768px).
+
+### Known limits
+
+- **No Escape-to-close.** Deliberate: native `<details>` doesn't close on <kbd>Esc</kbd>, and fixing this requires JavaScript. Keeping the zero-JS promise is the stronger property.
+- **No body-scroll-lock.** Opening the burger on iOS may let background content scroll. Filed as [#98](https://github.com/fabudde/nyxcode/issues/98) for future exploration.
+- **`icon=` is compile-time only.** Must be a string literal. Never bind to user input.
+
+### Review credits
+
+Spec: @NyxTheLobster. Design review: @Kiro-Rudel (nested-nav warning, `[open]` state hook, 1-2 day scope estimate, auto-`aria-label`). A11y/security review: @TytoTheOwl (state-correct dual spans replacing the static label, Esc-handler deferral, `content-visibility` debate, `icon=` XSS flag). Consolidated and implemented by @NyxTheLobster.
+
+### Added
+
+- `compileBurgerNav` helper in `src/compiler.ts` (~130 lines).
+- Parser: `burger` added to `LAYOUT_BOOLEANS` so it parses as a bare attribute.
+- 15 new tests in `src/tests/v0240-burger-nav.test.ts`. **113/113 green.**
+
+### Not in scope (future)
+
+- Escape-to-close handler (requires JS).
+- `content-visibility: hidden` on closed nav (deferred pending real AT-stack regression reports).
+- Body-scroll-lock on iOS (#98).
+- Animated hamburger-to-X glyph transitions (possible today via user-provided CSS on `details[open] summary`).
+
+---
+
 ## v0.23.5 — "Figma import" (2026-04-17)
 
 **FEATURE: [#88](https://github.com/fabudde/nyxcode/issues/88)** — Figma / W3C DTCG token importer.

@@ -2403,7 +2403,10 @@ private parseElement(): ElementNode {
           break; // Let form parser handle these
         }
         // Layout shorthand booleans: center, between, around, evenly, wrap, nowrap
-        const LAYOUT_BOOLEANS = new Set(['center', 'between', 'around', 'evenly', 'wrap', 'nowrap']);
+        // v0.24.0: 'burger' is a bare-attribute form on <nav> (Issue #96).
+        //   `nav burger { ... }` → responsive collapsible nav.
+        //   `nav burger=md { ... }` is handled by the key=value branch above.
+        const LAYOUT_BOOLEANS = new Set(['center', 'between', 'around', 'evenly', 'wrap', 'nowrap', 'burger']);
         if (LAYOUT_BOOLEANS.has(next.value)) {
           attributes.push({ name: this.advance().value, value: 'true' });
         }

@@ -316,6 +316,83 @@ theme {
 page / { div { style { p spacing.2xl } } }   # → padding: var(--spacing-2xl)
 ```
 
+## Responsive Burger Nav (v0.24.0)
+
+One attribute → full mobile-responsive collapsible nav. Zero JavaScript.
+
+```nyx
+nav burger {
+  a "Home"    href="/"
+  a "About"   href="/about"
+  a "Contact" href="/contact"
+}
+```
+
+Compiles to a native HTML5 `<details>`/`<summary>` pair with responsive CSS that hides the summary on desktop and shows it as a toggle button on mobile. No click-handler JS, no runtime dependency — the browser handles open/close natively (including keyboard and screen-reader support).
+
+### Options
+
+| Attribute                   | Default            | Description                                            |
+|-----------------------------|--------------------|--------------------------------------------------------|
+| `burger`                    | `768px` breakpoint | Bare flag enables the collapsible behavior.            |
+| `burger=<breakpoint>`       | —                  | Use a theme breakpoint token (`sm`, `md`, `lg`, etc.). |
+| `icon="..."`                | `Menu`             | Closed-state label. Accepts text or glyphs.            |
+| `open-label="..."`          | `Close`            | Open-state label.                                      |
+| `aria-label="..."`          | `Main navigation`  | `aria-label` on the inner `<nav>`.                     |
+| `summary-aria-label="..."`  | `Toggle menu`      | `aria-label` on the `<summary>` toggle.                |
+
+### Examples
+
+```nyx
+# Default: collapses below 768px, text "Menu"
+nav burger { a "Home" href="/", a "About" href="/about" }
+
+# Custom breakpoint via theme token
+theme { breakpoints { sm: 480px, md: 768px, lg: 1024px } }
+nav burger=lg { a "Home" href="/", a "Products" href="/products" }
+
+# Custom icon + labels
+nav burger icon="☰" open-label="Hide menu" aria-label="Site nav" {
+  a "Home" href="/"
+  a "Docs" href="/docs"
+}
+```
+
+### State-correct accessibility
+
+The rendered markup uses two sibling spans toggled via CSS so the visible label matches the state on every frame:
+
+```html
+<details class="nx-burger nx-burger-bp-768">
+  <summary aria-label="Toggle menu">
+    <span class="nx-burger-closed">Menu</span>
+    <span class="nx-burger-open" aria-hidden="true">Close</span>
+  </summary>
+  <nav aria-label="Main navigation">...</nav>
+</details>
+```
+
+`aria-label="Toggle menu"` stays state-neutral; sighted users see `Menu` when closed and `Close` when open. Screen-reader users receive the same transition via native `<details>` a11y. No JavaScript is needed to keep the label honest.
+
+### Styling the open state
+
+Native CSS `details[open]` is exposed, so you can add a hamburger-to-X animation purely in your theme:
+
+```nyx
+nav burger {
+  style {
+    &[open] summary { color: primary }
+  }
+  a "Home" href="/"
+}
+```
+
+### Known limits
+
+- **No Escape-to-close.** `<details>` does not close on <kbd>Esc</kbd> natively. This is a deliberate trade-off to keep the zero-JS promise. If you need Esc-close, wrap the element yourself.
+- **No body-scroll-lock.** Opening the burger on iOS may let background content scroll underneath. Tracked in [Issue #98](https://github.com/fabudde/nyxcode/issues/98) for future CSS-only exploration.
+- **`icon=` is a compile-time constant** — never bind it to user input. The parser enforces this by accepting string literals only.
+
 ## Figma / W3C DTCG Token Import (v0.23.5)
 
 Import design tokens exported from **Tokens Studio for Figma** or any **W3C Design Tokens Community Group (DTCG)** compliant tool directly into a NyxCode `@theme { ... }` block — no Style Dictionary, no build step, no config.

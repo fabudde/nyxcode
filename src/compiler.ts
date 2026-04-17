@@ -58,6 +58,8 @@ export class Compiler {
   private indent: number = 0;
   private pageClass: string = '';
   private stateVars: Map<string, string> = new Map(); // name -> initial value
+  // v0.24.0 nav-burger: one CSS block per breakpoint, emitted once per build.
+  private burgerBreakpointsEmitted: Set<string> = new Set();
   private computedVars: Map<string, string> = new Map(); // name -> expression
   private refNames: string[] = [];
   private stores: Map<string, { fields: Array<{name: string, value?: string, isAction: boolean, actionBody?: string}>, computed: Array<{name: string, expression: string}> }> = new Map();
@@ -672,6 +674,14 @@ export class Compiler {
       return this.compileComponentUsage(el);
     }
 
+    // ===== v0.24.0: nav burger =====
+    // Intercept `<nav>` elements that carry a `burger` attribute and rewrite
+    // them into a zero-JS <details>/<summary>/<nav> collapsible pattern.
+    // Spec consolidation: Issue #96, reviewed by Kiro (design) + Tyto (a11y).
+    if (el.tag === 'nav' && el.attributes.some(a => a.name === 'burger')) {
+      return this.compileBurgerNav(el);
+    }
+
     const tag = this.mapTag(el.tag);
     const content = this.compileContent(el.content);
 
@@ -834,6 +844,160 @@ export class Compiler {
     }
 
     return `${this.ind()}<${tag}${attrs}>${content}</${tag}>\n`;
+  }
+
+  /**
+   * v0.24.0: Compile a `<nav burger>` element into a zero-JS collapsible.
+   *
+   * Input AST:   `<nav burger [=<breakpoint>] [icon="..."] [aria-label="..."]> ... </nav>`
+   * Output HTML: `<details class="nx-burger">
+   *                 <summary aria-label="Toggle menu">
+   *                   <span class="nx-burger-closed">Menu|icon</span>
+   *                   <span class="nx-burger-open" aria-hidden="true">Close</span>
+   *                 </summary>
+   *                 <nav aria-label="Main navigation"> ...children... </nav>
+   *               </details>`
+   *
+   * Responsive CSS (once per build):
+   *   - `<summary>` is hidden above the burger breakpoint; inner `<nav>` is always visible.
+   *   - `<summary>` is shown below the breakpoint; inner `<nav>` only when `details[open]`.
+   *
+   * State-correct labels (Tyto 🦉 catch): the summary label stays neutral
+   * ("Toggle menu"), while two spans flip via CSS `[open]` so visible and
+   * screen-reader users both see accurate state.
+   *
+   * Spec: Issue #96. Design review: @Kiro-Rudel. A11y/security: @Alex-Yumi (Tyto).
+   */
+  private compileBurgerNav(el: ElementNode): string {
+    // ----- Parse the burger attributes -----
+    const burgerAttr = el.attributes.find(a => a.name === 'burger')!;
+    const iconAttr   = el.attributes.find(a => a.name === 'icon');
+    const navAriaAttr = el.attributes.find(a => a.name === 'aria-label');
+    const sumAriaAttr = el.attributes.find(a => a.name === 'summary-aria-label');
+    const openLabelAttr = el.attributes.find(a => a.name === 'open-label');
+
+    // Breakpoint: `burger` (bare) defaults to 768px; `burger=<token>` looks up theme.breakpoints
+    let breakpointPx = 768;
+    const burgerVal = typeof burgerAttr.value === 'string' ? burgerAttr.value : '';
+    if (burgerVal && burgerVal !== 'true') {
+      const themed = this.themeVars.get('breakpoints-' + burgerVal);
+      if (themed) {
+        // Strip units ("768px" -> 768)
+        const n = parseInt(String(themed), 10);
+        if (!isNaN(n)) breakpointPx = n;
+      } else {
+        // v0.23.3-style did-you-mean for unknown breakpoint tokens
+        const available: string[] = [];
+        for (const k of this.themeVars.keys()) {
+          if (k.startsWith('breakpoints-')) available.push(k.substring('breakpoints-'.length));
+        }
+        if (available.length > 0) {
+          const matches = nearestMatches(burgerVal, available, 1);
+          const hint = matches.length > 0
+            ? ` Did you mean '${matches[0]}'?`
+            : ` Available: ${available.join(', ')}.`;
+          throw new Error(`nav burger: unknown breakpoint '${burgerVal}'.${hint}`);
+        } else {
+          throw new Error(
+            `nav burger: breakpoint '${burgerVal}' requires theme.breakpoints.${burgerVal} to be defined. ` +
+            `Either add it to your @theme or use the default bare 'burger' attribute (768px).`
+          );
+        }
+      }
+    }
+
+    // Nested-nav warning (Kiro 🐺 point A): if a child <nav> exists, likely mistake
+    const hasNestedNav = el.children.some(c =>
+      c.type === 'Element' && (c as ElementNode).tag === 'nav'
+    );
+    if (hasNestedNav) {
+      // Emit as HTML comment to surface in built output; also console.warn at compile time.
+      console.warn(
+        `\x1b[33m⚠️  nav burger contains a nested <nav>. The inner <nav> will render verbatim — probably not what you want.\x1b[0m`
+      );
+    }
+
+    // Icon / label values (sanitized for HTML content). `icon` replaces the
+    // "Menu" text of the closed-state span; defaults to visible text "Menu".
+    const closedLabel = iconAttr && typeof iconAttr.value === 'string'
+      ? this.escapeHtml(iconAttr.value)
+      : 'Menu';
+    const openLabel = openLabelAttr && typeof openLabelAttr.value === 'string'
+      ? this.escapeHtml(openLabelAttr.value)
+      : 'Close';
+    const summaryAria = sumAriaAttr && typeof sumAriaAttr.value === 'string'
+      ? this.escapeHtml(sumAriaAttr.value)
+      : 'Toggle menu';
+    const navAria = navAriaAttr && typeof navAriaAttr.value === 'string'
+      ? this.escapeHtml(navAriaAttr.value)
+      : 'Main navigation';
+
+    // ----- Emit the responsive CSS once per breakpoint -----
+    // We use a stable class name (`nx-burger`) plus a unique id per breakpoint
+    // so multiple `nav burger` elements with different breakpoints coexist.
+    const bpKey = `nx-burger-bp-${breakpointPx}`;
+    if (!this.burgerBreakpointsEmitted.has(bpKey)) {
+      this.burgerBreakpointsEmitted.add(bpKey);
+      // Base: everything is hidden; the inner <nav> is only visible at desktop sizes
+      // or when <details> is open on mobile.
+      const baseCss =
+        `.nx-burger{all:unset;display:contents}` +
+        `.nx-burger>summary{display:none;cursor:pointer;list-style:none;user-select:none}` +
+        `.nx-burger>summary::-webkit-details-marker{display:none}` +
+        `.nx-burger>nav{display:flex;gap:1.5rem;align-items:center}` +
+        `.${bpKey}>summary{}` +
+        // Dual-span state-correct labels (Tyto)
+        `.nx-burger .nx-burger-open{display:none}` +
+        `.nx-burger[open] .nx-burger-closed{display:none}` +
+        `.nx-burger[open] .nx-burger-open{display:inline}`;
+      this.css.push(baseCss);
+
+      // Responsive: below breakpoint, show summary, hide nav unless open
+      const respCss =
+        `@media(max-width:${breakpointPx}px){` +
+        `.${bpKey}>summary{display:inline-block;padding:.5rem 1rem}` +
+        `.${bpKey}>nav{display:none;flex-direction:column;gap:1rem;padding:1rem}` +
+        `.${bpKey}[open]>nav{display:flex}` +
+        `}`;
+      this.css.push(respCss);
+    }
+
+    // ----- Compile children (the links inside the nav) -----
+    // We strip attributes that we've already consumed on the outer <nav>
+    // so they don't leak into the rewritten markup.
+    const CONSUMED = new Set(['burger', 'icon', 'aria-label', 'summary-aria-label', 'open-label']);
+    const passthroughAttrs = el.attributes.filter(a => !CONSUMED.has(a.name));
+
+    // Render inner nav children (anchors etc.) at an extra indent
+    this.indent += 2;
+    const innerChildren = el.children
+      .filter(c => c.type !== 'Style')
+      .map(c => this.compileStatement(c))
+      .join('');
+    this.indent -= 2;
+
+    // Also support an optional user-provided style block on the burger nav
+    let scopeClass = '';
+    const styleChild = el.children.find(c => c.type === 'Style') as StyleBlock | undefined;
+    if (styleChild) {
+      scopeClass = `nyx-${this.nextId('s')}`;
+      this.compileStyleWithClass(styleChild, scopeClass);
+    }
+
+    const detailsClasses = ['nx-burger', bpKey, scopeClass].filter(Boolean).join(' ');
+    const passthroughStr = this.compileAttributes(passthroughAttrs);
+
+    return (
+      `${this.ind()}<details class="${detailsClasses}"${passthroughStr}>\n` +
+      `${this.ind()}  <summary aria-label="${summaryAria}">` +
+      `<span class="nx-burger-closed">${closedLabel}</span>` +
+      `<span class="nx-burger-open" aria-hidden="true">${openLabel}</span>` +
+      `</summary>\n` +
+      `${this.ind()}  <nav aria-label="${navAria}">\n` +
+      innerChildren +
+      `${this.ind()}  </nav>\n` +
+      `${this.ind()}</details>\n`
+    );
   }
 
   private compileStyleWithClass(style: StyleBlock, className: string): void {
