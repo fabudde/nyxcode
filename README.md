@@ -110,6 +110,40 @@ security {
 
 Compiler generates Express server, SQLite schema, JWT auth, bcrypt, CRUD endpoints, rate limiting. Zero config. Zero dependencies to install.
 
+### 🎨 Design Tokens & Dark Mode (v0.22.0)
+
+Full design-token system: `colors`, `spacing`, `radius`, `shadows`, `fonts`, `layouts`, `borders`, `breakpoints`. Dot-notation references. Dark mode. Google Fonts auto-injection.
+
+```nyx
+theme {
+  colors  { primary: #0066ff; bg: #ffffff; text: #1a1a1a }
+  spacing { md: 16px; lg: 24px }
+  radius  { lg: 16px }
+  shadows { glow: 0 0 40px rgba(0, 102, 255, 0.4) }
+  breakpoints { sm: 600px; lg: 1024px }
+  fonts   { heading: Inter, source: google; body: "Open Sans", source: google }
+}
+
+theme dark {
+  colors { primary: #4da6ff; bg: #0a0a0a; text: #f0f0f0 }
+}
+
+page home {
+  style {
+    color: color.text
+    background: color.bg
+    padding: spacing.md spacing.lg
+    border-radius: radius.lg
+    box-shadow: shadow.glow
+    @mobile { padding: spacing.md }
+  }
+}
+```
+
+Compiles to CSS variables + `@media (prefers-color-scheme: dark)` + `[data-theme="dark"]` toggle, with Google Fonts auto-linked in `<head>`. Typos (`color.primry`) throw at compile time — no silent drift.
+
+Full docs: [`NYXCODE.md`](./NYXCODE.md#theme--design-tokens-v0220)
+
 ### 📄 Multi-File Projects (v0.21.0)
 
 One-file is the default. When projects grow, split — opt in with `use`:
@@ -364,10 +398,10 @@ Shipped:
 - [x] **v0.19** — Editorial & Media (`@media`, footnotes, inline SVG)
 - [x] **v0.20** — Components, Properly (positional args, defaults, no-wrapper-div, `${}` interpolation)
 - [x] **v0.21** — Modules (multi-file, `@/` alias, `nyx flatten`)
+- [x] **v0.22** — Themed (design tokens, dot-notation refs, dark mode, Google Fonts, named breakpoints)
 
 Next:
-- [ ] **v0.22** — Test infrastructure (snapshot tests, fixtures, CI)
-- [ ] **v0.23** — Error messages with file paths & hints
+- [ ] **v0.23** — Test infrastructure & error messages with file paths & hints
 - [ ] **v1.0** — Production-ready, stable API, migration guide
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for full details.

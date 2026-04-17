@@ -146,17 +146,115 @@ page / {
 ```
 Generates `.nyx-p_card` and `.nyx-p_label` CSS classes. Saves 30-40% tokens on repeated styling.
 
-## Theme — Colors & Fonts
+## Theme — Design Tokens (v0.22.0)
+
+Full design-token system: colors, spacing, radius, shadows, fonts, layouts, borders, breakpoints.
+
 ```nyx
 theme {
-  colors { primary #667eea, bg #0a0a12, card #1a1a2e, accent #f59e0b }
-  fonts { heading "Inter, sans-serif", body "system-ui, sans-serif" }
+  colors {
+    primary: #667eea
+    bg: #0a0a12
+    text: #f0f0f0
+  }
+  spacing {
+    sm: 8px
+    md: 16px
+    lg: 24px
+  }
+  radius {
+    sm: 4px
+    lg: 16px
+  }
+  shadows {
+    glow: 0 0 40px rgba(102, 126, 234, 0.4)
+  }
+  breakpoints {
+    sm: 600px
+    lg: 1024px
+  }
+  fonts {
+    heading: Inter, source: google
+    body: "Open Sans", source: google
+  }
 }
 ```
-- Colors become CSS custom properties: `--colors-primary`, `--colors-bg`, etc.
-- **Implicit theme colors (v0.9.0+):** Write `c primary` instead of `c var(--colors-primary)` — compiler auto-resolves!
-- Works everywhere: style blocks, presets, inline styles, CSS rules.
-- Font heading auto-applies to h1-h6, font body to body/p/span/li.
+
+### Dot-Notation Token References
+
+Reference any token by its section:
+```nyx
+style {
+  color: color.primary          # → var(--colors-primary)
+  padding: spacing.md spacing.lg # → var(--spacing-md) var(--spacing-lg)
+  border-radius: radius.lg       # → var(--radius-lg)
+  box-shadow: shadow.glow        # → var(--shadows-glow)
+}
+```
+
+Singular (`color.primary`) → plural storage (`--colors-primary`). Works everywhere: style blocks, presets, inline, CSS rules.
+
+**Hard errors on typos:** `color.primry` throws `Undefined theme token` at compile time — no silent drift.
+
+**Backward compat:** The v0.9 shortcut `c primary` still works for color properties.
+
+### Dark Mode
+
+```nyx
+theme {
+  colors { primary: #0066ff; bg: #ffffff; text: #1a1a1a }
+}
+
+theme dark {
+  colors { primary: #4da6ff; bg: #0a0a0a; text: #f0f0f0 }
+}
+```
+
+Emits both:
+- `@media (prefers-color-scheme: dark) { :root { ... } }` — auto dark based on OS
+- `[data-theme="dark"] { ... }` — toggle-able via JavaScript
+
+Only redefined tokens override; the rest inherit from the main theme.
+
+### Google Fonts Auto-Injection
+
+```nyx
+fonts {
+  heading: Inter, source: google
+  body: "Open Sans", source: google
+}
+```
+
+Compiler injects into `<head>`:
+```html
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Inter&family=Open+Sans&display=swap">
+```
+
+- `source: google` → auto-inject Google Fonts CDN links
+- `source: local path "./fonts/MyFont.woff2"` → local font file (existence checked at compile time)
+- `source: url "..."` → **hard error** (deferred for security; use `--allow-third-party-fonts` in a future release)
+
+### Named Breakpoints
+
+```nyx
+theme {
+  breakpoints { sm: 600px; lg: 1024px }
+}
+
+page home {
+  style {
+    padding: spacing.lg
+    @mobile { padding: spacing.sm }
+  }
+}
+```
+
+- `@mobile` auto-binds to `max-width: breakpoint.sm`
+- `@tablet` auto-binds to `min-width: breakpoint.sm`
+- `@desktop` auto-binds to `min-width: breakpoint.lg`
+- Without `breakpoints {}`: defaults to `768px / 1024px / 1280px` (backward compat)
 
 ### Theme Presets (v0.17.0)
 One line = entire visual identity:
@@ -167,7 +265,7 @@ theme "editorial"       # Serif fonts, clean typography, whitespace
 theme "neon"            # Dark bg, glowing green accents, monospace
 theme "minimal-dark"    # Subtle dark theme, indigo accents
 ```
-Optional overrides: `theme "neon" { colors { primary #ff6600 } }`
+Optional overrides: `theme "neon" { colors { primary: #ff6600 } }`
 
 ## CSS Functions (v0.17.0)
 ```nyx
