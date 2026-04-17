@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.21.3)
+# NYXCODE.md — AI Context File (v0.25.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -316,6 +316,92 @@ theme {
 
 page / { div { style { p spacing.2xl } } }   # → padding: var(--spacing-2xl)
 ```
+
+### Body Styles (v0.25.0)
+
+Native body-level styles in the theme block. No more head injection for body styling.
+
+```nyx
+theme {
+  colors { primary: #667eea }
+  body {
+    bg #0a0a12
+    c #f0eaff
+    of-x hidden
+    font-family "Inter", sans-serif
+    -webkit-font-smoothing antialiased
+  }
+}
+```
+
+- All CSS shorthands work (`bg`, `c`, `of-x`, `m`, `p`, etc.)
+- Vendor prefixes (`-webkit-*`) supported
+- Font-family with commas preserved correctly
+- Theme color refs resolve (`c .colors.primary` → `var(--colors-primary)`)
+- Emitted after `:root` variables, before page styles
+
+### Element Defaults (v0.25.0)
+
+Global element default styles via `:where()` — zero specificity, local styles always override.
+
+```nyx
+theme {
+  defaults {
+    a { c #9b8ec4; td none }
+    pre { font-family "JetBrains Mono", monospace }
+    code { font-family "JetBrains Mono", monospace }
+    img { max-w 100%; h auto }
+    h1 { m 0 }
+  }
+}
+```
+
+Emits: `:where(a) { color: #9b8ec4; text-decoration: none; }` etc.
+
+Because `:where()` has zero specificity, any local `style {}` on an element will override defaults without `!important`.
+
+### Selection Styles (v0.25.0)
+
+Native `::selection` styles in the theme block.
+
+```nyx
+theme {
+  selection {
+    bg rgba(155,142,196,0.3)
+    c #f0eaff
+  }
+}
+```
+
+Emits: `::selection { background: rgba(155, 142, 196, 0.3); color: #f0eaff; }`
+
+## Top-Level Keyframes (v0.25.0)
+
+Define animations at the top level — no head injection, no wrapping in style blocks.
+
+```nyx
+keyframes drift {
+  0%, 100% { tf translate(0, 0) }
+  50% { tf translate(-2%, 1.5%) }
+}
+
+keyframes fadeIn {
+  from { op 0 }
+  to { op 1 }
+}
+
+page / {
+  div { style { anim drift 30s ease-in-out infinite } }
+  div { style { anim fadeIn 0.5s ease-out } }
+}
+```
+
+- All shorthands work inside keyframe stops (`tf`, `op`, `bg`, `c`, etc.)
+- `from`/`to` and percentage selectors (`0%`, `50%`, `100%`)
+- Multiple selectors per stop (`0%, 100% { ... }`)
+- Duplicate keyframe names → compile error
+- Emitted after theme variables, before page styles
+- Also available inside `style {}` blocks as `@keyframes` (v0.18.1 syntax still works)
 
 ## Responsive Burger Nav (v0.24.0)
 
@@ -642,6 +728,9 @@ Supported tags:
 - **Animation**: animate, animateTransform, animateMotion, set, mpath
 
 ## `@keyframes` in `style {}` Blocks (v0.18.1)
+
+> **v0.25.0:** Prefer top-level `keyframes name { }` syntax (see above). Style-block `@keyframes` still works but top-level is cleaner.
+
 Keyframes support full shorthand expansion and theme resolution, just like regular style properties.
 
 ```nyx
@@ -1207,11 +1296,19 @@ Raw JavaScript captured at lexer level. Use sparingly — NyxCode native feature
 4. **Material Icons:** Add CDN in `head`, `span "heart" class="material-icons"`
 
 ## Head Injection
+
+> **v0.25.0:** Most head injection use cases are now covered natively:
+> - Body styles → `theme { body { } }`
+> - Keyframes → top-level `keyframes name { }`
+> - Selection → `theme { selection { } }`
+> - Element resets → `theme { defaults { } }`
+>
+> Use `head` only for third-party CDNs and edge cases.
+
 ```nyx
 page / {
   head "<link rel='stylesheet' href='https://cdn.example.com/lib.css'>"
   head "<script src='https://cdn.example.com/lib.js' defer></script>"
-  head "<style>@keyframes fade { from { opacity: 0 } to { opacity: 1 } }</style>"
   h1 "Page with third-party libs"
 }
 ```
