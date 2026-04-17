@@ -1,3 +1,59 @@
+## v0.23.3 — "Did you mean?" (2026-04-17)
+
+**Developer experience upgrade.** Error messages now help you fix what's wrong instead of pointing at what's broken.
+
+### What changed
+
+**1. Compiler `Undefined theme token` errors now include "Did you mean?" hints**
+
+Levenshtein-ranked suggestions, top 3, filtered by edit-distance relative to token length. Two-tier search: first within the section you referenced (e.g. typo in `color.*`), then globally if no close match in-section.
+
+Before:
+```
+[NyxCode Compiler Error] Undefined theme token: color.primry (available: color.primary, color.accent, color.bg, ...)
+```
+
+After:
+```
+[NyxCode Compiler Error] Undefined theme token: color.primry. Did you mean `color.primary`?
+```
+
+**2. Parser errors now show a source-frame with caret**
+
+CLI decorates parse errors with the offending line and a caret at the column. The file path shows `:line:col` for editor jump-to-error.
+
+Before:
+```
+[file.nyx] parse error: [NyxCode Parser Error] Unclosed block: opened at line 2:10 (colors) — expected } before EOF
+```
+
+After:
+```
+[file.nyx:2:10] parse error: [NyxCode Parser Error] Unclosed block: opened at line 2:10 (colors) — expected } before EOF
+  2 |   colors {
+    |          ^
+```
+
+### Why it matters
+
+Kiro's v0.22 migration of mindsmatter.now (2255 LOC, 650 token references) was the first time a real-world codebase stress-tested theme-token errors. A typo in a deep file with no caret is minutes of scrolling; a typo with "Did you mean?" is a 2-second fix. This shipped in preparation for the next migration.
+
+### Added
+
+- `src/suggest.ts` — Levenshtein distance + `nearestMatches()` + `didYouMean()` + `formatSourceFrame()` helpers.
+- 16 new tests in `src/tests/v0233-errors.test.ts`. **70/70 green.**
+
+### Changed
+
+- `compiler.ts resolveDotToken()` — suggestion list now Levenshtein-ranked, max 3, filtered by distance.
+- `cli.ts` — parse-error emission wraps via `decorateError()` with source-frame.
+
+### Backwards-compat
+
+Non-breaking. Error message text content is more helpful; programmatic callers that parsed the old `(available: ...)` tail should instead match on `Undefined theme token:` prefix (documented convention).
+
+---
+
 ## v0.23.2 — "Font-Stack Fix" (2026-04-17)
 
 **BUG FIX (HIGH): [#91](https://github.com/fabudde/nyxcode/issues/91)** — Comma-separated font stacks.

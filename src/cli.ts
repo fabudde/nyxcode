@@ -24,6 +24,31 @@ import { Parser } from './parser.js';
 import { Compiler } from './compiler.js';
 import { Validator, ValidationError } from './validator.js';
 import { Program, ComponentNode, UseStatement, TopLevelNode, PageNode, LayoutNode, ThemeNode, StoreNode } from './ast.js';
+import { formatSourceFrame } from './suggest.js';
+
+/**
+ * Extract `line:col` from an error message body that conventionally ends with
+ * `... at line N:C` (Parser Error convention). Returns null if not present.
+ */
+function extractLineCol(msg: string): { line: number; col: number } | null {
+  const m = msg.match(/at line (\d+):(\d+)/);
+  if (!m) return null;
+  return { line: parseInt(m[1], 10), col: parseInt(m[2], 10) };
+}
+
+/**
+ * Decorate a parse/compile error message with a source frame showing the
+ * offending line and a caret at the column. Falls back to the plain
+ * message if no line:col can be extracted.
+ */
+function decorateError(filePath: string, source: string, msg: string): string {
+  const rel = relative(process.cwd(), filePath);
+  const loc = extractLineCol(msg);
+  if (!loc) return `[${rel}] ${msg}`;
+  const frame = formatSourceFrame(source, loc.line, loc.col);
+  if (!frame) return `[${rel}] ${msg}`;
+  return `[${rel}:${loc.line}:${loc.col}] ${msg}\n${frame}`;
+}
 
 /**
  * Multi-file import system (v0.21.0)
@@ -140,7 +165,7 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
     try {
       imported = parse(src);
     } catch (e: any) {
-      errors.push(`[${relative(process.cwd(), absPath)}] parse error: ${e.message || e}`);
+      errors.push(decorateError(absPath, src, `parse error: ${e.message || e}`));
       return;
     }
 
@@ -290,7 +315,7 @@ function flattenToSource(entryPath: string): { source: string; errors: string[];
     try {
       ast = parse(src);
     } catch (e: any) {
-      errors.push(`[${relative(process.cwd(), absPath)}] parse error: ${e.message || e}`);
+      errors.push(decorateError(absPath, src, `parse error: ${e.message || e}`));
       return;
     }
     for (const node of ast.body) {

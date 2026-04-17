@@ -22,6 +22,7 @@ import {
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { nearestMatches, didYouMean } from './suggest.js';
 
 let NYXCODE_VERSION = '0.0.0';
 try {
@@ -2625,18 +2626,42 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
       return `var(--${fullKey})`;
     }
 
-    // Not found — build a helpful error with suggestions
+    // Not found — build a helpful error with Levenshtein-ranked suggestions.
+    // Two-tier approach:
+    //   1. If the prefix matches a known section (e.g. `color.`), rank keys
+    //      within that section by edit distance on the local key only. This
+    //      catches typos like `color.primry` → `color.primary`.
+    //   2. If no close match in-section, widen the search to all theme keys
+    //      globally (distance over the full dotted form). Handles cases
+    //      where the user picked the wrong section entirely.
     const canonicalToken = prefix + '.' + key;
-    const suggestions: string[] = [];
+    const inSectionKeys: string[] = [];
+    const allDottedKeys: string[] = [];
     for (const k of this.themeVars.keys()) {
-      if (k.startsWith(plural + '-')) {
-        suggestions.push(prefix + '.' + k.slice(plural.length + 1));
+      // themeVars stores flat keys like `colors-primary`, `spacing-md` etc.
+      const dashIdx = k.indexOf('-');
+      if (dashIdx < 0) continue;
+      const section = k.slice(0, dashIdx);
+      const localKey = k.slice(dashIdx + 1);
+      // Reverse-lookup: find the canonical singular form for this section.
+      let canonicalPrefix = section;
+      for (const [sing, plur] of Object.entries(Compiler.THEME_SECTION_PLURAL)) {
+        if (plur === section) { canonicalPrefix = sing; break; }
       }
+      allDottedKeys.push(canonicalPrefix + '.' + localKey);
+      if (section === plural) inSectionKeys.push(localKey);
     }
-    let msg = `Undefined theme token: ${canonicalToken}`;
-    if (suggestions.length > 0) {
-      msg += ` (available: ${suggestions.join(', ')})`;
+
+    let suggestions = nearestMatches(key, inSectionKeys, 3).map(
+      (k2) => prefix + '.' + k2,
+    );
+    if (suggestions.length === 0) {
+      suggestions = nearestMatches(canonicalToken, allDottedKeys, 3);
     }
+
+    let msg = `Undefined theme token: ${canonicalToken}.`;
+    const hint = didYouMean(suggestions);
+    if (hint) msg += hint;
     throw new Error(`[NyxCode Compiler Error] ${msg}`);
   }
 
