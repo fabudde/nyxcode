@@ -236,10 +236,49 @@ export class Lexer {
     this.tokens.push({ type: TokenType.Number, value, line: this.line, col: startCol });
   }
 
+  /**
+   * Decide whether a `/` at the current position should open a path-literal
+   * (like `/users/:id`) rather than being a plain Slash operator.
+   *
+   * Two-tier rule:
+   *   1. If the previous non-whitespace emitted token is a path-introducing
+   *      keyword (`page`, `api`, `layout`), accept any valid path character
+   *      after the `/` — including digits. This fixes Bug #94 where routes
+   *      like `/650-hex-values/` failed because digits weren't allowed to
+   *      start a path segment.
+   *   2. Otherwise, keep the conservative rule (alpha / `:` / `*`) so that
+   *      arithmetic or other non-route `/` contexts don't get misparsed.
+   */
   private canStartPath(): boolean {
     const next = this.peekNext();
     if (!next) return false;
+
+    // Tier 1: inside a route after a path-introducing keyword, allow digits.
+    const prev = this.lastEmittedToken();
+    if (prev) {
+      const t = prev.type;
+      if (t === 'Page' || t === 'Api' || t === 'Layout') {
+        return (
+          this.isAlphaNumeric(next) ||
+          next === ':' ||
+          next === '*' ||
+          next === '_' ||
+          next === '-'
+        );
+      }
+    }
+
+    // Tier 2: conservative default for all other contexts.
     return this.isAlpha(next) || next === ':' || next === '*';
+  }
+
+  /**
+   * Return the most recently emitted token, or null if none.
+   * Used by `canStartPath` for context-sensitive lexing. Keeps the lexer
+   * single-pass — no lookbehind over source characters.
+   */
+  private lastEmittedToken(): Token | null {
+    return this.tokens.length > 0 ? this.tokens[this.tokens.length - 1] : null;
   }
 
   private readPath(): void {

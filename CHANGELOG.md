@@ -1,3 +1,41 @@
+## v0.23.4 — "Digit routes" (2026-04-17)
+
+**BUG FIX: [#94](https://github.com/fabudde/nyxcode/issues/94)** — Routes starting with a digit failed to lex.
+
+### The bug
+
+```nyx
+page /650-hex-values/ { p "hi" }
+```
+
+Produced:
+```
+[NyxCode Parser Error] Expected LeftBrace, got '650' (Number)
+```
+
+The lexer split on the first char after `/`:
+```
+Page / Number(650) Identifier(-) Identifier(hex-values) Slash ...
+```
+
+### Root cause
+
+`lexer.ts canStartPath()` required the char after `/` to be alpha, `:`, or `*`. Digits weren't allowed, so digit-starting route segments fell through to the generic digit handler and were tokenized as numbers.
+
+### Fix
+
+Track the previous emitted token in the lexer. When `/` follows a path-introducing keyword (`page`, `api`, `layout`), accept any valid path character — including digits. Preserves conservative default in all other contexts so arithmetic/division (`calc(100% / 2)`) is unaffected.
+
+### Added
+
+- 8 new tests in `src/tests/v0234-digit-routes.test.ts`. **78/78 green.**
+
+### Discovery
+
+Found while dog-fooding v0.23 to build [heynyx.dev/blog](https://heynyx.dev/blog/) — the initial route I tried was `/650-hex-values/`. Had to rename to `/tacit-design/` to ship the blog. Bug was always there; v0.22/0.23 didn't surface it because no route happened to start with a digit. Same pattern as #86: the first person who throws the tool at a new-shaped input is the first person who finds the bug.
+
+---
+
 ## v0.23.3 — "Did you mean?" (2026-04-17)
 
 **Developer experience upgrade.** Error messages now help you fix what's wrong instead of pointing at what's broken.
