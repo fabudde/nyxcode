@@ -84,8 +84,9 @@ Property shorthands work in `style {}` blocks, `preset` definitions, inline styl
 | `td` | text-decoration | `tt` | text-transform |
 | `ws` | white-space | `wb` | word-break |
 | `op` | opacity | `cur` | cursor |
-| `of` | overflow | `ox` | overflow-x |
-| `oy` | overflow-y | `v` | visibility |
+| `of` | overflow | `ox` / `of-x` | overflow-x |
+| `oy` / `of-y` | overflow-y | `v` | visibility |
+| `br` | border-radius | `brad` | border-radius (alias) |
 | `tr` | transition | `tf` | transform |
 | `anim` | animation | `shadow` | box-shadow |
 | `tshadow` | text-shadow | `o` | outline |
@@ -1203,6 +1204,17 @@ page / {
 - Raw HTML string injected into `<head>`.
 - Use for third-party CDNs, custom meta tags, complex CSS that needs `{}` in strings.
 - If `head` contains `<title>`, compiler skips auto-generated title.
+
+### Meta Precedence (v0.24.2)
+Page-level `meta {}` keys **override** site-level keys of the same name:
+```nyx
+meta { title "My Site", description "Site desc" }  # site-level
+page /about {
+  meta { title "About Us" }  # overrides site title, keeps site description
+  h1 "About"
+}
+```
+Only one `<title>` emitted. Applies to title, description, og:*, twitter:*, canonical.
 
 ## `__version__` Keyword (v0.9.3+)
 ```nyx

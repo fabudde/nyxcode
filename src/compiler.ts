@@ -505,7 +505,9 @@ export class Compiler {
     const scriptContent = [js, reactiveRuntime].filter(Boolean).join('\n');
     const hasScript = scriptContent.trim().length > 0 || renderCalls.length > 0;
 
-    const headExtra = this.headInjections.length > 0 ? '\n  ' + this.headInjections.join('\n  ') : '';
+    // Issue #97: dedupe singleton meta tags so page-level `meta {}` overrides site-level.
+    const dedupedInjections = this.dedupeHeadInjections(this.headInjections);
+    const headExtra = dedupedInjections.length > 0 ? '\n  ' + dedupedInjections.join('\n  ') : '';
     const animCSS = this.animations.length > 0 ? '\n    ' + this.animations.join('\n    ') : '';
     const elementDefaults = this.buildElementDefaults();
 
@@ -519,7 +521,7 @@ export class Compiler {
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">${hasViewport ? '' : '\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">'}${hasGenerator ? '' : `\n  <meta name="generator" content="NyxCode v${NYXCODE_VERSION}">`}${hasTitle ? '' : `\n  <title>NyxCode - ${this.escapeHtml(pageTitle)}</title>`}${hasDescription ? '' : `\n  <meta name="description" content="NyxCode documentation - ${this.escapeHtml(pageTitle)}">`}${hasCanonical ? '' : `\n  <link rel="canonical" href="https://nyxcode.io${pagePath}">`}` + headExtra + `
+  <meta charset="UTF-8">${hasViewport ? '' : '\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">'}${hasGenerator ? '' : `\n  <meta name="generator" content="NyxCode v${NYXCODE_VERSION}">`}${hasTitle ? '' : `\n  <title>NyxCode - ${this.escapeHtml(pageTitle)}</title>`}${hasDescription ? '' : `\n  <meta name="description" content="NyxCode documentation - ${this.escapeHtml(pageTitle)}">`}` + headExtra + `
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :where(body) { font-family: system-ui, -apple-system, sans-serif; }` + animCSS + elementDefaults + `
@@ -2667,7 +2669,9 @@ export class Compiler {
     const scriptContent = [js, reactiveRuntime].filter(Boolean).join('\n');
     const hasScript = scriptContent.trim().length > 0 || renderCalls.length > 0;
 
-    const headExtra = this.headInjections.length > 0 ? '\n  ' + this.headInjections.join('\n  ') : '';
+    // Issue #97: dedupe singleton meta tags so page-level `meta {}` overrides site-level.
+    const dedupedInjections = this.dedupeHeadInjections(this.headInjections);
+    const headExtra = dedupedInjections.length > 0 ? '\n  ' + dedupedInjections.join('\n  ') : '';
     const animCSS = this.animations.length > 0 ? '\n    ' + this.animations.join('\n    ') : '';
     const elementDefaults = this.buildElementDefaults();
 
@@ -3013,7 +3017,13 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
       // Borders
       'border': 'border',
       'bt': 'border-top',
-      'br': 'border-right',
+      // Issue #100: `br` previously mapped to `border-right`, but every utility framework
+      // (Tailwind, UnoCSS, Tachyons) uses it for `border-radius`. Users writing `br 6px`
+      // expect rounded corners, not a right-side border. Semantic fix — `border-right`
+      // is spelled out by anyone who actually means it.
+      'br': 'border-radius',
+      'brad': 'border-radius',
+      'border-right': 'border-right',
       'bb': 'border-bottom',
       'bl': 'border-left',
       'bc': 'border-color',
@@ -3044,8 +3054,14 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
       'of': 'overflow',
       'ox': 'overflow-x',
       'ofx': 'overflow-x',
+      // Issue #100: `of-x` / `of-y` weren't mapped, so `style { of-x auto }` on a <pre>
+      // emitted literal `of-x: auto;` which browsers silently ignore. The styles looked
+      // dropped; they were present but invalid. Added the hyphenated forms to match
+      // how users actually write it (hyphens are first-class identifier chars in the lexer).
+      'of-x': 'overflow-x',
       'oy': 'overflow-y',
       'ofy': 'overflow-y',
+      'of-y': 'overflow-y',
       'v': 'visibility',
       'cur': 'cursor',
       'us': 'user-select',
@@ -3236,6 +3252,90 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  /**
+   * Deduplicate meta-style head tags (Issue #97).
+   *
+   * Site-level `meta {}` blocks are pushed to headInjections BEFORE page-level ones.
+   * Without dedup, a page that overrides `title` or `og:image` would emit BOTH tags —
+   * browsers pick the first, so site-level would silently win.
+   *
+   * Strategy: walk the injection list, extract a stable "key" from known singleton
+   * tags (<title>, <meta name/property>, <link rel="canonical"|"icon">), and keep
+   * only the LAST occurrence of each key. Non-keyed tags (<style>, <script>,
+   * <link rel="stylesheet">, <link rel="preconnect">, etc.) are always kept —
+   * losing a theme <style> block would be catastrophic.
+   *
+   * The injection strings produced by parseMeta() / buildMetaHtml() may contain
+   * multiple tags separated by newlines, so we tokenize each injection into
+   * individual tag lines before dedup.
+   */
+  private dedupeHeadInjections(injections: string[]): string[] {
+    // Flatten: split each injection into individual <tag> lines so one `meta {}`
+    // block producing 5 tags can be dedup'd tag-by-tag against other blocks.
+    // We only split on newlines between top-level tags (not inside <style>/<script>
+    // bodies, which are emitted as single-line strings by the theme/font code).
+    type Entry = { key: string | null; html: string };
+    const entries: Entry[] = [];
+
+    for (const inj of injections) {
+      // Theme <style>, Google Fonts <link>, etc. are always single-tag strings
+      // without embedded newlines. Meta blocks join entries with '\n  ' (newline +
+      // indent). Split on newline-followed-by-optional-whitespace-then-'<', but only
+      // when the injection actually has embedded newlines between top-level tags.
+      const hasInnerBreak = /\n\s*</.test(inj);
+      const pieces = hasInnerBreak ? inj.split(/\n\s*(?=<)/) : [inj];
+      for (const raw of pieces) {
+        const piece = raw.trim();
+        if (!piece) continue;
+        entries.push({ key: this.headTagKey(piece), html: piece });
+      }
+    }
+
+    // Last-wins dedup for keyed entries; keep all non-keyed entries in order.
+    const lastIdx = new Map<string, number>();
+    for (let i = 0; i < entries.length; i++) {
+      const k = entries[i].key;
+      if (k !== null) lastIdx.set(k, i);
+    }
+
+    const out: string[] = [];
+    for (let i = 0; i < entries.length; i++) {
+      const { key, html } = entries[i];
+      if (key === null) { out.push(html); continue; }
+      if (lastIdx.get(key) === i) out.push(html);
+      // else: superseded by a later page-level override — drop it.
+    }
+    return out;
+  }
+
+  /**
+   * Return a dedup key for singleton head tags, or null for tags that may repeat.
+   * Keys: 'title', 'meta:name:<name>', 'meta:property:<prop>', 'link:canonical',
+   *       'link:icon'.
+   */
+  private headTagKey(tag: string): string | null {
+    if (/^<title[\s>]/i.test(tag)) return 'title';
+    if (/^<meta\s/i.test(tag)) {
+      const nameMatch = tag.match(/\sname=["']([^"']+)["']/i);
+      if (nameMatch) return 'meta:name:' + nameMatch[1].toLowerCase();
+      const propMatch = tag.match(/\sproperty=["']([^"']+)["']/i);
+      if (propMatch) return 'meta:property:' + propMatch[1].toLowerCase();
+      // <meta charset>, <meta http-equiv> — rare in user meta {} blocks; treat as non-dedup.
+      return null;
+    }
+    if (/^<link\s/i.test(tag)) {
+      const relMatch = tag.match(/\srel=["']([^"']+)["']/i);
+      if (relMatch) {
+        const rel = relMatch[1].toLowerCase();
+        if (rel === 'canonical' || rel === 'icon' || rel === 'shortcut icon') {
+          return 'link:' + rel;
+        }
+      }
+      return null;
+    }
+    return null;
   }
 
   /**

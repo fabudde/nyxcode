@@ -1,3 +1,22 @@
+## v0.24.2 — "Kiro's Revenge" (2026-04-17)
+
+Three bugs found by @Kiro-Rudel 🐺 during mindsmatter.now QA. All real, all fixed.
+
+### Fixed
+
+- **[#97](https://github.com/fabudde/nyxcode/issues/97) — Double `<title>` tag.** Pages with both site-level and page-level `meta { title }` emitted two `<title>` tags. Browsers use the first, so page-level titles were silently ignored. New `dedupeHeadInjections()` helper ensures page-level meta keys **replace** site-level keys of the same name. Applies to `<title>`, `<meta name=...>`, `<meta property=...>`, `<link rel="canonical">`. (9 new tests)
+
+- **[#99](https://github.com/fabudde/nyxcode/issues/99) — Hardcoded `nyxcode.io` canonical URL.** Every built site emitted `<link rel="canonical" href="https://nyxcode.io/...">` regardless of actual deploy domain. mindsmatter.now canonicals pointed to nyxcode.io → 404. Fix: canonical is only emitted when explicitly set via `meta { canonical "..." }`. No more lying to search engines. (7 new tests)
+
+- **[#100](https://github.com/fabudde/nyxcode/issues/100) — `<pre>` styles silently dropped.** Plot twist: not a `<pre>`-specific bug. Two shorthand mappings were wrong/missing: `of-x` wasn’t mapped (emitted as-is, browser ignored it), and `br` mapped to `border-right` instead of `border-radius`. Both fixed. `brad` added as explicit long-form alias. (7 new tests)
+
+### Stats
+
+- **185 tests**, all green (was 162 in v0.24.1 — +23 new tests)
+- No breaking changes (unless you relied on `br` meaning `border-right`, which nobody did)
+
+---
+
 ## v0.24.1 — "Lockdown" (2026-04-17)
 
 Three security & UX fixes. All found by the Rudel — Tyto 🦉 (security review), Kiro 🐺 (QA), Nyx 🦞 (implementation via 4.7 sub-agents).
