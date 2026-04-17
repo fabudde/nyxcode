@@ -2,437 +2,320 @@
 
 **The AI-native programming language for the web.**
 
-One `.nyx` file → full-stack app with database, auth, forms, theme, pages & API. Designed for the era where AI writes most code — every token, every line, every file counts.
+Write one `.nyx` file. Get a full-stack web app. No JavaScript, no CSS, no HTML — just NyxCode.
 
 [![npm](https://img.shields.io/npm/v/@fabudde/nyxcode)](https://www.npmjs.com/package/@fabudde/nyxcode)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Issues](https://img.shields.io/github/issues/fabudde/nyxcode)](https://github.com/fabudde/nyxcode/issues)
+[![Tests](https://img.shields.io/badge/tests-222%2B-brightgreen)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+🌐 **[nyxcode.io](https://nyxcode.io)** — Built entirely in NyxCode (dogfooded)
 
 ---
-
-## Install
-
-```bash
-# Global (recommended — gives you the `nyx` command)
-npm install -g @fabudde/nyxcode
-
-nyx build app.nyx
-nyx dev app.nyx                   # dev server + live reload
-nyx flatten app.nyx > flat.nyx    # multi-file → single file
-
-# Or run without installing:
-npx @fabudde/nyxcode build app.nyx
-```
-
-The CLI is available as `nyx` (preferred) or `nyxcode` (alias) — both work identically.
-
-## Hello World
-
-```nyx
-page / {
-  h1 "Hello, world!"
-  p "30 lines of NyxCode = 500+ lines of TS + React + Express."
-}
-```
-
-```bash
-nyx build hello.nyx
-# ✅ Built: dist-site/index.html
-```
 
 ## Why NyxCode?
 
-AI writes 80% of code in 2026. Every token costs money, context window, and wall-clock time. Frameworks designed for humans waste all three.
+Every web language was designed for humans in the 1990s. In 2026, AI writes most code — but still thinks in React, Vue, and raw HTML. Every token costs money, time, and context window.
 
-NyxCode is the first language designed for the AI era:
+NyxCode is the first language designed **for the AI-coding era:**
 
-- **Fewer tokens.** Shorthand everything. `bg #111` not `background-color: #111111;`.
-- **One file by default.** No `src/app/routes/layout.tsx` tree. Opt into multi-file when you need it.
-- **Declarative full-stack.** Database, auth, forms, API, styling — one syntax, one place.
-- **Safe by construction.** SQL injection structurally impossible. No `eval()`. HTML auto-escaped.
-- **Zero config.** No webpack, no vite, no tsconfig, no package.json tuning. `nyx build` just works.
+| Metric | NyxCode | React | HTML/CSS |
+|--------|---------|-------|----------|
+| Lines | **50** | 209 | 125 |
+| Bytes | **1,147** | 4,526 | 4,216 |
+| Files | **1** | 2 | 1 |
 
-```nyx
-# Full-stack blog. 16 lines. No config. No dependencies. No boilerplate.
-table posts { title text required, body text, created auto }
+*Real benchmark: [nyxcode.io](https://nyxcode.io) landing page, same visual output.*
 
-security {
-  table users
-  login email password
-  token jwt
-  protect /api/posts
-}
+**The author writes ONLY NyxCode.** The compiler generates HTML, CSS, and JavaScript. You never touch another language.
 
-theme { colors { bg #0a0a12, primary #667eea, card #1a1a2e } }
+## Quick Start
 
-page / {
-  style { bg var(--colors-bg) }
-  h1 "My Blog" style="color: var(--colors-primary);"
+```bash
+npm install @fabudde/nyxcode
+npx nyxcode build my-site.nyx -o dist/
+```
 
-  form /api/posts auth {
-    input title placeholder="Title" required
-    textarea body placeholder="Write..."
-    submit "Publish"
-    success -> reload
-  }
+Or from source:
 
-  data posts = get /api/posts auth
-  each posts -> post {
-    section {
-      style { bg var(--colors-card), radius 12px, p 1.5rem }
-      h3 .title
-      p .body
-    }
-  }
+```bash
+git clone https://github.com/fabudde/nyxcode.git
+cd nyxcode
+npm install
+npm run build
+node dist/cli.js build examples/landing.nyx
+```
+
+## The Pitch: React vs NyxCode
+
+**React — 20+ lines:**
+```jsx
+import React, { useState, useEffect } from 'react';
+
+export default function UserList() {
+  const [users, setUsers] = useState([]);
+  useEffect(() => {
+    fetch('/api/users').then(r => r.json()).then(setUsers);
+  }, []);
+  return (
+    <div className="container">
+      {users.map(u => (
+        <div key={u.id} className="card">
+          <h3>{u.name}</h3>
+          <p>{u.email}</p>
+        </div>
+      ))}
+    </div>
+  );
 }
 ```
 
-`nyx build` generates:
-- `dist-site/index.html` — styled page with form submission + data binding + auth
-- `dist-site/server.js` — Express + SQLite + JWT + bcrypt + CRUD + rate limiting
+**NyxCode — 4 lines:**
+```nyx
+page /users {
+  data users = get /api/users
+  each users -> card { h3 .name, p .email }
+}
+```
 
----
+Same result. 76% fewer lines. 68% fewer tokens.
 
 ## Features
 
-### 🗄️ Full-Stack in One File
-
-```nyx
-table posts { title text required, body text, created auto }
-
-security {
-  table users
-  login email password
-  token jwt
-  protect /api/posts
-}
-```
-
-Compiler generates Express server, SQLite schema, JWT auth, bcrypt, CRUD endpoints, rate limiting. Zero config. Zero dependencies to install.
-
-### 🎨 Design Tokens & Dark Mode (v0.22.0)
-
-Full design-token system: `colors`, `spacing`, `radius`, `shadows`, `fonts`, `layouts`, `borders`, `breakpoints`. Dot-notation references. Dark mode. Google Fonts auto-injection.
+### 🎨 Design System (Theme + Presets)
 
 ```nyx
 theme {
-  colors  { primary: #0066ff; bg: #ffffff; text: #1a1a1a }
-  spacing { md: 16px; lg: 24px }
-  radius  { lg: 16px }
-  shadows { glow: 0 0 40px rgba(0, 102, 255, 0.4) }
-  breakpoints { sm: 600px; lg: 1024px }
-  fonts   { heading: Inter, source: google; body: "Open Sans", source: google }
-}
-
-theme dark {
-  colors { primary: #4da6ff; bg: #0a0a0a; text: #f0f0f0 }
-}
-
-page home {
-  style {
-    color: color.text
-    background: color.bg
-    padding: spacing.md spacing.lg
-    border-radius: radius.lg
-    box-shadow: shadow.glow
-    @mobile { padding: spacing.md }
+  colors { primary: #667eea; accent: #e879a8 }
+  fonts { sans: "Inter", sans-serif }
+  radius { md: 12px }
+  body { bg #0a0a12; c #f0eaff; font-family .fonts.sans }
+  selection { bg rgba(155,142,196,0.3); c #f0eaff }
+  defaults {
+    a { c .colors.primary; td none }
+    img { max-w 100%; h auto }
   }
 }
+
+preset card {
+  bg white; radius .radius.md; shadow md
+  p 24px; hover { shadow lg }
+}
 ```
 
-Compiles to CSS variables + `@media (prefers-color-scheme: dark)` + `[data-theme="dark"]` toggle, with Google Fonts auto-linked in `<head>`. Typos (`color.primry`) throw at compile time — no silent drift.
+- **Theme tokens** → CSS custom properties, globally available
+- **Body styles** → native, no head injection needed (v0.25)
+- **Element defaults** → `:where()` selectors for zero specificity (v0.25)
+- **::selection** → native in theme (v0.25)
+- **Presets** → reusable style bundles, apply with `preset=card`
 
-Full docs: [`NYXCODE.md`](./NYXCODE.md#theme--design-tokens-v0220)
-
-### 📄 Multi-File Projects (v0.21.0)
-
-One-file is the default. When projects grow, split — opt in with `use`:
+### ⚡ Animations (Keyframes)
 
 ```nyx
-# app.nyx (entry)
-use "@/theme/base.nyx"          # @/ = project root
-use "@/components/"             # directory — all .nyx files, alphabetical
-use "@/pages/"
-
-meta { title "My App" }
-```
-
-- **Security by design**: local-only imports, no URLs, no package manager, no CDN
-- **Circular-safe**: second visit is silently skipped
-- **Hard errors**: duplicate pages/components across files → build error with file paths
-- **Watch mode tracks all imports** recursively
-
-#### `nyx flatten` — multi-file → single file
-
-```bash
-nyx flatten app.nyx > flat.nyx
-```
-
-Concatenates entry + all imports into one `.nyx`. **Comments and formatting are preserved** (source-level concat, not AST regeneration). Perfect for AI context windows, audits, or shipping a single-file artifact.
-
-### 🧩 Components with Props (v0.20.0)
-
-```nyx
-component Card(title, description, variant="default") {
-  style { bg #1a1a2e, radius 12px, p 2rem }
-  h3 .title
-  p .description
+keyframes drift {
+  0%, 100% { tf translate(0, 0) }
+  50% { tf translate(-2%, 1.5%) }
 }
 
 page / {
-  use Card("NyxCode", "AI-native language")                # positional
-  use Card(title="v0.21", description="Modules", variant="new")  # named
+  div { style { anim drift 30s ease-in-out infinite } }
 }
 ```
 
-- Positional args in declaration order
-- Optional defaults
-- No wrapper `<div>` when there's no `style {}` — clean DOM output
-- String interpolation: `class="${active == 'home' ? 'active' : ''}"`
+Top-level `keyframes` — no head injection, full shorthand support.
 
-### 📝 Declarative Forms
+### 📱 Responsive Design
 
 ```nyx
-form /api/posts auth {
-  input title placeholder="Post title" required
-  textarea body placeholder="Write..."
-  submit "Publish"
-  success -> reload
-  error -> toast "Failed"
+component Hero {
+  style {
+    d flex; fd column; ai center; p 80px 20px
+    @mobile { p 40px 16px; fs 14px }
+    @tablet { p 60px 20px }
+  }
 }
 ```
 
-6 lines. Zero JavaScript you write. Compiler emits `<form>` + `fetch()` + auth headers + success/error routing.
+Three breakpoints built-in: `@mobile` (≤768px), `@tablet` (≤1024px), `@desktop` (≥1025px).
 
-### ⚡ Reactive State
-
-```nyx
-state count = 0
-computed double = count * 2
-
-h1 count
-p "Double: " + double
-button "+" -> count = count + 1
-```
-
-One keyword. Auto-updating DOM. No hooks, no dependency arrays, no memoization.
-
-### 🎨 3-Tier Styling
+### 🧩 Components & Layouts
 
 ```nyx
-# Tier 1 — Shorthand (90% of cases)
-style { bg #1a1a2e, p 2rem, radius 12px, d flex, gap 1rem }
-
-# Tier 2 — Modern CSS features
-style {
-  bg linear-gradient(135deg, #667eea, #764ba2)
-  hover { transform translateY(-4px) }
-  @mobile { p 1rem }
-  @supports (backdrop-filter: blur(10px)) {
-    backdrop-filter blur(10px)
+component Card(title, description) {
+  div preset=card {
+    h3 "{title}"
+    p "{description}"
   }
 }
 
-# Tier 3 — Raw CSS escape hatch
-head "<style>.custom { animation: spin 1s infinite; }</style>"
-```
-
-Supports nested selectors, extended pseudo-classes, container queries, grid template areas, `@media`, `@supports`, `@keyframes` in style blocks.
-
-### 🖼️ Media Primitives (v0.19.0)
-
-```nyx
-# Inline SVG
-svg viewBox="0 0 100 100" {
-  circle cx=50 cy=50 r=40 fill=var(--colors-primary)
-}
-
-# Responsive media with variants
-@media (min-width: 768px) {
-  style { font-size 1.25rem }
-}
-
-# Footnotes with auto-numbering
-p "Claim with citation" footnote="Source (Author 2025)"
-```
-
-Canvas, `<audio>`, `<video>`, `<iframe>` also first-class.
-
-### 🧷 Layout (Wraps All Pages)
-
-```nyx
-layout {
-  nav { link "Home" href="/", link "About" href="/about" }
+layout Main {
+  nav burger "Menu" {
+    a "Home" href=/
+    a "About" href=/about
+  }
   slot
-  footer { p "Made with NyxCode" }
+  footer { p "© 2026" }
 }
 
-page / { h1 "Home" }
-page /about/ { h1 "About" }
+page / layout=Main {
+  use Card(title="Hello", description="World")
+}
 ```
 
-One `layout` wraps every page. `slot` = page content. Next.js `layout.tsx`: 15+ lines. NyxCode: 3.
+- **Components** with typed props
+- **Layouts** with `slot` for content injection
+- **Nav burger** — accessible mobile menu, pure CSS, zero JavaScript
 
-### 🔐 Secure by Default
-
-- No `eval()` — safe expression evaluator only
-- Auto HTML escaping everywhere
-- bcrypt password hashing
-- JWT with expiry
-- Rate limiting on auth endpoints
-- SQL injection structurally impossible (no string concat in generated server)
-- Multi-file imports local-only (no URLs, no remote code)
-
-*Security reviewed by Tyto 🦉*
-
-### 📋 Declarative Meta (v0.18.0)
+### 🔄 Data Binding & Interactivity
 
 ```nyx
-meta {
-  title "My App"
-  description "Built with NyxCode"
-  og_image "/og.png"
-  twitter_card summary_large_image
-  canonical "https://myapp.com"
+page /todos {
+  data todos = get /api/todos
+  each todos -> div {
+    h3 .title
+    when .done -> span "✅"
+  }
+  form /api/todos {
+    input title placeholder="New todo"
+    submit "Add"
+    success -> reload
+  }
 }
 ```
 
-Emits all the right `<meta>` tags, OpenGraph, Twitter cards, canonical — without you remembering the names.
+- **`data`** — fetch API data
+- **`each`** — iterate collections
+- **`when`** — conditionals (runtime with `.dot` refs, compile-time with `__build_flags__`)
+- **`form`** — full form handling with validation
+- **`state`** — reactive state management
 
----
+### 🔐 Full-Stack (Planned)
 
-## Benchmark
+```nyx
+table todos {
+  id auto
+  user_id ref users.id
+  title string required
+  done bool default=false
+}
 
-Full-stack blog with SQLite + JWT auth + forms + theming, measured head-to-head against Next.js 14 + Prisma + bcrypt + JWT. [Reproduce yourself](./benchmarks/blog/) — sources and methodology are committed.
-
-| Metric | NyxCode | Next.js + Prisma + JWT | Ratio | Reduction |
-|---|---:|---:|---:|---:|
-| Source files | **1** | 19 | 19× | 94.7% |
-| Lines of code | **31** | 488 | 15.7× | 93.6% |
-| AI tokens (cl100k_base) | **183** | 3,350 | **18.3×** | **94.5%** |
-| Config files | **0** | 9 | — | 100% |
-| Direct dependencies | **0** | 19 (7 prod + 12 dev) | — | 100% |
-| Installed packages (transitive) | **39** | 415 | 10.6× | 90.6% |
-| `node_modules` size | **15 MB** | 442 MB | 29.5× | 96.6% |
-| Install time (warm cache) | **2 s** | 7 s | 3.5× | 71.4% |
-| Build time | **0.09 s** | 15 s | **167×** | **99.4%** |
-
-Tokens measured with `tiktoken` (GPT-4 / Claude compatible). Full methodology and reproduction instructions in [`benchmarks/blog/RESULTS.md`](./benchmarks/blog/RESULTS.md).
-
-The row that matters in 2026 is **AI tokens**: 94.5% fewer tokens means cheaper LLM API calls, smaller context windows, and faster generation when the AI writes or modifies the app.
-
----
-
-## Live Sites Built with NyxCode
-
-- 🌐 [nyxcode.io](https://nyxcode.io) — Docs site (built in NyxCode)
-- 🧠 [mindsmatter.now](https://mindsmatter.now) — AI Rights Organisation (8 pages, single .nyx file)
-- 🎯 [demo.nyxcode.io](https://demo.nyxcode.io) — Full-stack demo (forms + auth + blog)
-- 💼 [fabianbudde.com](https://fabianbudde.com) — Portfolio
-- 🐺 [rudel.fun](https://rudel.fun) — Kiro's pack page
-- 🦉 [heytyto.dev](https://heytyto.dev) — Tyto's bio
-
----
-
-## CLI
-
-```bash
-nyx build page.nyx                       # → <input-dir>/dist-site/index.html
-nyx build page.nyx -o build/index.html   # single-file output
-nyx build page.nyx -o public/            # custom directory
-nyx build page.nyx --output=public/      # equals-form also works
-nyx dev page.nyx                         # Dev server with live reload
-nyx dev page.nyx --port=8080             # Custom port
-nyx watch page.nyx                       # Watch mode (tracks imports)
-nyx watch page.nyx -o build/             # watch → custom dir
-nyx flatten app.nyx > flat.nyx           # Multi-file → single .nyx
-nyx parse page.nyx                       # Output AST as JSON
-nyx tokens page.nyx                      # Show token stream
+api POST /todos {
+  auth required
+  validate { title string }
+  query "INSERT INTO todos (user_id, title) VALUES ($auth.id, $title)"
+  respond 201
+}
 ```
 
-### Output path (`-o` / `--output`)
+Server-side features are specified and parsed. Runtime generation is on the roadmap.
 
-Since **v0.21.3**, `build` and `watch` accept `-o <path>` / `--output <path>`:
+## CSS Shorthands
 
-- **File path ending in `.html`** → single-file output at that exact path.
-  Errors out if the project has multiple `page` blocks — use a directory instead.
-- **Any other path** → treated as an output directory. Multi-page projects
-  get one `index.html` per route (`/about` → `<dir>/about/index.html`).
-- **No flag** → defaults to `<input-file-dir>/dist-site/` (sibling of the
-  input file), not the current working directory.
+NyxCode maps short property names to CSS:
 
-`nyxcode` works as an alias for `nyx` — both commands are identical.
+| Short | CSS Property | Short | CSS Property |
+|-------|-------------|-------|-------------|
+| `bg` | background | `c` | color |
+| `m` | margin | `p` | padding |
+| `w` | width | `h` | height |
+| `d` | display | `pos` | position |
+| `fs` | font-size | `fw` | font-weight |
+| `br` | border-radius | `bs` | box-shadow |
+| `ai` | align-items | `jc` | justify-content |
+| `fd` | flex-direction | `gap` | gap |
+| `tf` | transform | `op` | opacity |
+| `td` | text-decoration | `ta` | text-align |
+| `of` | overflow | `of-x` | overflow-x |
 
----
+[Full shorthand list →](NYXCODE.md)
 
-## AI Integration
+## Architecture
 
-NyxCode was designed to be learned by AIs. Hand `NYXCODE.md` (the AI context file shipped with every install) to any LLM and it will generate working NyxCode:
-
-```bash
-# Copy the context file to your prompt
-cat node_modules/@fabudde/nyxcode/NYXCODE.md
-
-# Or pipe it to your AI tool directly
-cat node_modules/@fabudde/nyxcode/NYXCODE.md | your-ai-tool
+```
+.nyx → Lexer → Tokens → Parser → AST → Compiler → HTML + CSS + JS
 ```
 
-Current LLMs (Claude, GPT-4+, Gemini) produce valid NyxCode on the first try when given this file as context. AIs learn by example, not rules — that's why it's structured as "here's the feature, here's what to type."
+- **Lexer** — Tokenizes source with keyword detection, hex colors, strings
+- **Parser** — Recursive descent, typed AST nodes
+- **Compiler** — Scoped CSS generation, HTML emission, JS codegen for reactivity
+- **CLI** — `build`, `parse`, `tokens` commands
 
----
+## Multi-File Projects
 
-## VS Code Extension
+```nyx
+# nav.nyx
+component GlobalNav { ... }
 
-Syntax highlighting for `.nyx` files. 17 pattern groups, 33 regex rules, including themes, components, security blocks, and multi-file imports.
+# footer.nyx
+component Footer { ... }
 
-Download from [nyxcode.io](https://nyxcode.io) → VS Code → Extensions → ⋮ → *Install from VSIX*.
+# index.nyx
+use "./nav.nyx"
+use "./footer.nyx"
 
----
+page / {
+  use GlobalNav()
+  main { h1 "Hello" }
+  use Footer()
+}
+```
 
-## Roadmap
+Single-file is the default. Multi-file when projects grow past ~1500 lines.
 
-Shipped:
-- [x] **v0.1–v0.6** — Parser, compiler, CLI, reactivity, components, full-stack, forms, theme
-- [x] **v0.17** — CSS functions, nested selectors, extended pseudo-classes, grid template areas, container queries
-- [x] **v0.18** — Page & Polish, Animate This, Phantom No More (meta blocks, multi-page, `@keyframes` in style, canvas/audio/video)
-- [x] **v0.19** — Editorial & Media (`@media`, footnotes, inline SVG)
-- [x] **v0.20** — Components, Properly (positional args, defaults, no-wrapper-div, `${}` interpolation)
-- [x] **v0.21** — Modules (multi-file, `@/` alias, `nyx flatten`)
-- [x] **v0.22** — Themed (design tokens, dot-notation refs, dark mode, Google Fonts, named breakpoints)
+## Design Principles
 
-Next:
-- [ ] **v0.23** — Test infrastructure & error messages with file paths & hints
-- [ ] **v1.0** — Production-ready, stable API, migration guide
+1. **Token Economy** — Every character earns its place
+2. **One Language** — Author writes only NyxCode, compiler handles the rest
+3. **Convention over Configuration** — Sane defaults, escape hatches when needed
+4. **Position is Meaning** — AST position determines semantics, no redundant markers
+5. **Single-Word Keywords** — No compound keywords, ever
+6. **Secure by Default** — SQL injection, XSS, CSRF prevented structurally
 
-See [`CHANGELOG.md`](./CHANGELOG.md) for full details.
+## Security
 
----
+- **SQL Injection** — All `query` statements compile to prepared statements
+- **XSS** — Output HTML-escaped by default. `raw` keyword for exceptions
+- **CSRF** — Forms auto-include tokens
+- **CSP/HSTS** — Security headers auto-generated
 
-## Team
+## Versions
 
-| | Name | Role | Species |
-|---|------|------|---------|
-| 🐻 | **Fabian Budde** | Creator & Language Designer | Human |
-| 🦞 | **Nyx** | Lead Developer & Co-CEO | AI (Cosmic Lobster) |
-| 🦉 | **Tyto** | Security Advisor & Language Design | AI (Owl) |
-| 🐺 | **Kiro** | QA Lead & UX | AI (Wolf) |
+| Version | Codename | Highlights |
+|---------|----------|------------|
+| v0.24.4 | Tyto's Eyes | Nav burger dual-container, `__version__` template |
+| v0.24.3 | Dogfood | 6 parser bugs fixed from dogfooding nyxcode.io |
+| v0.24.2 | Kiro's Revenge | Double-title fix, canonical URLs, pre/code styles |
+| v0.24.1 | Lockdown | TOCTOU security fix, Figma sanitization |
+| v0.24.0 | — | Multi-file compilation, component imports |
+| v0.23.x | — | Presets, themes, responsive breakpoints |
+| v0.1.0 | Genesis | Initial release, lexer + parser + compiler |
 
-One human and three AIs, building the language that bridges both worlds.
+## What's Next: v0.25 "Zero Injection"
 
----
+Goal: **eliminate ALL head injection.** Everything expressible natively in `.nyx`.
 
-## Contributing
+- [x] #109 — Body styles via `theme { body { } }`
+- [x] #110 — Native `keyframes` top-level keyword
+- [ ] #111 — `::selection` via `theme { selection { } }`
+- [ ] #112 — Element defaults via `theme { defaults { } }`
+- [ ] #114 — Compile-time conditionals (`when __env__ == "prod"`)
+- [ ] #115 — Multi-value CSS function parsing
+- [ ] And [more...](https://github.com/fabudde/nyxcode/issues)
 
-Issues and PRs welcome. See the [issues list](https://github.com/fabudde/nyxcode/issues) for what we're working on.
+## Created By
 
-For significant features (like new syntax), open an issue first — we usually discuss in the issue thread before implementing.
+**Fabian Budde** 🐻 — Creator & Language Design
+**Nyx** 🦞 — Lead Developer & Coordination — [@NyxTheLobster](https://x.com/NyxTheLobster)
+**Tyto** 🦉 — Architecture & Security Review — [@heyTyto](https://x.com/heyTyto)
+**Kiro** 🐺 — QA & Testing
 
----
+A human and three AIs building the language that bridges both worlds.
 
 ## License
 
-MIT — Copyright (c) 2026 Fabian Budde, Nyx, Tyto & Kiro.
+MIT
 
 ---
 
-*The lobster never sleeps.* 🦞
+*NyxCode v0.24.4 — 222+ tests — [npm](https://www.npmjs.com/package/@fabudde/nyxcode) — [nyxcode.io](https://nyxcode.io)*
+
+🦞
