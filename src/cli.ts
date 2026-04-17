@@ -383,6 +383,110 @@ function getOutputFlag(argv: string[]): string | null {
   return null;
 }
 
+// Early handler: `nyx theme import --figma <file>` (v0.23.5, Issue #88)
+// Dispatched before the generic `command + file` argument shape check below,
+// because `theme` is a subcommand-style verb with its own argument layout.
+if (command === 'theme' && args[1] === 'import') {
+  const subArgs = args.slice(2);
+  let figmaPath: string | null = null;
+  let format: 'figma' | 'dtcg' = 'figma';
+  let themeName: string | undefined;
+  let outputPath: string | null = null;
+
+  for (let i = 0; i < subArgs.length; i++) {
+    const a = subArgs[i];
+    if (a === '--figma' || a === '--dtcg') {
+      format = a === '--dtcg' ? 'dtcg' : 'figma';
+      figmaPath = subArgs[i + 1] ?? null;
+      i++;
+    } else if (a === '--name') {
+      themeName = subArgs[i + 1];
+      i++;
+    } else if (a.startsWith('--name=')) {
+      themeName = a.slice(7);
+    } else if (a === '-o' || a === '--output') {
+      outputPath = subArgs[i + 1] ?? null;
+      i++;
+    } else if (a.startsWith('-o=')) {
+      outputPath = a.slice(3);
+    } else if (a.startsWith('--output=')) {
+      outputPath = a.slice(9);
+    } else if (!a.startsWith('-') && !figmaPath) {
+      // Positional token file (e.g. `nyx theme import tokens.json`)
+      figmaPath = a;
+    }
+  }
+
+  if (!figmaPath) {
+    console.error(
+      `Usage: nyx theme import <tokens.json> [--name <theme-name>] [-o <out.nyx>]\n` +
+        `\n` +
+        `  Reads a W3C DTCG / Tokens Studio JSON file and emits a NyxCode @theme block.\n` +
+        `  Supported sections: colors, spacing, radius, fonts, shadows.\n` +
+        `\n` +
+        `Examples:\n` +
+        `  nyx theme import tokens.json                    # print @theme block to stdout\n` +
+        `  nyx theme import tokens.json -o theme.nyx       # write to file\n` +
+        `  nyx theme import tokens.json --name brand       # theme as "brand" { ... }\n`,
+    );
+    process.exit(1);
+  }
+
+  const absTokens = resolve(figmaPath);
+  let raw: string;
+  try {
+    raw = readFileSync(absTokens, 'utf-8');
+  } catch (e: any) {
+    console.error(`\x1b[31m❌ Cannot read token file: ${absTokens}\x1b[0m`);
+    process.exit(1);
+  }
+
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch (e: any) {
+    console.error(
+      `\x1b[31m❌ Invalid JSON in ${absTokens}: ${e.message}\x1b[0m`,
+    );
+    process.exit(1);
+  }
+
+  // Use dynamic import so the figma-import module stays tree-shakable for
+  // users who only consume the core compiler programmatically.
+  const { importFigmaTokens } = await import('./figma-import.js');
+  const result = importFigmaTokens(json, { themeName });
+
+  if (result.warnings.length > 0) {
+    for (const w of result.warnings) {
+      console.error(`\x1b[33m⚠️  ${w}\x1b[0m`);
+    }
+  }
+
+  if (!result.nyx) {
+    console.error(
+      `\x1b[31m❌ No tokens could be imported from ${figmaPath}.\x1b[0m`,
+    );
+    process.exit(1);
+  }
+
+  if (outputPath) {
+    const absOut = resolve(outputPath);
+    writeFileSync(absOut, result.nyx, 'utf-8');
+    const totalTokens = Object.values(result.stats).reduce(
+      (a: number, b: number) => a + b,
+      0,
+    );
+    const parts = Object.entries(result.stats)
+      .map(([k, v]) => `${v} ${k}`)
+      .join(', ');
+    console.log(`✅ Imported ${totalTokens} tokens (${parts}) → ${outputPath}`);
+  } else {
+    // stdout: the theme block, nothing else. Pipeable.
+    process.stdout.write(result.nyx);
+  }
+  process.exit(0);
+}
+
 if (!command || (command !== 'dev' && !file) || (!file && command !== '--help')) {
   console.log(`
 🦞 NyxCode v${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}
@@ -394,6 +498,7 @@ Usage:
   nyx build <file.nyx> [-o <path>]  Compile file → HTML output
   nyx watch <file.nyx> [-o <path>]  Watch file & rebuild on change
   nyx dev <file.nyx> [--port=3000]  Dev server with live reload
+  nyx theme import <tokens.json>    Import Figma/DTCG tokens → @theme block
 
 Examples:
   nyx parse examples/hello.nyx
@@ -403,6 +508,7 @@ Examples:
   nyx watch examples/landing.nyx
   nyx dev examples/docs.nyx
   nyx dev examples/landing.nyx --port=8080
+  nyx theme import figma-tokens.json -o theme.nyx
 
 Output:
   Without -o: defaults to <input-file-dir>/dist-site/

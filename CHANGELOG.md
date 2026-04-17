@@ -1,3 +1,92 @@
+## v0.23.5 — "Figma import" (2026-04-17)
+
+**FEATURE: [#88](https://github.com/fabudde/nyxcode/issues/88)** — Figma / W3C DTCG token importer.
+
+### New command
+
+```bash
+nyx theme import tokens.json                    # print @theme block to stdout
+nyx theme import tokens.json -o theme.nyx       # write to file
+nyx theme import tokens.json --name brand       # theme as "brand" { ... }
+```
+
+Reads a JSON token file exported from Tokens Studio for Figma (or any W3C DTCG-compliant tool) and emits a NyxCode `@theme { ... }` block.
+
+### Supported
+
+| Figma / DTCG `$type` | NyxCode section | Example |
+|---|---|---|
+| `color` | `colors` | `primary: #8b5cf6` |
+| `dimension` / `spacing` | `spacing` | `md: 16px` |
+| `borderRadius` / `radius` | `radius` | `md: 8px` |
+| `fontFamily` / `typography` | `fonts` | `body: Inter, system-ui, sans-serif` |
+| `shadow` / `boxShadow` | `shadows` | `md: 0 4px 8px rgba(0,0,0,0.1)` |
+
+### Format compatibility
+
+- **W3C DTCG** (`$value`, `$type`) — primary, default
+- **Tokens Studio legacy** (`value`, `type`) — also supported transparently
+- **Nested groups** — dash-joined (`color.brand.primary` → `brand-primary`)
+- **Global wrapper** — auto-unwrapped when a single top-level key exists
+- **fontFamily arrays** — comma-joined stacks with automatic quoting for multi-word families
+- **Composite shadows** — `{offsetX, offsetY, blur, spread, color}` object form collapses to CSS string (spread=0 omitted per CSS convention)
+
+### Roundtrip example
+
+Given `figma-tokens.json` with 17 tokens across 5 sections:
+
+```
+$ nyx theme import figma-tokens.json -o theme.nyx
+✅ Imported 17 tokens (5 colors, 5 spacing, 3 radius, 2 fonts, 2 shadows) → theme.nyx
+```
+
+```nyx
+# theme.nyx (generated)
+theme {
+  colors {
+    brand-primary: #8b5cf6
+    brand-secondary: #ec4899
+    text-body: #4a4a4a
+    ...
+  }
+  spacing { xs: 4px, sm: 8px, md: 16px, ... }
+  radius { sm: 4px, md: 8px, lg: 16px }
+  fonts {
+    body: Inter, system-ui, sans-serif
+    heading: "Playfair Display"
+  }
+  shadows {
+    sm: 0 1px 3px rgba(0,0,0,0.1)
+    lg: 0 10px 20px rgba(0,0,0,0.15)
+  }
+}
+```
+
+Use the imported theme directly:
+
+```nyx
+use "./theme.nyx"
+page / {
+  p "hi" style="color:color.brand-primary;padding:spacing.md"
+}
+```
+
+### Added
+
+- `src/figma-import.ts` — standalone importer module (programmatic API too).
+- `nyx theme import` CLI subcommand with `--name`, `-o`, `--figma`, `--dtcg` flags.
+- 20 new tests in `src/tests/v0235-figma-import.test.ts`. **98/98 green.**
+
+### Not in scope (v0.24+)
+
+- Reverse direction (`nyx theme export --figma > tokens.json`)
+- Token references (DTCG `{color.primary}` alias resolution)
+- Dark mode / Figma Modes → `theme dark { }`
+- Composite typography tokens (currently extracts `fontFamily` only)
+- Figma plugin (requires auth + hosting, out of scope for a CLI)
+
+---
+
 ## v0.23.4 — "Digit routes" (2026-04-17)
 
 **BUG FIX: [#94](https://github.com/fabudde/nyxcode/issues/94)** — Routes starting with a digit failed to lex.
