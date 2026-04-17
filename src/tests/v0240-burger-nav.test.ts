@@ -126,10 +126,10 @@ describe('v0.24.0: nav burger — CSS emission', () => {
     const { html } = compile(`
       page / { nav burger { a "H" href="/" } }
     `);
-    assert.match(html, /\.nx-burger\{all:unset;display:flex;align-items:center\}/);
-    assert.match(html, /\.nx-burger>summary\{display:none/);
-    assert.match(html, /\.nx-burger\[open\] \.nx-burger-closed\{display:none\}/);
-    assert.match(html, /\.nx-burger\[open\] \.nx-burger-open\{display:inline\}/);
+    assert.match(html, /\.nx-burger-desktop\{display:flex;gap:1\.5rem;align-items:center\}/);
+    assert.match(html, /\.nx-burger-mobile>summary\{cursor:pointer/);
+    assert.match(html, /\.nx-burger-mobile\[open\] \.nx-burger-closed\{display:none\}/);
+    assert.match(html, /\.nx-burger-mobile\[open\] \.nx-burger-open\{display:inline\}/);
   });
 
   test('responsive CSS uses the correct breakpoint', () => {
@@ -139,7 +139,7 @@ describe('v0.24.0: nav burger — CSS emission', () => {
     `);
     assert.match(
       html,
-      /@media\(max-width:480px\)\{[^}]*\.nx-burger-bp-480>summary\{display:inline-block/,
+      /@media\(max-width:480px\).*nx-burger-bp-480>summary\{display:inline-block/,
     );
   });
 

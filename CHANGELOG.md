@@ -1,3 +1,20 @@
+## v0.24.4 — "Tyto's Eyes" (2026-04-17)
+
+Two more issues from Tyto's eagle-eyed QA.
+
+### Fixed
+
+- **[#107](https://github.com/fabudde/nyxcode/issues/107) — `nav burger` links invisible on desktop.** Compiler now generates dual containers: `<div class="nx-burger-desktop">` (always visible) + `<details class="nx-burger-mobile">` (toggle on mobile). Solves the `<details>` closed-state hiding issue.
+
+- **[#108](https://github.com/fabudde/nyxcode/issues/108) — `__version__` not replaced in text content.** Bare `__version__` (without `${}` wrapper) now resolves at compile time everywhere: quoted strings, element content, and inline text.
+
+### Stats
+
+- **222 tests**, all green (+4 new)
+- Dual-container nav burger architecture inspired by Tyto 🦉 and Kiro 🐺
+
+---
+
 ## v0.24.3 — "Dogfood" (2026-04-17)
 
 Six compiler bugs found by building nyxcode.io in NyxCode itself. All fixed.

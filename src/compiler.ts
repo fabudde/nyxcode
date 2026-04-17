@@ -943,15 +943,16 @@ export class Compiler {
       // Base: everything is hidden; the inner <nav> is only visible at desktop sizes
       // or when <details> is open on mobile.
       const baseCss =
-        `.nx-burger{all:unset;display:flex;align-items:center}` +
-        `.nx-burger>summary{display:none;cursor:pointer;list-style:none;user-select:none}` +
-        `.nx-burger>summary::-webkit-details-marker{display:none}` +
-        `.nx-burger>nav{display:flex;gap:1.5rem;align-items:center}` +
+        `.nx-burger-desktop{display:flex;gap:1.5rem;align-items:center}` +
+        `.nx-burger-mobile{display:none}` +
+        `.nx-burger-mobile>summary{cursor:pointer;list-style:none;user-select:none}` +
+        `.nx-burger-mobile>summary::-webkit-details-marker{display:none}` +
+        `.nx-burger-mobile>nav{display:flex;gap:1.5rem;align-items:center}` +
         `.${bpKey}>summary{}` +
         // Dual-span state-correct labels (Tyto)
-        `.nx-burger .nx-burger-open{display:none}` +
-        `.nx-burger[open] .nx-burger-closed{display:none}` +
-        `.nx-burger[open] .nx-burger-open{display:inline}`;
+        `.nx-burger-mobile .nx-burger-open{display:none}` +
+        `.nx-burger-mobile[open] .nx-burger-closed{display:none}` +
+        `.nx-burger-mobile[open] .nx-burger-open{display:inline}`;
       this.css.push(baseCss);
 
       // Responsive: below breakpoint, show summary, hide nav unless open.
@@ -963,6 +964,8 @@ export class Compiler {
       // prevents scroll-chaining into the body when the nav itself overflows.
       const respCss =
         `@media(max-width:${breakpointPx}px){` +
+        `.nx-burger-desktop{display:none}` +
+        `.nx-burger-mobile{display:block}` +
         `.${bpKey}>summary{display:inline-block;padding:.5rem 1rem}` +
         `.${bpKey}>nav{display:none;flex-direction:column;gap:1rem;padding:1rem}` +
         `.${bpKey}[open]>nav{display:flex}` +
@@ -997,7 +1000,12 @@ export class Compiler {
     const passthroughStr = this.compileAttributes(passthroughAttrs);
 
     return (
-      `${this.ind()}<details class="${detailsClasses}"${passthroughStr}>\n` +
+      // Desktop: plain div with links (no details/summary needed)
+      `${this.ind()}<div class="nx-burger-desktop">\n` +
+      innerChildren +
+      `${this.ind()}</div>\n` +
+      // Mobile: details/summary for zero-JS toggle
+      `${this.ind()}<details class="${detailsClasses} nx-burger-mobile"${passthroughStr}>\n` +
       `${this.ind()}  <summary aria-label="${summaryAria}">` +
       `<span class="nx-burger-closed">${closedLabel}</span>` +
       `<span class="nx-burger-open" aria-hidden="true">${openLabel}</span>` +
@@ -3343,12 +3351,16 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
    * Shared by page-level escapeContent() and component-level interpolate() (#81).
    */
   private resolveBuiltins(str: string): string {
-    return str.replace(/\$\{(__\w+__)\}/g, (match, name) => {
+    // First resolve ${__version__} syntax (#81)
+    let result = str.replace(/\$\{(__\w+__)\}/g, (match, name) => {
       switch (name) {
         case '__version__': return NYXCODE_VERSION;
         default: return match; // unknown built-in → leave literal
       }
     });
+    // Also resolve bare __version__ without ${} wrapper (#108)
+    result = result.replace(/__version__/g, NYXCODE_VERSION);
+    return result;
   }
 
   private escapeContent(str: string): string {
