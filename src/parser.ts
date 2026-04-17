@@ -509,9 +509,51 @@ export class Parser {
         if (this.check(TokenType.Colon)) this.advance();
         // If next is a string literal, use directly
         if (this.peek().type === TokenType.String) {
-          const strVal = this.advance().value;
-          if (this.check(TokenType.Comma)) this.advance();
-          // For fonts: check for trailing `source: google` after string value + comma
+          let strVal = this.advance().value;
+          let strValLastLine = this.tokens[this.pos - 1].line;
+          // Bug #91 fix (v0.23.2): for fonts, a comma-separated font-stack continuation must be
+          // captured as part of THIS entry, not treated as a new key. Collect additional stack
+          // parts until we hit (a) a newline followed by a known font-key, (b) `}`, or (c) EOF.
+          // Stop at `source` too (handled below).
+          const FONT_KEYS = new Set(['heading', 'body', 'mono', 'code', 'display', 'ui', 'sans', 'serif']);
+          while (sectionName === 'fonts' && this.check(TokenType.Comma)) {
+            // CRITICAL lookahead: if the token AFTER the comma is a known font-key followed
+            // by a colon, this comma separates TWO entries, not a font-stack. Do NOT consume
+            // the comma — let the outer loop handle it.
+            const la1 = this.tokens[this.pos + 1]; // token after comma (doesn't exist? bail)
+            const la2 = this.tokens[this.pos + 2]; // token after that
+            if (la1 && la1.type === TokenType.Identifier && FONT_KEYS.has(la1.value)
+                && la2 && la2.type === TokenType.Colon) {
+              // Comma separates entries: `body: "Inter", heading: "Playfair"`
+              this.advance(); // consume comma
+              break;
+            }
+            this.advance(); // consume comma
+            const la = this.peek();
+            if (la.type === TokenType.Identifier && la.value === 'source') break;
+            if (la.type === TokenType.RightBrace) break;
+            // Collect one stack entry: a sequence of identifiers/strings on the current logical line.
+            const stackParts: string[] = [];
+            while (!this.check(TokenType.RightBrace) && !this.check(TokenType.Comma) && !this.isAtEnd()) {
+              const t = this.peek();
+              if (t.type === TokenType.Identifier && t.value === 'source') break;
+              if (t.type === TokenType.Identifier && FONT_KEYS.has(t.value) && t.line > strValLastLine && stackParts.length > 0) break;
+              if (t.type === TokenType.Identifier && FONT_KEYS.has(t.value) && t.line > strValLastLine && stackParts.length === 0) {
+                // Peek ahead: if after this identifier we find a `:`, it's definitely a new key.
+                const next = this.tokens[this.pos + 1];
+                if (next && next.type === TokenType.Colon) break;
+              }
+              stackParts.push(t.value);
+              strValLastLine = t.line;
+              this.advance();
+            }
+            if (stackParts.length > 0) {
+              strVal += ', ' + stackParts.join(' ');
+            }
+          }
+          // For non-font sections: single trailing comma is still accepted.
+          if (sectionName !== 'fonts' && this.check(TokenType.Comma)) this.advance();
+          // For fonts: check for trailing `source: google` after string value + stack
           if (sectionName === 'fonts' && this.check(TokenType.Identifier) && this.peek().value === 'source') {
             this.advance(); // consume 'source'
             if (this.check(TokenType.Colon)) this.advance();
@@ -523,34 +565,60 @@ export class Parser {
                 `Use source: google or source: local path "..." instead. (line ${start.line})`
               );
             } else if (sourceType === 'google') {
-              fontsMeta[key] = { family: strVal.trim(), source: 'google' };
+              fontsMeta[key] = { family: strVal.split(',')[0].trim(), source: 'google' };
             } else if (sourceType === 'local') {
               if (this.check(TokenType.Identifier) && this.peek().value === 'path') this.advance();
               const localPath = this.check(TokenType.String) ? this.advance().value : '';
-              fontsMeta[key] = { family: strVal.trim(), source: 'local', localPath };
+              fontsMeta[key] = { family: strVal.split(',')[0].trim(), source: 'local', localPath };
             }
           }
           entries[key] = strVal;
           continue;
         }
         if (sectionName === 'fonts') {
-          // Fonts: collect until comma, semicolon, }, or known font key (heading/body/mono/code/display/ui)
+          // Fonts (non-string, e.g. `heading: Georgia, serif`).
+          // Bug #91 fix (v0.23.2): comma-separated stacks must be collected as ONE entry.
+          // Stop on: semicolon, `}`, newline-followed-by-new-key, or `source:` meta.
           const FONT_KEYS = new Set(['heading', 'body', 'mono', 'code', 'display', 'ui', 'sans', 'serif']);
-          let parts: string[] = [];
-          while (!this.check(TokenType.RightBrace) && !this.check(TokenType.Comma) && !this.isAtEnd()) {
-            // Semicolons act as separators (lexed as Identifier with value ";")
+          const stackEntries: string[] = [];
+          let currentParts: string[] = [];
+          let lastTokLine = this.peek().line;
+          const flushPart = () => { if (currentParts.length) { stackEntries.push(currentParts.join(' ')); currentParts = []; } };
+          while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            // Semicolons end the entry
             if (this.check(TokenType.Identifier) && this.peek().value === ';') {
-              this.advance(); // consume ';'
+              this.advance();
               break;
             }
-            // If this identifier is a known font key and we already have parts → new entry
-            if (this.check(TokenType.Identifier) && parts.length > 0 && FONT_KEYS.has(this.peek().value)) {
+            // Comma: flush current part, continue collecting next stack entry
+            if (this.check(TokenType.Comma)) {
+              this.advance();
+              flushPart();
+              continue;
+            }
+            // New-line + known font-key followed by `:` → next entry
+            const t = this.peek();
+            if (t.type === TokenType.Identifier && FONT_KEYS.has(t.value) && t.line > lastTokLine && currentParts.length === 0) {
+              const next = this.tokens[this.pos + 1];
+              if (next && next.type === TokenType.Colon) break;
+            }
+            // `source` keyword terminates stack collection (meta follows)
+            if (t.type === TokenType.Identifier && t.value === 'source' && (currentParts.length > 0 || stackEntries.length > 0)) {
               break;
             }
-            parts.push(this.advance().value);
+            // New-line + known font-key when we already have content → previous entry ends
+            if (t.type === TokenType.Identifier && FONT_KEYS.has(t.value) && t.line > lastTokLine && (currentParts.length > 0 || stackEntries.length > 0)) {
+              const next = this.tokens[this.pos + 1];
+              if (next && next.type === TokenType.Colon) break;
+            }
+            currentParts.push(this.advance().value);
+            lastTokLine = t.line;
           }
-          if (this.check(TokenType.Comma)) this.advance();
-          const rawValue = parts.join(' ');
+          flushPart();
+          // Preserve back-compat: single-entry stack gets space-joined (old semantic); multi-entry uses CSS `, `.
+          const rawValue = stackEntries.length <= 1
+            ? (stackEntries[0] || '')
+            : stackEntries.join(', ');
 
           // Check for trailing `source: google` / `source: local path "..."` / `source: url "..."`
           if (this.check(TokenType.Identifier) && this.peek().value === 'source') {

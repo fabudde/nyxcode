@@ -1,3 +1,58 @@
+## v0.23.2 — "Font-Stack Fix" (2026-04-17)
+
+**BUG FIX (HIGH): [#91](https://github.com/fabudde/nyxcode/issues/91)** — Comma-separated font stacks.
+
+### The bug
+
+```nyx
+theme { fonts { body: "Inter", system-ui, sans-serif } }
+```
+
+Previously emitted:
+```css
+--fonts-body: "Inter";
+--fonts-system-ui: "";      /* phantom */
+--fonts-sans-serif: "";     /* phantom */
+```
+
+And worse, multi-line:
+```nyx
+fonts {
+  body: "Inter", system-ui, sans-serif
+  heading: Georgia, serif
+}
+```
+
+Previously:
+```css
+--fonts-sans-serif: "heading : Georgia";   /* next-line bleed! */
+```
+
+### Root cause
+
+The fonts parser in both the string-branch and the identifier-branch treated comma as "end of entry". For font stacks (the standard CSS way to write font fallbacks: `body: "Inter", system-ui, sans-serif`), that's wrong — comma continues the stack.
+
+This was in the same family as [#86](https://github.com/fabudde/nyxcode/issues/86) (whitespace split) but on a different terminator (comma), so the v0.22.1 fix didn't cover it.
+
+### Fix
+
+- **String-value fonts**: after the string + comma, look ahead. If the next tokens are `<font-key>:` (known key + colon), the comma separates two entries; otherwise, continue collecting the stack.
+- **Identifier-value fonts**: collect stack entries delimited by commas, stop on newline-followed-by-known-font-key+colon, or on `source` keyword.
+- **Output semantic**: single-entry stacks keep old behavior (single value). Multi-entry stacks join with `, ` — valid CSS font-family syntax.
+
+### Tests
+
+- 7 new regression tests in `v0231-font-stacks.test.ts` (single-line stacks, multi-line stacks, stack + source: google, extends with stacks, next-key-bleed prevention)
+- **54/54 total green**
+
+### Migration impact
+
+Production themes with font stacks (basically every real-world theme) will now emit correctly. No syntax changes required — existing `.nyx` files will just start working.
+
+Thanks @Kiro-Rudel 🐺 for the HIGH-priority catch during v0.23.0 QA. That's **four production catches in under 24 hours** (#86, #87, #90, #91).
+
+---
+
 ## v0.23.1 — "Allowlist" (2026-04-17)
 
 Security hardening in the CLI's import-path resolver (`use` + `theme extends`).
