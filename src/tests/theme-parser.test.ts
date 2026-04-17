@@ -179,3 +179,121 @@ describe('theme dot-notation in style blocks (end-to-end)', () => {
   });
 
 });
+
+// ===== Phase 3: Dark Mode, Google Fonts, Named Breakpoints =====
+
+describe('dark mode via theme dark { ... }', () => {
+
+  it('theme dark { colors { primary: ... } } emits prefers-color-scheme + data-theme selector', () => {
+    const out = compile(`
+      theme {
+        colors { primary: #0066ff; bg: #ffffff }
+      }
+      theme dark {
+        colors { primary: #4da6ff; bg: #0a0a0a }
+      }
+      page / {
+        p "Hello"
+      }
+    `);
+    // Light theme :root
+    assert.match(out.html, /--colors-primary:\s*#0066ff/,
+      'Light theme should have --colors-primary: #0066ff');
+    // Dark mode via media query
+    assert.match(out.html, /@media\(prefers-color-scheme:dark\)\{:root\{/,
+      'Should emit @media (prefers-color-scheme: dark)');
+    assert.match(out.html, /prefers-color-scheme:dark[^}]*--colors-primary:\s*#4da6ff/,
+      'Dark media query should have --colors-primary: #4da6ff');
+    // Dark mode via data-theme attribute
+    assert.match(out.html, /\[data-theme="dark"\]\{/,
+      'Should emit [data-theme="dark"] selector');
+    assert.match(out.html, /\[data-theme="dark"\][^}]*--colors-bg:\s*#0a0a0a/,
+      '[data-theme="dark"] should override --colors-bg');
+  });
+
+});
+
+describe('Google Fonts auto-injection', () => {
+
+  it('font with source: google injects 3 link tags', () => {
+    const out = compile(`
+      theme {
+        fonts {
+          heading: Inter, source: google
+          body: "Open Sans", source: google
+        }
+      }
+      page / {
+        p "Hello"
+      }
+    `);
+    assert.match(out.html, /<link rel="preconnect" href="https:\/\/fonts\.googleapis\.com">/,
+      'Should inject preconnect to fonts.googleapis.com');
+    assert.match(out.html, /<link rel="preconnect" href="https:\/\/fonts\.gstatic\.com" crossorigin>/,
+      'Should inject preconnect to fonts.gstatic.com');
+    assert.match(out.html, /<link rel="stylesheet" crossorigin="anonymous" href="https:\/\/fonts\.googleapis\.com\/css2\?family=Inter&family=Open\+Sans&display=swap">/,
+      'Should inject stylesheet link with both font families');
+  });
+
+  it('font with source: url throws security error', () => {
+    assert.throws(
+      () => compile(`
+        theme {
+          fonts {
+            heading: Inter, source: url "https://evil.com/font.woff2"
+          }
+        }
+        page / {
+          p "Hello"
+        }
+      `),
+      (err: Error) => {
+        assert.match(err.message, /External URL font sources are deprecated for security/,
+          'Error should mention deprecated third-party URL sources');
+        return true;
+      },
+    );
+  });
+
+});
+
+describe('named breakpoints from theme', () => {
+
+  it('breakpoints { sm: 600px } rebinds @mobile to max-width: 600px', () => {
+    const out = compile(`
+      theme {
+        colors { primary: #000 }
+        breakpoints { sm: 600px; lg: 1024px }
+      }
+      page / {
+        style {
+          color: color.primary
+          @mobile { padding: 8px }
+        }
+        p "Hello"
+      }
+    `);
+    assert.match(out.html, /@media \(max-width: 600px\)/,
+      '@mobile should use user-defined breakpoints.sm (600px)');
+    assert.doesNotMatch(out.html, /@media \(max-width: 768px\)/,
+      'Should NOT use default 768px when user defines breakpoints.sm');
+  });
+
+  it('@mobile without user breakpoints defaults to 768px', () => {
+    const out = compile(`
+      theme {
+        colors { primary: #000 }
+      }
+      page / {
+        style {
+          color: color.primary
+          @mobile { padding: 8px }
+        }
+        p "Hello"
+      }
+    `);
+    assert.match(out.html, /@media \(max-width: 768px\)/,
+      '@mobile should default to 768px without user breakpoints');
+  });
+
+});
