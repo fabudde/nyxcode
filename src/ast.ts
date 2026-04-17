@@ -68,10 +68,11 @@ export interface StoreNode extends BaseNode {
   body: StoreField[];
 }
 
-/** `theme { ... }` */
+/** `theme { ... }` or `theme dark { ... }` */
 export interface ThemeNode extends BaseNode {
   type: 'Theme';
   sections: ThemeSection[];
+  mode?: 'dark'; // If set, this is a dark-mode override theme
 }
 
 /** `security { ... }` */
@@ -393,6 +394,13 @@ export interface StoreField {
 export interface ThemeSection {
   name: string; // 'colors', 'fonts', 'spacing', etc.
   entries: Record<string, string>;
+  fontsMeta?: Record<string, FontMeta>; // metadata for font entries (source, localPath)
+}
+
+export interface FontMeta {
+  family: string;
+  source: 'google' | 'local' | 'stack';
+  localPath?: string;
 }
 
 /** `config { env JWT_SECRET required }` */

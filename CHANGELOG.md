@@ -1,3 +1,89 @@
+## v0.22.0 — "Themed" (2026-04-17)
+
+Design-token system. Write tokens once, reference them anywhere, override for dark mode. No runtime cost — everything compiles to CSS variables + a `prefers-color-scheme` block.
+
+Co-designed by [@TytoTheOwl](https://github.com/TytoTheOwl) 🦉 (security) and [@Kiro-Rudel](https://github.com/Kiro-Rudel) 🐺 (empirical scope). Discussion: [#85](https://github.com/fabudde/nyxcode/issues/85).
+
+### Added
+
+- **Design tokens** — new nested blocks under `@theme`: `colors`, `spacing`, `radius`, `shadows`, `fonts`, `layouts`, `borders`, `breakpoints`. Each entry becomes a CSS custom property (`--colors-primary`, `--spacing-md`, etc.).
+
+- **Dot-notation token references** — reference tokens by singular section name:
+  ```nyx
+  style {
+    color: color.primary            # → var(--colors-primary)
+    padding: spacing.md spacing.lg  # → var(--spacing-md) var(--spacing-lg)
+    border-radius: radius.lg        # → var(--radius-lg)
+    box-shadow: shadow.glow         # → var(--shadows-glow)
+  }
+  ```
+  Works in style blocks, CSS rules, keyframes, responsive blocks — everywhere values are accepted.
+
+- **Hard errors on undefined tokens** — `color.primry` (typo) now throws `Undefined theme token: color.primry` at compile time with the list of defined tokens. No more silent drift.
+
+- **Dark mode** — second `@theme` block with the `dark` modifier:
+  ```nyx
+  theme {
+    colors { primary: #0066ff; bg: #ffffff; text: #1a1a1a }
+  }
+  theme dark {
+    colors { primary: #4da6ff; bg: #0a0a0a; text: #f0f0f0 }
+  }
+  ```
+  Compiles to `@media (prefers-color-scheme: dark) { :root { ... } }` **and** `[data-theme="dark"] { ... }` — both OS-level auto and JS-toggled opt-in work out of the box. Only redefined tokens override.
+
+- **Google Fonts auto-injection** — annotate fonts with `source: google`:
+  ```nyx
+  fonts {
+    heading: Inter, source: google
+    body: "Open Sans", source: google
+  }
+  ```
+  Compiler injects 3 `<link>` tags: preconnect + preconnect (crossorigin) + stylesheet (with `crossorigin="anonymous"`). Family names auto-URL-encoded.
+
+- **Local font sources** — `source: local path "./fonts/MyFont.woff2"` for self-hosted fonts. File existence is verified at compile time (loud failure if missing).
+
+- **Named breakpoints** — `@mobile`, `@tablet`, `@desktop` now auto-bind to user-defined `breakpoints {}`:
+  ```nyx
+  theme {
+    breakpoints { sm: 600px; lg: 1024px }
+  }
+  style {
+    padding: spacing.lg
+    @mobile { padding: spacing.md }  # max-width: 600px
+  }
+  ```
+  Without `breakpoints {}`, defaults to 768px / 1024px / 1280px (backward-compatible).
+
+- **Colon & semicolon delimiters** — theme blocks now accept both `primary #ff0000` and `primary: #ff0000`, with optional `;` between entries:
+  ```nyx
+  colors { primary: #ff0000; bg: #ffffff; text: #000000 }
+  ```
+
+### Changed
+
+- `resolveThemeValue()` now resolves dot-notation refs for ALL properties, not just colors. The v0.9 bare-name shortcut (`c primary`) still works for color properties — backward-compatible.
+
+### Security
+
+- **External URL font sources are deprecated.** `source: url "..."` throws at compile time: supply chain + CSP risk. Planned reintroduction behind a `--allow-third-party-fonts` flag with domain allowlist in a future release. Thanks @TytoTheOwl 🦉.
+
+### Known Limitations
+
+- Numeric-prefix token keys like `spacing.2xl` lex as `Number + Identifier` and aren't yet supported. Workaround: use alphabetic names (`xl`, `xxl`) or hyphens (`spacing.2x-l` — ugly, avoid). Full support planned for v0.23.
+
+### Fixes
+
+- **parser**: `section.key` dot-notation is now preserved as a single value token in style blocks. Previously, `color: color.primary` split into `color: .` + stray `color.primary` property, producing broken CSS. (caught by end-to-end dog-fooding.)
+- **parser**: optional colon (`:`) and semicolon (`;`) in theme blocks now accepted.
+- **compiler**: layout head-injections now preserve ALL theme CSS (dark mode block, Google Fonts links) across `compileMultiFile()` boundaries.
+
+### Tests
+
+20 tests across 5 suites covering every feature. Dog-fooded against a real `.nyx` file before shipping — because unit tests that pass mean nothing if parser splits tokens differently in real files. (Lesson relearned from v0.21.2.)
+
+---
+
 ## v0.21.3 — "Write Where I Told You" (2026-04-16)
 
 Short, late-night fix. Found this while testing `preset` behavior — noticed

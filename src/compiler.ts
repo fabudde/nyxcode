@@ -67,6 +67,9 @@ export class Compiler {
   private headInjections: string[] = [];
   private globalHeadInjections: string[] = []; // From top-level `meta {}` or `head "..."` blocks — shared across all pages
   private themeVars: Map<string, string> = new Map();
+  private darkThemeVars: Map<string, string> = new Map(); // dark mode overrides
+  private googleFonts: string[] = []; // Google Font family names to inject
+  private googleFontsInjected: boolean = false; // prevent double injection
   private themeColorNames: Map<string, string> = new Map(); // value name → full CSS var name (e.g. 'primary' → 'colors-primary')
   private presets: Map<string, string> = new Map(); // preset name → CSS class name
   private scripts: string[] = [];
@@ -144,18 +147,12 @@ export class Compiler {
     }
 
     // Process theme blocks — generate CSS custom properties
-    let themeCSS = '';
     const themes = program.body.filter(n => n.type === 'Theme');
     for (const theme of themes) {
       this.compileTheme(theme);
     }
-    if (this.themeVars.size > 0) {
-      themeCSS = ':root{';
-      for (const [key, value] of this.themeVars) {
-        themeCSS += '--' + key + ':' + value + ';';
-      }
-      themeCSS += '}';
-    }
+    // Save all theme-related head injections (light :root, dark mode, Google Fonts)
+    const themeHeadInjections = [...this.headInjections];
 
     // Process preset blocks
     for (const node of program.body) {
@@ -204,7 +201,8 @@ export class Compiler {
       this.staticMode = false;
       layoutCssBlocks = [...this.css];
       layoutHeadInjections = [...this.headInjections];
-      if (themeCSS) layoutHeadInjections.unshift('<style>' + themeCSS + '</style>');
+      // Prepend all theme head injections (light :root, dark mode, Google Fonts)
+      layoutHeadInjections.unshift(...themeHeadInjections);
       layoutInteractiveElements = new Set(this.usedInteractiveElements);
     }
 
@@ -1541,6 +1539,10 @@ export class Compiler {
       // Still process sections if any (overrides)
       if (!theme.sections || theme.sections.length === 0) return;
     }
+
+    const isDark = theme.mode === 'dark';
+    const targetVars = isDark ? this.darkThemeVars : this.themeVars;
+
     let fontCSS = '';
     for (const section of theme.sections) {
       if (section.name === 'fonts') {
@@ -1549,21 +1551,53 @@ export class Compiler {
           // Quote multi-word font names and process font stack
           const fontValue = this.processFontFamily('"' + (value as string) + '"');
           const fullKey = 'fonts-' + key;
-          this.themeVars.set(fullKey, fontValue);
-          if (key === 'heading') fontCSS += 'h1,h2,h3,h4,h5,h6{font-family:' + fontValue + ';}';
-          if (key === 'body') fontCSS += 'body,p,span,li,td,label,input,textarea,select{font-family:' + fontValue + ';}';
+          targetVars.set(fullKey, fontValue);
+          if (!isDark) {
+            if (key === 'heading') fontCSS += 'h1,h2,h3,h4,h5,h6{font-family:' + fontValue + ';}';
+            if (key === 'body') fontCSS += 'body,p,span,li,td,label,input,textarea,select{font-family:' + fontValue + ';}';
+          }
+        }
+        // Collect Google Font metadata for injection
+        if (section.fontsMeta && !isDark) {
+          for (const [key, meta] of Object.entries(section.fontsMeta)) {
+            const fontMeta = meta as { family: string; source: string; localPath?: string };
+            if (fontMeta.source === 'google') {
+              // Extract the first word/quoted name as the family name
+              const family = fontMeta.family.trim();
+              if (family && !this.googleFonts.includes(family)) {
+                this.googleFonts.push(family);
+              }
+            }
+          }
         }
       } else {
         for (const [key, value] of Object.entries(section.entries)) {
           const fullKey = section.name + '-' + key;
-          this.themeVars.set(fullKey, value as string);
+          targetVars.set(fullKey, value as string);
           // Track color names for implicit resolution (e.g. 'primary' → 'colors-primary')
-          this.themeColorNames.set(fullKey, fullKey);  // 'colors-primary' → 'colors-primary'
-          this.themeColorNames.set(key, fullKey);      // 'primary' → 'colors-primary' (shorthand)
+          if (!isDark) {
+            this.themeColorNames.set(fullKey, fullKey);  // 'colors-primary' → 'colors-primary'
+            this.themeColorNames.set(key, fullKey);      // 'primary' → 'colors-primary' (shorthand)
+          }
         }
       }
     }
-    // Generate CSS custom properties
+
+    if (isDark) {
+      // Dark mode CSS: emit @media + [data-theme] blocks
+      if (this.darkThemeVars.size > 0) {
+        let darkVarCSS = '';
+        for (const [key, value] of this.darkThemeVars) {
+          darkVarCSS += '--' + key + ':' + value + ';';
+        }
+        const mediaCSS = '@media(prefers-color-scheme:dark){:root{' + darkVarCSS + '}}';
+        const attrCSS = '[data-theme="dark"]{' + darkVarCSS + '}';
+        this.headInjections.push('<style>' + mediaCSS + attrCSS + '</style>');
+      }
+      return;
+    }
+
+    // Generate CSS custom properties for main (light) theme
     let css = '';
     if (this.themeVars.size > 0) {
       css = ':root{';
@@ -1575,6 +1609,15 @@ export class Compiler {
     if (fontCSS) css += fontCSS;
     if (css) {
       this.headInjections.push('<style>' + css + '</style>');
+    }
+
+    // Google Fonts injection (guard against double-injection)
+    if (this.googleFonts.length > 0 && !this.googleFontsInjected) {
+      this.googleFontsInjected = true;
+      const families = this.googleFonts.map(f => 'family=' + f.replace(/\s+/g, '+')).join('&');
+      this.headInjections.push('<link rel="preconnect" href="https://fonts.googleapis.com">');
+      this.headInjections.push('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>');
+      this.headInjections.push('<link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?' + families + '&display=swap">');
     }
   }
 
@@ -2427,10 +2470,79 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
     return value;
   }
 
+  // Singular → plural mapping for dot-notation theme tokens.
+  // Users write `color.primary`, internal storage uses `colors-primary`.
+  private static readonly THEME_SECTION_PLURAL: Record<string, string> = {
+    color: 'colors',
+    shadow: 'shadows',
+    font: 'fonts',
+    layout: 'layouts',
+    border: 'borders',
+    // These are already plural in common usage — identity mapping
+    spacing: 'spacing',
+    radius: 'radius',
+  };
+
+  // All recognized dot-notation prefixes (singular form).
+  // Handles both `spacing.md` and `spacing . md` (parser may insert spaces around `.`).
+  private static readonly THEME_DOT_PREFIX_RE =
+    /\b(color|spacing|radius|shadow|shadows|font|fonts|layout|layouts|border|borders)\s*\.\s*([a-z0-9][a-z0-9-]*)/g;
+
+  /**
+   * Resolve a `section.key` dot-notation token to `var(--plural-key)`.
+   * Accepts pre-split prefix and key (regex capture groups).
+   * Throws a hard compile error if the token isn't defined in themeVars.
+   */
+  private resolveDotToken(prefix: string, key: string): string {
+    // Normalize: singular → plural (color → colors), already-plural stays
+    const plural = Compiler.THEME_SECTION_PLURAL[prefix] ?? prefix;
+    const fullKey = plural + '-' + key;
+
+    if (this.themeVars.has(fullKey)) {
+      return `var(--${fullKey})`;
+    }
+
+    // Not found — build a helpful error with suggestions
+    const canonicalToken = prefix + '.' + key;
+    const suggestions: string[] = [];
+    for (const k of this.themeVars.keys()) {
+      if (k.startsWith(plural + '-')) {
+        suggestions.push(prefix + '.' + k.slice(plural.length + 1));
+      }
+    }
+    let msg = `Undefined theme token: ${canonicalToken}`;
+    if (suggestions.length > 0) {
+      msg += ` (available: ${suggestions.join(', ')})`;
+    }
+    throw new Error(`[NyxCode Compiler Error] ${msg}`);
+  }
+
+  /**
+   * Replace all dot-notation theme refs in a value string.
+   * E.g. "spacing.md 0" → "var(--spacing-md) 0"
+   * Also handles parser-spaced form: "spacing . md" → "var(--spacing-md)"
+   */
+  private resolveDotNotationRefs(value: string): string {
+    // Reset lastIndex for global regex reuse
+    Compiler.THEME_DOT_PREFIX_RE.lastIndex = 0;
+    if (!Compiler.THEME_DOT_PREFIX_RE.test(value)) return value;
+    Compiler.THEME_DOT_PREFIX_RE.lastIndex = 0;
+    return value.replace(Compiler.THEME_DOT_PREFIX_RE, (_match, prefix: string, key: string) =>
+      this.resolveDotToken(prefix, key)
+    );
+  }
+
   private resolveThemeValue(cssProperty: string, value: string): string {
     if (cssProperty === 'font-family') return this.processFontFamily(value);
+
+    // Phase 1: Resolve dot-notation tokens (works for ALL properties)
+    if (this.themeVars.size > 0) {
+      value = this.resolveDotNotationRefs(value);
+    }
+
+    // Phase 2: Implicit color-name resolution (backward compat — "primary" without dot prefix)
     if (this.themeColorNames.size === 0) return value;
-    // Only resolve for color-accepting properties
+    // Only resolve bare names for color-accepting properties
     const colorProps = new Set([
       'color', 'background', 'background-color', 'border-color',
       'fill', 'stroke', 'outline-color', 'text-decoration-color',
@@ -2698,10 +2810,15 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
     return key;
   }
   private mapBreakpoint(bp: string): string {
+    // Use user-defined breakpoints from theme if available
+    const userSm = this.themeVars.get('breakpoints-sm');
+    const userLg = this.themeVars.get('breakpoints-lg');
+    const userMd = this.themeVars.get('breakpoints-md');
+
     const breakpoints: Record<string, string> = {
-      'mobile': '768px',
-      'tablet': '1024px',
-      'desktop': '1280px',
+      'mobile': userSm || '768px',
+      'tablet': userMd || userLg || '1024px',
+      'desktop': userLg || '1280px',
     };
     return breakpoints[bp] || bp;
   }

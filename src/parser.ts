@@ -436,6 +436,8 @@ export class Parser {
           const entries: Record<string, string> = {};
           while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
             const key = this.consumeIdentifier();
+            // Skip optional colon after key (CSS habit: "primary: #fff")
+            if (this.check(TokenType.Colon)) this.advance();
             let val = '';
             if (this.peek().type === TokenType.String) val = this.advance().value;
             else while (!this.check(TokenType.RightBrace) && !this.check(TokenType.Identifier) && !this.isAtEnd()) val += this.advance().value;
@@ -448,6 +450,14 @@ export class Parser {
       }
       return { type: 'Theme', preset, sections, line: start.line, col: start.col } as any;
     }
+
+    // Check for dark mode variant: theme dark { ... }
+    let mode: 'dark' | undefined;
+    if (this.check(TokenType.Identifier) && this.peek().value === 'dark') {
+      this.advance(); // consume 'dark'
+      mode = 'dark';
+    }
+
     this.consume(TokenType.LeftBrace);
 
     const sections: ThemeSection[] = [];
@@ -456,19 +466,47 @@ export class Parser {
       this.consume(TokenType.LeftBrace);
 
       const entries: Record<string, string> = {};
+      const fontsMeta: Record<string, { family: string; source: 'google' | 'local' | 'stack'; localPath?: string }> = {};
       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
         const key = this.consumeIdentifier();
+        // Skip optional colon after key (CSS habit: "primary: #fff")
+        if (this.check(TokenType.Colon)) this.advance();
         // If next is a string literal, use directly
         if (this.peek().type === TokenType.String) {
-          entries[key] = this.advance().value;
+          const strVal = this.advance().value;
           if (this.check(TokenType.Comma)) this.advance();
+          // For fonts: check for trailing `source: google` after string value + comma
+          if (sectionName === 'fonts' && this.check(TokenType.Identifier) && this.peek().value === 'source') {
+            this.advance(); // consume 'source'
+            if (this.check(TokenType.Colon)) this.advance();
+            const sourceType = this.consumeIdentifier();
+            if (sourceType === 'url') {
+              const urlVal = this.check(TokenType.String) ? this.advance().value : '<unknown>';
+              throw new Error(
+                `[NyxCode Parser Error] External URL font sources are deprecated for security. ` +
+                `Use source: google or source: local path "..." instead. (line ${start.line})`
+              );
+            } else if (sourceType === 'google') {
+              fontsMeta[key] = { family: strVal.trim(), source: 'google' };
+            } else if (sourceType === 'local') {
+              if (this.check(TokenType.Identifier) && this.peek().value === 'path') this.advance();
+              const localPath = this.check(TokenType.String) ? this.advance().value : '';
+              fontsMeta[key] = { family: strVal.trim(), source: 'local', localPath };
+            }
+          }
+          entries[key] = strVal;
           continue;
         }
         if (sectionName === 'fonts') {
-          // Fonts: collect until comma, }, or known font key (heading/body/mono/code/display/ui)
+          // Fonts: collect until comma, semicolon, }, or known font key (heading/body/mono/code/display/ui)
           const FONT_KEYS = new Set(['heading', 'body', 'mono', 'code', 'display', 'ui', 'sans', 'serif']);
           let parts: string[] = [];
           while (!this.check(TokenType.RightBrace) && !this.check(TokenType.Comma) && !this.isAtEnd()) {
+            // Semicolons act as separators (lexed as Identifier with value ";")
+            if (this.check(TokenType.Identifier) && this.peek().value === ';') {
+              this.advance(); // consume ';'
+              break;
+            }
             // If this identifier is a known font key and we already have parts → new entry
             if (this.check(TokenType.Identifier) && parts.length > 0 && FONT_KEYS.has(this.peek().value)) {
               break;
@@ -476,7 +514,36 @@ export class Parser {
             parts.push(this.advance().value);
           }
           if (this.check(TokenType.Comma)) this.advance();
-          entries[key] = parts.join(' ');
+          const rawValue = parts.join(' ');
+
+          // Check for trailing `source: google` / `source: local path "..."` / `source: url "..."`
+          if (this.check(TokenType.Identifier) && this.peek().value === 'source') {
+            this.advance(); // consume 'source'
+            // Skip optional colon
+            if (this.check(TokenType.Colon)) this.advance();
+            const sourceType = this.consumeIdentifier();
+            if (sourceType === 'url') {
+              // Hard error: third-party URL font sources are deprecated
+              const urlVal = this.check(TokenType.String) ? this.advance().value : '<unknown>';
+              throw new Error(
+                `[NyxCode Parser Error] External URL font sources are deprecated for security. ` +
+                `Use source: google or source: local path "..." instead. (line ${start.line})`
+              );
+            } else if (sourceType === 'google') {
+              fontsMeta[key] = { family: rawValue.trim(), source: 'google' };
+            } else if (sourceType === 'local') {
+              // Expect: path "..."
+              if (this.check(TokenType.Identifier) && this.peek().value === 'path') {
+                this.advance(); // consume 'path'
+              }
+              const localPath = this.check(TokenType.String) ? this.advance().value : '';
+              fontsMeta[key] = { family: rawValue.trim(), source: 'local', localPath };
+            } else {
+              fontsMeta[key] = { family: rawValue.trim(), source: 'stack' };
+            }
+          }
+
+          entries[key] = rawValue;
         } else {
           // Colors/other: simple single value (no multi-word needed)
           let parts: string[] = [];
@@ -486,6 +553,8 @@ export class Parser {
             if (this.check(TokenType.RightParen)) { parenDepth--; parts.push(this.advance().value); continue; }
             if (parenDepth > 0) { parts.push(this.advance().value); continue; }
             if (this.check(TokenType.Comma)) { this.advance(); break; }
+            // Semicolons act as separators (lexed as Identifier with value ";")
+            if (this.check(TokenType.Identifier) && this.peek().value === ';') { this.advance(); break; }
             // If we have a value and next is an identifier, it's a new key
             if (parts.length > 0 && this.check(TokenType.Identifier)) break;
             parts.push(this.advance().value);
@@ -495,11 +564,15 @@ export class Parser {
       }
 
       this.consume(TokenType.RightBrace);
-      sections.push({ name: sectionName, entries });
+      const section: ThemeSection = { name: sectionName, entries };
+      if (Object.keys(fontsMeta).length > 0) section.fontsMeta = fontsMeta;
+      sections.push(section);
     }
 
     this.consume(TokenType.RightBrace);
-    return { type: 'Theme', sections, line: start.line, col: start.col };
+    const node: ThemeNode = { type: 'Theme', sections, line: start.line, col: start.col };
+    if (mode) node.mode = mode;
+    return node;
   }
 
   private parseSecurity(): SecurityNode {
@@ -1374,6 +1447,11 @@ export class Parser {
       name = '-' + this.advance().value;
     }
 
+    // Skip optional colon after property name (CSS habit: "color: value" vs NyxCode "color value")
+    if (this.check(TokenType.Colon)) {
+      this.advance();
+    }
+
     // Resolve the full property name (might be hyphenated, e.g., "font" + "-" + "family")
     let fullPropName = name;
     // Peek ahead: if next tokens form a hyphenated CSS property name suffix, DON'T consume here
@@ -1472,6 +1550,20 @@ export class Parser {
       }
 
       if (['hover', 'focus', 'active', 'before', 'after', 'first-child', 'last-child', 'disabled', 'checked', 'focus-within', 'focus-visible', 'placeholder', 'empty', 'visited'].includes(next.value)) break;
+
+      // Dot-notation theme references: ident.ident (e.g., color.primary, spacing.md)
+      // Must be checked BEFORE the CSS property break — otherwise "color" in
+      // "color.primary" triggers the property-boundary heuristic.
+      if (next.type === TokenType.Identifier && this.peekAt(1)?.type === TokenType.Dot && this.peekAt(2)?.type === TokenType.Identifier) {
+        const ident1 = this.advance().value; // e.g. "color"
+        this.advance();                       // consume Dot
+        const ident2 = this.advance().value; // e.g. "primary"
+        // TODO: numeric-prefix keys like "2xl" would lex as Number("2") + Identifier("xl").
+        // That combo isn't handled here yet — known limitation for a follow-up commit.
+        value += (value ? ' ' : '') + ident1 + '.' + ident2;
+        continue;
+      }
+
       // If we see an identifier that's a known CSS property, it's the NEXT property
       if (next.type === TokenType.Identifier && value.length > 0) {
         // Check for hyphenated property: e.g., 'border' + '-' + 'color' = 'border-color'
