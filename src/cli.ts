@@ -639,6 +639,11 @@ if (command === 'theme' && args[1] === 'import') {
   process.exit(0);
 }
 
+if (command === '--version' || command === '-v') {
+  console.log(`v${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}`);
+  process.exit(0);
+}
+
 if (!command || (command !== 'dev' && !file) || (!file && command !== '--help')) {
   console.log(`
 🦞 NyxCode v${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}
