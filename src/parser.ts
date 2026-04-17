@@ -436,6 +436,8 @@ export class Parser {
           const entries: Record<string, string> = {};
           while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
             const key = this.consumeIdentifier();
+            // Skip optional colon after key (CSS habit: "primary: #fff")
+            if (this.check(TokenType.Colon)) this.advance();
             let val = '';
             if (this.peek().type === TokenType.String) val = this.advance().value;
             else while (!this.check(TokenType.RightBrace) && !this.check(TokenType.Identifier) && !this.isAtEnd()) val += this.advance().value;
@@ -458,6 +460,8 @@ export class Parser {
       const entries: Record<string, string> = {};
       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
         const key = this.consumeIdentifier();
+        // Skip optional colon after key (CSS habit: "primary: #fff")
+        if (this.check(TokenType.Colon)) this.advance();
         // If next is a string literal, use directly
         if (this.peek().type === TokenType.String) {
           entries[key] = this.advance().value;
@@ -1374,6 +1378,11 @@ export class Parser {
       name = '-' + this.advance().value;
     }
 
+    // Skip optional colon after property name (CSS habit: "color: value" vs NyxCode "color value")
+    if (this.check(TokenType.Colon)) {
+      this.advance();
+    }
+
     // Resolve the full property name (might be hyphenated, e.g., "font" + "-" + "family")
     let fullPropName = name;
     // Peek ahead: if next tokens form a hyphenated CSS property name suffix, DON'T consume here
@@ -1472,6 +1481,20 @@ export class Parser {
       }
 
       if (['hover', 'focus', 'active', 'before', 'after', 'first-child', 'last-child', 'disabled', 'checked', 'focus-within', 'focus-visible', 'placeholder', 'empty', 'visited'].includes(next.value)) break;
+
+      // Dot-notation theme references: ident.ident (e.g., color.primary, spacing.md)
+      // Must be checked BEFORE the CSS property break — otherwise "color" in
+      // "color.primary" triggers the property-boundary heuristic.
+      if (next.type === TokenType.Identifier && this.peekAt(1)?.type === TokenType.Dot && this.peekAt(2)?.type === TokenType.Identifier) {
+        const ident1 = this.advance().value; // e.g. "color"
+        this.advance();                       // consume Dot
+        const ident2 = this.advance().value; // e.g. "primary"
+        // TODO: numeric-prefix keys like "2xl" would lex as Number("2") + Identifier("xl").
+        // That combo isn't handled here yet — known limitation for a follow-up commit.
+        value += (value ? ' ' : '') + ident1 + '.' + ident2;
+        continue;
+      }
+
       // If we see an identifier that's a known CSS property, it's the NEXT property
       if (next.type === TokenType.Identifier && value.length > 0) {
         // Check for hyphenated property: e.g., 'border' + '-' + 'color' = 'border-color'
