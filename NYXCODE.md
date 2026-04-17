@@ -316,6 +316,115 @@ theme {
 page / { div { style { p spacing.2xl } } }   # → padding: var(--spacing-2xl)
 ```
 
+## Figma / W3C DTCG Token Import (v0.23.5)
+
+Import design tokens exported from **Tokens Studio for Figma** or any **W3C Design Tokens Community Group (DTCG)** compliant tool directly into a NyxCode `@theme { ... }` block — no Style Dictionary, no build step, no config.
+
+### Command
+
+```bash
+nyx theme import tokens.json                  # print @theme block to stdout
+nyx theme import tokens.json -o theme.nyx     # write to file
+nyx theme import tokens.json --name brand     # theme as "brand" { ... }
+```
+
+### Supported `$type` → section mapping
+
+| Figma / DTCG `$type`        | NyxCode section |
+|-----------------------------|-----------------|
+| `color`                     | `colors`        |
+| `dimension` / `spacing`     | `spacing`       |
+| `borderRadius`              | `radius`        |
+| `fontFamily` / `typography` | `fonts`         |
+| `shadow` / `boxShadow`      | `shadows`       |
+
+### Format compatibility
+
+- **W3C DTCG** (`$value`, `$type`) — primary, default.
+- **Tokens Studio legacy** (`value`, `type`) — supported transparently.
+- **Nested groups** — flattened with dash-joined keys: `color.brand.primary` → `brand-primary`.
+- **`global` wrapper** — auto-unwrapped when a single non-section top-level key exists.
+- **fontFamily arrays** — joined as comma-separated stacks; multi-word families auto-quoted.
+- **Composite shadow objects** `{offsetX, offsetY, blur, spread, color}` — collapsed to CSS shorthand (spread=0 omitted per CSS convention).
+- **Radius heuristic** — `$type: dimension` with `radius` in the group path routes to `radius` instead of `spacing`.
+
+### Example
+
+Input (`figma-tokens.json` from Tokens Studio):
+
+```json
+{
+  "global": {
+    "color": {
+      "brand": {
+        "primary":   { "$value": "#8b5cf6", "$type": "color" },
+        "secondary": { "$value": "#ec4899", "$type": "color" }
+      }
+    },
+    "spacing": {
+      "md": { "$value": "16px", "$type": "dimension" }
+    },
+    "borderRadius": {
+      "lg": { "$value": "12px", "$type": "borderRadius" }
+    },
+    "fontFamily": {
+      "body": { "$value": ["Inter", "system-ui", "sans-serif"], "$type": "fontFamily" }
+    },
+    "shadow": {
+      "card": {
+        "$value": { "offsetX": 0, "offsetY": 4, "blur": 12, "color": "rgba(0,0,0,0.1)" },
+        "$type": "shadow"
+      }
+    }
+  }
+}
+```
+
+Command:
+
+```bash
+$ nyx theme import figma-tokens.json -o theme.nyx
+✅ Imported 5 tokens (2 colors, 1 spacing, 1 radius, 1 fonts, 1 shadows) → theme.nyx
+```
+
+Output (`theme.nyx`):
+
+```nyx
+theme {
+  colors {
+    brand-primary: #8b5cf6
+    brand-secondary: #ec4899
+  }
+  spacing { md: 16px }
+  radius  { lg: 12px }
+  fonts   { body: Inter, system-ui, sans-serif }
+  shadows { card: 0 4px 12px rgba(0,0,0,0.1) }
+}
+```
+
+Use immediately in any page:
+
+```nyx
+use "./theme.nyx"
+page / {
+  div style="background:color.brand-primary;padding:spacing.md;border-radius:radius.lg;box-shadow:shadows.card" {
+    h1 "Imported from Figma"
+  }
+}
+```
+
+### Not yet supported
+
+- Reverse export (`@theme` → Figma JSON) — planned for v0.24+.
+- DTCG alias resolution (`{color.primary}` references) — planned for v0.24+.
+- Figma **Modes** → `theme dark { }` — planned for v0.24+.
+- Composite typography tokens (size / weight / lineHeight) — `fontFamily` is extracted today; other typography fields are dropped.
+- Figma plugin (push-button sync from inside Figma) — out of scope for the CLI.
+
+### Security note
+
+Figma JSON is **third-party input**. The v0.23.5 importer passes token values through with minimal transformation — this means you should only import tokens from trusted sources. Input-validation (per-type CSS value whitelisting) is tracked for v0.24.
+
 ## CSS Functions (v0.17.0)
 ```nyx
 div { style { w calc(100% - 2rem); fs clamp(1rem, 2vw, 2rem); h min(100vh, 800px) } }
