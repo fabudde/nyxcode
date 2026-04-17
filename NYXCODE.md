@@ -146,9 +146,11 @@ page / {
 ```
 Generates `.nyx-p_card` and `.nyx-p_label` CSS classes. Saves 30-40% tokens on repeated styling.
 
-## Theme — Design Tokens (v0.22.0)
+## Theme — Design Tokens (v0.22.0, patched v0.22.1)
 
 Full design-token system: colors, spacing, radius, shadows, fonts, layouts, borders, breakpoints.
+
+*v0.22.1 fixed two bugs found during real-world migration: `borders {}` composite shorthand values (`1px solid color.X`) no longer split into zombie vars, and dot-notation refs no longer emit trailing ` ;;`. See CHANGELOG for details.*
 
 ```nyx
 theme {

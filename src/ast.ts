@@ -72,7 +72,10 @@ export interface StoreNode extends BaseNode {
 export interface ThemeNode extends BaseNode {
   type: 'Theme';
   sections: ThemeSection[];
-  mode?: 'dark'; // If set, this is a dark-mode override theme
+  mode?: 'dark';         // If set, this is a dark-mode override theme
+  preset?: string;       // v0.17.0 — `@theme "brutalist"` (preset name)
+  name?: string;         // v0.23.0 — `@theme "brand-base" { ... }` (named theme, extractable as base)
+  extends?: string;      // v0.23.0 — `@theme extends "./themes/base.nyx" { ... }` (inherits from named theme at path, token-merge only, not style-inheritance)
 }
 
 /** `security { ... }` */

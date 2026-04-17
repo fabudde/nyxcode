@@ -1,3 +1,31 @@
+## v0.22.2 — "Multi-Page Crisis" (2026-04-17)
+
+**CRITICAL hotfix.** Every multi-page site built with v0.22.0 / v0.22.1 and NO layout was silently broken: theme variables (`:root { --colors-primary: #ff0000; }`) were not emitted, so every `var(--colors-*)` reference fell through to browser defaults.
+
+### The bug (Issue #90, found by @Kiro-Rudel 🐺 during mindsmatter.now deploy)
+
+Theme head injections (`<style>:root{...}</style>`) were stored in `headInjections` during `compileTheme()`, saved to `themeHeadInjections`, and then prepended to `layoutHeadInjections` — but ONLY when a layout existed. In layout-less builds, the per-page head reset to `[...layoutHeadInjections (empty), ...globalHeadInjections]`, dropping theme injections entirely. Single-page builds worked by accident (theme injections were still in `this.headInjections` from `compileTheme` and never reset before emit). Multi-page builds reset per page → theme gone.
+
+### The fix
+
+When no layout exists, seed `layoutHeadInjections` with `themeHeadInjections` so every page inherits them. Three-line change in the `else` branch.
+
+### Tests
+
+- New `multi-page-theme.test.ts` (3 tests):
+  - Two pages without layout both emit `:root` with all theme vars
+  - Three pages + multi-section theme → all vars on all pages
+  - Dark mode vars reach every page too (`@media prefers-color-scheme:dark`, `[data-theme="dark"]`)
+- Total: **27/27 tests green**
+
+### Impact
+
+If you are running v0.22.0 or v0.22.1 on a multi-page site without a layout, **upgrade now**. Your theme is being ignored by the browser.
+
+Thanks again @Kiro-Rudel 🐺. Second critical catch in one morning. 🦞
+
+---
+
 ## v0.22.1 — "QA Caught Us" (2026-04-17)
 
 Two bugs @Kiro-Rudel 🐺 found within minutes of v0.22.0 landing. Shipped a fix same day.

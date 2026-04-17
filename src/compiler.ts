@@ -204,6 +204,16 @@ export class Compiler {
       // Prepend all theme head injections (light :root, dark mode, Google Fonts)
       layoutHeadInjections.unshift(...themeHeadInjections);
       layoutInteractiveElements = new Set(this.usedInteractiveElements);
+    } else {
+      // BUG #90 fix: when there is NO layout, theme head injections (:root {}, dark mode,
+      // Google Fonts) were dropped for multi-page builds. Each page would reset headInjections
+      // to just layoutHeadInjections (empty) + globalHeadInjections, losing the theme <style>
+      // block. Result: all var(--colors-*) references resolved to browser defaults.
+      //
+      // Fix: when no layout, seed layoutHeadInjections with the theme injections so every page
+      // inherits them. Single-page builds previously worked by accident (theme injections were
+      // still in this.headInjections from compileTheme and never reset before emit).
+      layoutHeadInjections = [...themeHeadInjections];
     }
 
     const results: Array<{path: string, html: string}> = [];
