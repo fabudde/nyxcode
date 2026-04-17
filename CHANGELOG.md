@@ -1,3 +1,36 @@
+## v0.23.1 — "Allowlist" (2026-04-17)
+
+Security hardening in the CLI's import-path resolver (`use` + `theme extends`).
+
+### Change
+
+Switched from **denylist** (`^(https?|ftp|file|//)`) to **allowlist** for URI schemes. The previous regex blocked known bad schemes but missed `javascript:`, `data:`, `ws://`, `wss://`, `ssh://`, `git://`, `s3://`, `gs://`, compound `git+ssh://`, and any future scheme we haven't anticipated.
+
+New rule: a `use "..."` or `theme extends "..."` path is rejected if it matches `/^[a-zA-Z][a-zA-Z0-9+.-]+:/` (scheme-like) or starts with `//` (protocol-relative). Windows `C:\` drive letters are still accepted (the regex requires 2+ alpha chars before `:`).
+
+### Accepted:
+- `./foo.nyx`, `../foo.nyx` (relative)
+- `@/foo.nyx` (project-root alias)
+- `/abs/foo.nyx` (absolute, but still checked against projectRoot)
+- `foo.nyx`, `foo/bar.nyx` (bare filename / subdir, relative to importing file's dir)
+- `C:\foo.nyx` (Windows drive letters not confused with URI schemes)
+
+### Rejected:
+- `http://`, `https://`, `ftp://`, `file://`
+- `javascript:`, `data:`, `ws://`, `wss://`, `ssh://`, `git://`, `s3://`, `gs://`
+- `git+ssh://`
+- `//host/` (protocol-relative)
+- Any future URI scheme
+
+### Tests
+
+- 9 new CLI security tests in `cli-security.test.ts`
+- **47/47 total green**
+
+Thanks @TytoTheOwl 🦉 for the defense-in-depth review.
+
+---
+
 ## v0.23.0 — "Composable" (2026-04-17)
 
 Theme inheritance. Compose sites from a shared geometry base + site-specific identity.

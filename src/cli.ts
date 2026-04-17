@@ -58,9 +58,23 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
   const mergedBody: TopLevelNode[] = [];
 
   function resolveImportPath(rawPath: string, fromFile: string): string | null {
-    // Reject remote URLs
-    if (/^(https?:|ftp:|file:|\/\/)/i.test(rawPath)) {
-      errors.push(`[${relative(process.cwd(), fromFile)}] remote imports are not allowed: "${rawPath}"`);
+    // v0.23.1 security hardening (recommended by @TytoTheOwl 🦉):
+    // Use an ALLOWLIST, not a denylist. Any URI scheme we don't explicitly permit is rejected.
+    // This catches current and future schemes we haven't anticipated: javascript:, data:, ws://,
+    // wss://, ssh://, git://, s3://, gs://, protocol-relative //, etc.
+    //
+    // Allowed shapes:
+    //   ./foo.nyx        — relative (current dir)
+    //   ../foo.nyx       — relative (parent dir)
+    //   @/foo.nyx        — project-root alias
+    //   /abs/foo.nyx     — absolute (only permitted if within projectRoot; checked below)
+    //   foo.nyx          — bare filename, treated as relative to the importing file's dir
+    //   foo/bar.nyx      — subdir, also relative
+    //
+    // Anything with a `<scheme>:` prefix or a `//` prefix is rejected.
+    // Scheme detection: at least 2 alpha chars followed by `:` (to not collide with Windows C:\ paths).
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]+:/.test(rawPath) || rawPath.startsWith('//')) {
+      errors.push(`[${relative(process.cwd(), fromFile)}] only local relative, @/-alias, or in-project absolute paths are allowed. Got: "${rawPath}"`);
       return null;
     }
     let resolved: string;
