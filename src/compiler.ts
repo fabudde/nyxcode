@@ -2427,10 +2427,79 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
     return value;
   }
 
+  // Singular → plural mapping for dot-notation theme tokens.
+  // Users write `color.primary`, internal storage uses `colors-primary`.
+  private static readonly THEME_SECTION_PLURAL: Record<string, string> = {
+    color: 'colors',
+    shadow: 'shadows',
+    font: 'fonts',
+    layout: 'layouts',
+    border: 'borders',
+    // These are already plural in common usage — identity mapping
+    spacing: 'spacing',
+    radius: 'radius',
+  };
+
+  // All recognized dot-notation prefixes (singular form).
+  // Handles both `spacing.md` and `spacing . md` (parser may insert spaces around `.`).
+  private static readonly THEME_DOT_PREFIX_RE =
+    /\b(color|spacing|radius|shadow|shadows|font|fonts|layout|layouts|border|borders)\s*\.\s*([a-z0-9][a-z0-9-]*)/g;
+
+  /**
+   * Resolve a `section.key` dot-notation token to `var(--plural-key)`.
+   * Accepts pre-split prefix and key (regex capture groups).
+   * Throws a hard compile error if the token isn't defined in themeVars.
+   */
+  private resolveDotToken(prefix: string, key: string): string {
+    // Normalize: singular → plural (color → colors), already-plural stays
+    const plural = Compiler.THEME_SECTION_PLURAL[prefix] ?? prefix;
+    const fullKey = plural + '-' + key;
+
+    if (this.themeVars.has(fullKey)) {
+      return `var(--${fullKey})`;
+    }
+
+    // Not found — build a helpful error with suggestions
+    const canonicalToken = prefix + '.' + key;
+    const suggestions: string[] = [];
+    for (const k of this.themeVars.keys()) {
+      if (k.startsWith(plural + '-')) {
+        suggestions.push(prefix + '.' + k.slice(plural.length + 1));
+      }
+    }
+    let msg = `Undefined theme token: ${canonicalToken}`;
+    if (suggestions.length > 0) {
+      msg += ` (available: ${suggestions.join(', ')})`;
+    }
+    throw new Error(`[NyxCode Compiler Error] ${msg}`);
+  }
+
+  /**
+   * Replace all dot-notation theme refs in a value string.
+   * E.g. "spacing.md 0" → "var(--spacing-md) 0"
+   * Also handles parser-spaced form: "spacing . md" → "var(--spacing-md)"
+   */
+  private resolveDotNotationRefs(value: string): string {
+    // Reset lastIndex for global regex reuse
+    Compiler.THEME_DOT_PREFIX_RE.lastIndex = 0;
+    if (!Compiler.THEME_DOT_PREFIX_RE.test(value)) return value;
+    Compiler.THEME_DOT_PREFIX_RE.lastIndex = 0;
+    return value.replace(Compiler.THEME_DOT_PREFIX_RE, (_match, prefix: string, key: string) =>
+      this.resolveDotToken(prefix, key)
+    );
+  }
+
   private resolveThemeValue(cssProperty: string, value: string): string {
     if (cssProperty === 'font-family') return this.processFontFamily(value);
+
+    // Phase 1: Resolve dot-notation tokens (works for ALL properties)
+    if (this.themeVars.size > 0) {
+      value = this.resolveDotNotationRefs(value);
+    }
+
+    // Phase 2: Implicit color-name resolution (backward compat — "primary" without dot prefix)
     if (this.themeColorNames.size === 0) return value;
-    // Only resolve for color-accepting properties
+    // Only resolve bare names for color-accepting properties
     const colorProps = new Set([
       'color', 'background', 'background-color', 'border-color',
       'fill', 'stroke', 'outline-color', 'text-decoration-color',

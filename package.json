@@ -19,7 +19,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "parse": "node dist/cli.js",
-    "test": "node --test dist/tests/",
+    "test": "node --test 'dist/tests/*.test.js'",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
