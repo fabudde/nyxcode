@@ -359,19 +359,33 @@ nav burger icon="☰" open-label="Hide menu" aria-label="Site nav" {
 }
 ```
 
-### State-correct accessibility
+### Dual-Container Architecture (v0.24.4)
 
-The rendered markup uses two sibling spans toggled via CSS so the visible label matches the state on every frame:
+The compiler generates **two containers** — one for desktop, one for mobile:
 
 ```html
-<details class="nx-burger nx-burger-bp-768">
+<!-- Desktop: plain div, always visible -->
+<div class="nx-burger-desktop">
+  <a href="/">Home</a>
+  <a href="/about">About</a>
+</div>
+
+<!-- Mobile: details/summary toggle -->
+<details class="nx-burger nx-burger-mobile nx-burger-bp-768">
   <summary aria-label="Toggle menu">
     <span class="nx-burger-closed">Menu</span>
     <span class="nx-burger-open" aria-hidden="true">Close</span>
   </summary>
-  <nav aria-label="Main navigation">...</nav>
+  <nav aria-label="Main navigation">
+    <a href="/">Home</a>
+    <a href="/about">About</a>
+  </nav>
 </details>
 ```
+
+**Why two containers?** `<details>` without `open` hides children via browser UA behavior — no CSS can override this. On desktop you don't need a toggle, so links live in a plain `<div>`. On mobile, `<details>`/`<summary>` provides zero-JS toggling with native accessibility.
+
+CSS handles visibility: `.nx-burger-desktop` is `display:flex` by default, `.nx-burger-mobile` is `display:none`. Below the breakpoint, they swap.
 
 `aria-label="Toggle menu"` stays state-neutral; sighted users see `Menu` when closed and `Close` when open. Screen-reader users receive the same transition via native `<details>` a11y. No JavaScript is needed to keep the label honest.
 
