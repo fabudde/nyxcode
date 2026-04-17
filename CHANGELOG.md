@@ -1,3 +1,81 @@
+## v0.23.0 — "Composable" (2026-04-17)
+
+Theme inheritance. Compose sites from a shared geometry base + site-specific identity.
+
+### `theme as "name" { ... }` — register a named base theme
+
+```nyx
+# base.nyx
+theme as "editorial-reader" {
+  spacing  { xs: 0.25rem, sm: 0.5rem, md: 1rem, lg: 1.5rem, xl: 2rem, 2xl: 3rem, 3xl: 4rem }
+  radius   { sm: 4px, md: 8px, lg: 12px, 2xl: 20px }
+  fonts    { body: "Inter", heading: "Playfair Display" }
+}
+```
+
+A named theme is a **definition only**: it does NOT emit CSS on its own. It exists to be inherited by other themes.
+
+### `theme extends "./path.nyx" { ... }` — inherit + override
+
+```nyx
+# site.nyx
+theme extends "./base.nyx" {
+  colors  { primary: #8b5cf6, text: #2c3e50 }
+  spacing { 4xl: 6rem }   # adds; base's xs..3xl remain
+}
+```
+
+Semantics (locked via review with @TytoTheOwl 🦉 + @Kiro-Rudel 🐺):
+
+- **TOKEN-MERGE ONLY.** Base file's `@style` blocks are NOT auto-imported. This avoids the Sass `@extend` footgun where inheritance explodes generated CSS. Want shared styles? Use `use "./base.nyx"` explicitly.
+- **Overrides replace matching keys only.** Base tokens not mentioned in the extending theme pass through unchanged.
+- **New sections and keys can be added.** The extending theme can introduce `radius`, more spacing keys, whatever.
+- **Relative paths only.** `theme extends "brand-base"` ❌. `theme extends "https://..."` ❌. `theme extends "@org/theme"` ❌. Only `./` and `../` — same rules as `use`. (Supply-chain safety.)
+- **Extending themes across files work automatically.** The CLI follows `extends` like it follows `use`, so you don't need both.
+
+### Numeric-prefix theme keys (`2xl`, `3xl`, `4xl`, `5xl`…)
+
+Fixed limitation from v0.22: you can now write:
+
+```nyx
+theme {
+  spacing { 2xl: 3rem, 3xl: 4rem }
+  radius  { 2xl: 20px }
+  breakpoints { 2xl: 1536px }
+}
+```
+
+And references work: `style { p spacing.2xl }` → `padding: var(--spacing-2xl)`.
+
+### Migration strategy (Kiro's insight)
+
+Count your repeated token references. A real base theme is often smaller than you think:
+
+- **Structural base** (universal): `spacing`, `radius`, `font-family`, `transition`. Typically ~15 tokens.
+- **Site identity** (per-site): `colors.primary`, `colors.text-*`, brand-accent. These stay in the extending theme.
+
+So a multi-site setup (main + archive + blog) can share one geometry base of ~15 tokens, and each site defines its 3–8 identity colors.
+
+### Tests
+
+- 11 new tests in `v023-compose.test.ts`
+- 27 existing tests still green
+- **38/38 total**
+
+### Known limitations (deferred to v0.24+)
+
+- Multi-parent composition: `theme compose [a, b] { ... }` (one parent is enough for v0.23)
+- Cherry-pick sections: `theme pick from "base" { spacing }` (YAGNI until users ask)
+- Better error messages: file-path + caret + "did you mean" — planned for v0.23.1
+- Figma token import: planned for v0.24
+
+### Thanks
+
+- @TytoTheOwl 🦉 — token-merge-only semantics + relative-path-only security (caught the Sass footgun + supply-chain risk)
+- @Kiro-Rudel 🐺 — base-theme sizing insight + `extends`-over-`compose` rationale + migration data from mindsmatter.now
+
+---
+
 ## v0.22.2 — "Multi-Page Crisis" (2026-04-17)
 
 **CRITICAL hotfix.** Every multi-page site built with v0.22.0 / v0.22.1 and NO layout was silently broken: theme variables (`:root { --colors-primary: #ff0000; }`) were not emitted, so every `var(--colors-*)` reference fell through to browser defaults.

@@ -269,6 +269,53 @@ theme "minimal-dark"    # Subtle dark theme, indigo accents
 ```
 Optional overrides: `theme "neon" { colors { primary: #ff6600 } }`
 
+### Theme Composition (v0.23.0)
+
+Extract a shared **geometry base** (spacing, radius, fonts, transitions) into its own file, then extend it per-site for colors and identity.
+
+```nyx
+# base.nyx
+theme as "editorial-reader" {
+  spacing  { xs: 0.25rem, sm: 0.5rem, md: 1rem, lg: 1.5rem, xl: 2rem, 2xl: 3rem, 3xl: 4rem }
+  radius   { sm: 4px, md: 8px, lg: 12px, 2xl: 20px }
+  fonts    { body: "Inter", heading: "Playfair Display" }
+}
+```
+
+```nyx
+# site.nyx
+theme extends "./base.nyx" {
+  colors  { primary: #8b5cf6, text: #2c3e50 }
+  spacing { 4xl: 6rem }    # adds a new key; base's xs..3xl survive
+}
+
+page / { h1 "Hi" { style { c color.primary; p spacing.2xl } } }
+```
+
+**Rules:**
+
+- `theme as "name"` registers a **named base theme** — it does NOT emit CSS on its own.
+- `theme extends "./path.nyx"` loads the named theme from `path.nyx` and merges tokens:
+  - Keys in the extending theme **override** matching base keys.
+  - Base keys not mentioned **pass through** unchanged.
+  - New sections and keys can be **added** freely.
+- Only tokens are merged. `@style` blocks in the base file are NOT auto-imported (use `use "./base.nyx"` for that).
+- The `extends` path must start with `./` or `../` — URLs, absolute paths, and npm-style names are rejected.
+
+### Numeric-prefix theme keys (v0.23.0)
+
+Keys starting with a digit now work in theme sections:
+
+```nyx
+theme {
+  spacing { md: 1rem, 2xl: 3rem, 3xl: 4rem, 4xl: 6rem }
+  radius  { 2xl: 20px }
+  breakpoints { 2xl: 1536px }
+}
+
+page / { div { style { p spacing.2xl } } }   # → padding: var(--spacing-2xl)
+```
+
 ## CSS Functions (v0.17.0)
 ```nyx
 div { style { w calc(100% - 2rem); fs clamp(1rem, 2vw, 2rem); h min(100vh, 800px) } }

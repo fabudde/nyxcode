@@ -420,8 +420,44 @@ export class Parser {
     return { type: 'Store', name, body, line: start.line, col: start.col };
   }
 
+  /**
+   * v0.23.0 — consumes a theme section key, allowing numeric-prefix identifiers like `2xl`, `3xl`, `4xl`.
+   * The lexer already merges `2xl` into a single Number token with string value `"2xl"`. We accept
+   * that as a key if the value matches /^[0-9]+[a-zA-Z][a-zA-Z0-9_-]*$/.
+   */
+  private consumeThemeSectionKey(): string {
+    const tok = this.peek();
+    if (tok.type === TokenType.Number && typeof tok.value === 'string' && /^[0-9]+[a-zA-Z][a-zA-Z0-9_-]*$/.test(tok.value)) {
+      this.advance();
+      return tok.value;
+    }
+    return this.consumeIdentifier();
+  }
+
   private parseTheme(): ThemeNode {
     const start = this.consume(TokenType.Theme);
+
+    // v0.23.0 — `@theme as "name" { ... }` registers a named theme (extractable as base)
+    let themeName: string | undefined;
+    let themeExtends: string | undefined;
+    if (this.check(TokenType.Identifier) && this.peek().value === 'as') {
+      this.advance(); // consume 'as'
+      if (!this.check(TokenType.String)) {
+        throw this.error('Expected string literal after `@theme as`, e.g. `@theme as "brand-base" { ... }`');
+      }
+      themeName = this.advance().value;
+    } else if (this.check(TokenType.Identifier) && this.peek().value === 'extends') {
+      this.advance(); // consume 'extends'
+      if (!this.check(TokenType.String)) {
+        throw this.error('Expected relative path string after `@theme extends`, e.g. `@theme extends "./base.nyx" { ... }`');
+      }
+      const extPath = this.advance().value;
+      if (!extPath.startsWith('./') && !extPath.startsWith('../')) {
+        throw this.error(`@theme extends requires a relative file path starting with './' or '../', got: "${extPath}". Abstract names, URLs, and npm-style references are not allowed (supply-chain safety).`);
+      }
+      themeExtends = extPath;
+    }
+
     // Theme preset: theme "brutalist" (no braces needed)
     if (this.check(TokenType.String)) {
       const preset = this.advance().value;
@@ -435,7 +471,7 @@ export class Parser {
           this.consume(TokenType.LeftBrace);
           const entries: Record<string, string> = {};
           while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-            const key = this.consumeIdentifier();
+            const key = this.consumeThemeSectionKey();
             // Skip optional colon after key (CSS habit: "primary: #fff")
             if (this.check(TokenType.Colon)) this.advance();
             let val = '';
@@ -468,7 +504,7 @@ export class Parser {
       const entries: Record<string, string> = {};
       const fontsMeta: Record<string, { family: string; source: 'google' | 'local' | 'stack'; localPath?: string }> = {};
       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-        const key = this.consumeIdentifier();
+        const key = this.consumeThemeSectionKey();
         // Skip optional colon after key (CSS habit: "primary: #fff")
         if (this.check(TokenType.Colon)) this.advance();
         // If next is a string literal, use directly
@@ -562,10 +598,16 @@ export class Parser {
             if (this.check(TokenType.Comma)) { this.advance(); break; }
             // Semicolons act as separators (lexed as Identifier with value ";")
             if (this.check(TokenType.Identifier) && this.peek().value === ';') { this.advance(); break; }
-            // NEW LINE heuristic: if next token is an Identifier on a different line than
-            // the last value token, AND we already have parts, it's a new key.
-            if (parts.length > 0 && this.check(TokenType.Identifier) && this.peek().line > lastValueLine) {
-              break;
+            // NEW LINE heuristic: if next token starts a new key on a different line than
+            // the last value token, AND we already have parts, stop.
+            // v0.23.0: numeric-prefix keys like `2xl` come through as a single Number token
+            // with a string value matching /^\d+[a-z]/ — treat those as key starts too.
+            if (parts.length > 0 && this.peek().line > lastValueLine) {
+              const t = this.peek();
+              if (t.type === TokenType.Identifier) break;
+              if (t.type === TokenType.Number && typeof t.value === 'string' && /^[0-9]+[a-zA-Z]/.test(t.value)) {
+                break;
+              }
             }
             const tok = this.advance();
             parts.push(tok.value);
@@ -593,6 +635,11 @@ export class Parser {
     this.consume(TokenType.RightBrace);
     const node: ThemeNode = { type: 'Theme', sections, line: start.line, col: start.col };
     if (mode) node.mode = mode;
+    if (themeName) node.name = themeName;
+    if (themeExtends) node.extends = themeExtends;
+    if (node.mode && (node.name || node.extends)) {
+      throw this.error('`@theme dark` cannot be combined with `as` or `extends`. Dark mode is a per-theme variant; declare it separately.');
+    }
     return node;
   }
 

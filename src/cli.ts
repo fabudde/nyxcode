@@ -138,6 +138,15 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
           loadFile(subResolved, absPath, (node as UseStatement).path);
         }
       }
+      // v0.23.0 — also follow `@theme extends "./path.nyx"` as an implicit import
+      // so users do not have to write a separate `use` line. Same security rules apply.
+      if (node.type === 'Theme' && (node as any).extends) {
+        const extPath = (node as any).extends;
+        const subResolved = resolveImportPath(extPath, absPath);
+        if (subResolved !== null) {
+          loadFile(subResolved, absPath, extPath);
+        }
+      }
     }
 
     // Merge non-Use nodes into global body, checking for duplicates
@@ -172,7 +181,15 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
         seenLayoutFile.value = fileRel;
       } else if (node.type === 'Theme') {
         // Theme: multiple theme nodes in ONE file are legal (preset selection + overrides).
-        // But two DIFFERENT files both declaring theme is ambiguous — error.
+        // v0.23.0: Named themes (`theme as "name"`) and extending themes (`theme extends "./..."`)
+        // ARE allowed across files — that is the whole point of composition.
+        const themeNode: any = node;
+        const isComposable = !!themeNode.name || !!themeNode.extends;
+        if (isComposable) {
+          mergedBody.push(node);
+          continue;
+        }
+        // Regular themes: cross-file ambiguity is still an error.
         if (seenThemeFile.value !== null && seenThemeFile.value !== fileRel) {
           errors.push(`theme defined in multiple files (${seenThemeFile.value} and ${fileRel}) — consolidate into one file`);
           continue;

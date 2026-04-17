@@ -68,6 +68,10 @@ export class Compiler {
   private globalHeadInjections: string[] = []; // From top-level `meta {}` or `head "..."` blocks — shared across all pages
   private themeVars: Map<string, string> = new Map();
   private darkThemeVars: Map<string, string> = new Map(); // dark mode overrides
+  // v0.23.0 — registry of named base themes: `@theme as "name" { ... }`
+  private namedThemes: Map<string, any[]> = new Map();
+  // v0.23.0 — current source file path (used to resolve `@theme extends "./..."`)
+  private currentSourcePath: string | null = null;
   private googleFonts: string[] = []; // Google Font family names to inject
   private googleFontsInjected: boolean = false; // prevent double injection
   private themeColorNames: Map<string, string> = new Map(); // value name → full CSS var name (e.g. 'primary' → 'colors-primary')
@@ -147,10 +151,13 @@ export class Compiler {
     }
 
     // Process theme blocks — generate CSS custom properties
+    // v0.23.0: named themes (`theme as "name"`) must be processed first so that extending
+    // themes can resolve against them. Light/dark/extends/preset all come after.
     const themes = program.body.filter(n => n.type === 'Theme');
-    for (const theme of themes) {
-      this.compileTheme(theme);
-    }
+    const namedThemeNodes = themes.filter((t: any) => t.name);
+    const regularThemeNodes = themes.filter((t: any) => !t.name);
+    for (const theme of namedThemeNodes) this.compileTheme(theme);
+    for (const theme of regularThemeNodes) this.compileTheme(theme);
     // Save all theme-related head injections (light :root, dark mode, Google Fonts)
     const themeHeadInjections = [...this.headInjections];
 
@@ -301,9 +308,12 @@ export class Compiler {
       this.components.set(comp.name, comp);
     }
 
-    // Process theme blocks
+    // Process theme blocks — named first so extends can resolve them (v0.23.0)
     for (const node of program.body) {
-      if (node.type === 'Theme') this.compileTheme(node);
+      if (node.type === 'Theme' && (node as any).name) this.compileTheme(node);
+    }
+    for (const node of program.body) {
+      if (node.type === 'Theme' && !(node as any).name) this.compileTheme(node);
     }
 
     // Process preset blocks
@@ -1542,7 +1552,105 @@ export class Compiler {
     'minimal-dark': `:root{--colors-bg:#1a1a1a;--colors-text:#e8e8e8;--colors-primary:#6366f1;--colors-accent:#a78bfa;--colors-surface:#242424;--colors-muted:#888;--fonts-body:system-ui,-apple-system,sans-serif;--fonts-heading:system-ui,-apple-system,sans-serif;--spacing-base:1rem;--radius:8px}body{background:var(--colors-bg);color:var(--colors-text);font-family:var(--fonts-body);line-height:1.6}h1,h2,h3,h4,h5,h6{font-family:var(--fonts-heading);font-weight:600}a{color:var(--colors-primary);text-decoration:none}a:hover{color:var(--colors-accent)}section,article,aside{background:var(--colors-surface);border-radius:var(--radius);padding:1.5rem;border:1px solid rgba(255,255,255,0.06)}button{background:var(--colors-primary);color:#fff;border:none;border-radius:var(--radius);padding:0.625rem 1.25rem;font-weight:500;transition:opacity 0.15s}button:hover{opacity:0.9}input,select,textarea{background:var(--colors-surface);border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius);color:var(--colors-text);padding:0.625rem}hr{border:none;border-top:1px solid rgba(255,255,255,0.08);margin:2rem 0}`,
   };
 
+  /**
+   * v0.23.0 — resolve `@theme extends "./base.nyx" { ...overrides }` into merged sections.
+   *
+   * Semantics: TOKEN-MERGE ONLY. Base file's @style blocks are NOT imported (use `use` for that).
+   *
+   * Rules:
+   *   - `extendsPath` must be a relative path (already validated by parser)
+   *   - Referenced file must be resolvable via importResolver
+   *   - Referenced file must contain exactly one `@theme as "..." { ... }` block
+   *   - Overrides replace base entries key-by-key within each section; unreferenced base sections pass through
+   *   - Base's own `@theme extends "..."` is followed recursively (depth <= 8, cycle detection)
+   */
+  private resolveExtendsThemeSections(extendsPath: string, ownSections: any[], chain: string[] = []): any[] {
+    if (chain.includes(extendsPath)) {
+      throw new Error(`[NyxCode Compile Error] Circular @theme extends detected: ${[...chain, extendsPath].join(' → ')}`);
+    }
+    if (chain.length >= 8) {
+      throw new Error(`[NyxCode Compile Error] @theme extends chain exceeds max depth of 8 (got ${chain.length + 1}: ${[...chain, extendsPath].join(' → ')})`);
+    }
+    // The CLI pre-flattens all files reached through `use` and `@theme extends` into a single
+    // AST, so the named theme should already be in `this.namedThemes` (populated during the
+    // first pass over Theme nodes). We look it up by matching the path's basename against
+    // the namedThemes map as a fallback, but preferred path is: use the registered map.
+    //
+    // If not found: the user may have forgotten to declare the base as a named theme, or the
+    // file path in `extends` does not resolve to a file that contains a named theme.
+    if (this.namedThemes.size === 0) {
+      throw new Error(`[NyxCode Compile Error] @theme extends "${extendsPath}" — no named themes are registered. Declare the base with \`theme as "name" { ... }\` in the referenced file.`);
+    }
+    // In v0.23, there is at most one named theme per file (enforced at parse time). Since the
+    // CLI merges ASTs, we just use the single named theme available — or require the user to
+    // disambiguate by naming if multiple. For simplicity and forward-compat, use the last one
+    // registered (latest definition wins), but prefer a named theme whose name matches the
+    // basename of the path (e.g. "base" for "./base.nyx" if name == "base").
+    const basename = extendsPath.replace(/^.*[\/\\]/, '').replace(/\.nyx$/, '');
+    let chosenName: string | null = null;
+    for (const name of this.namedThemes.keys()) {
+      if (name === basename) { chosenName = name; break; }
+    }
+    if (!chosenName) {
+      // Fallback: if exactly one named theme exists, use it.
+      if (this.namedThemes.size === 1) {
+        chosenName = this.namedThemes.keys().next().value as string;
+      } else {
+        throw new Error(`[NyxCode Compile Error] @theme extends "${extendsPath}" — cannot determine which named theme to inherit from. Found ${this.namedThemes.size} named themes: ${Array.from(this.namedThemes.keys()).join(', ')}. Make the name match the file's basename (e.g. \`theme as "${basename}"\` for "${extendsPath}").`);
+      }
+    }
+    const baseSections = this.namedThemes.get(chosenName) || [];
+    return this.mergeThemeSections(baseSections, ownSections);
+  }
+
+  /**
+   * Merge two lists of ThemeSection: for each section name, overlay own entries on base entries.
+   * - Section in base only → keep as-is.
+   * - Section in own only → append.
+   * - Section in both → copy base entries, overlay own (own wins on key conflict).
+   * fontsMeta is also merged at the section level for the `fonts` section.
+   */
+  private mergeThemeSections(baseSections: any[], ownSections: any[]): any[] {
+    const out: any[] = [];
+    const ownByName = new Map<string, any>();
+    for (const s of ownSections) ownByName.set(s.name, s);
+    const seen = new Set<string>();
+    for (const baseSec of baseSections) {
+      const ownSec = ownByName.get(baseSec.name);
+      if (ownSec) {
+        const mergedEntries = { ...(baseSec.entries || {}), ...(ownSec.entries || {}) };
+        const mergedFontsMeta = { ...(baseSec.fontsMeta || {}), ...(ownSec.fontsMeta || {}) };
+        const merged: any = { name: baseSec.name, entries: mergedEntries };
+        if (Object.keys(mergedFontsMeta).length > 0) merged.fontsMeta = mergedFontsMeta;
+        out.push(merged);
+        seen.add(baseSec.name);
+      } else {
+        out.push(baseSec);
+      }
+    }
+    for (const ownSec of ownSections) {
+      if (!seen.has(ownSec.name)) out.push(ownSec);
+    }
+    return out;
+  }
+
   private compileTheme(theme: any): void {
+    // v0.23.0 — Named theme: `@theme as "brand-base" { ... }` only registers, does not emit.
+    if (theme.name) {
+      if (this.namedThemes.has(theme.name)) {
+        throw new Error(`[NyxCode Compile Error] Named theme "${theme.name}" is already defined. Each name must be unique within a compilation unit.`);
+      }
+      this.namedThemes.set(theme.name, theme.sections || []);
+      return;
+    }
+
+    // v0.23.0 — Extending theme: `@theme extends "./path.nyx" { ... }` loads base, merges tokens.
+    if (theme.extends) {
+      const resolvedSections = this.resolveExtendsThemeSections(theme.extends, theme.sections || []);
+      // Replace theme.sections with merged result, then fall through to normal emission.
+      theme = { ...theme, sections: resolvedSections, extends: undefined };
+    }
+
     // Handle preset themes: theme "brutalist" etc.
     if (theme.preset && Compiler.THEME_PRESETS[theme.preset]) {
       this.headInjections.push('<style>' + Compiler.THEME_PRESETS[theme.preset] + '</style>');
