@@ -689,7 +689,15 @@ export class Parser {
           // Tighten hex colors and units: the lexer emits `#` and hex as separate or joined tokens;
           // but numbers followed by units (e.g., `1 px`) should be `1px`. Handle common units:
           joined = joined.replace(/(\d)\s+(px|rem|em|%|vw|vh|fr|ms|s|deg|rad|turn)\b/g, '$1$2');
-          // Collapse `rgba( x , y , z , a )` style → already handled inside parenDepth; no-op here.
+          // Bug #102 fix: Normalize whitespace around parens and commas so CSS function
+          // values like `rgba(20, 20, 37, 0.6)` and `linear-gradient(135deg, #e00, #a55)`
+          // are preserved instead of emitted as `rgba ( 20 , 20 , 37 , 0.6 )` — browsers
+          // silently ignore the malformed form with a space before `(`.
+          // Safe because at parenDepth===0 the parser already breaks on commas, so any
+          // `(`, `)`, or `,` in `parts` is guaranteed to be inside balanced parens.
+          joined = joined.replace(/\s*\(\s*/g, '(');   // `rgba ( 20` → `rgba(20`
+          joined = joined.replace(/\s*\)/g, ')');       // `0.6 )` → `0.6)`
+          joined = joined.replace(/\s*,\s*/g, ', ');    // `20 , 20` → `20, 20`
           entries[key] = joined.trim();
         }
       }
@@ -1639,8 +1647,29 @@ export class Parser {
           value += this.advance().value + ' '; // comma + space inside parens
         } else {
           const tok = this.advance();
-          // Add spaces around +/- operators in calc() expressions
-          if ((tok.value === '-' || tok.value === '+') && value.length > 0 && !value.endsWith('(')) {
+          // Bug #101: `var(--name)` was being mangled to `var(- - name)` because
+          // the calc()-style spacing below treated each `-` as a binary operator.
+          // CSS custom properties always start with `--`, and a leading `-` on
+          // an identifier (e.g. `-webkit-*` inside a function arg) is part of
+          // the identifier — not a subtraction. Detect `--` as an atomic token
+          // and glue it onto whatever identifier follows without adding spaces.
+          if (tok.value === '-' && this.peek()?.value === '-') {
+            this.advance(); // consume the 2nd '-'
+            // Glue to next identifier (the custom-property name body).
+            if (this.peek()?.type === TokenType.Identifier) {
+              value += '--' + this.advance().value;
+            } else {
+              value += '--';
+            }
+            continue;
+          }
+          // Add spaces around +/- operators in calc() expressions — BUT only
+          // when they're acting as binary operators. A `-` immediately after
+          // `(` or `,` (i.e. at the start of an argument) is a unary sign,
+          // e.g. `translate(-50%, -50%)` or `rgba(0, 0, 0, -0)`; those must
+          // stick to the next token without a space.
+          if ((tok.value === '-' || tok.value === '+') && value.length > 0 &&
+              !value.endsWith('(') && !value.endsWith(', ') && !value.endsWith(',')) {
             value += ' ' + tok.value + ' ';
           } else {
             value += tok.value;
@@ -1651,6 +1680,29 @@ export class Parser {
 
       // Outside parentheses: normal rules
       if (next.type === TokenType.RightBrace || next.type === TokenType.At) break;
+
+      // Issue #104: New-line property boundary detection.
+      //
+      // When the previous value ended with a function call like `rgba(...)` or
+      // `linear-gradient(...)` and the next property on a new line uses a shorthand
+      // that isn't in CSS_PROPERTIES (e.g., `bdf`, `bf`) or a vendor prefix (e.g.,
+      // `-webkit-background-clip`), the parser would greedily merge the next
+      // property's name into the previous property's value:
+      //
+      //     bg rgba(10, 10, 18, 0.7)
+      //     bdf blur(20px)
+      //
+      // Before this fix that compiled to `background: rgba(...) bdf blur(20px);`.
+      // The robust rule is: in NyxCode, one property per line. If we've already
+      // accumulated value content, paren depth is balanced, and the next token
+      // starts on a *later line* than the last consumed token, treat it as the
+      // start of a new property.
+      if (parenDepth === 0 && value.length > 0 && next.type === TokenType.Identifier) {
+        const prevTok = this.tokens[this.pos - 1];
+        if (prevTok && next.line > prevTok.line) {
+          break;
+        }
+      }
       // Semicolons act as property separators in style blocks (CSS habit).
       // Lexer emits ';' as an Identifier token with value ';'.
       // Bug #87 fix: previously this trailing ';' leaked into the value string,
@@ -1880,40 +1932,76 @@ export class Parser {
   }
 
   private collectCSSValue(): string {
-    // String literal = complete value
-    if (this.peek().type === TokenType.String) {
-      return this.advance().value;
-    }
-    let parts: string[] = [];
+    // Bug #105 fix (v0.24.3): values can contain commas (font-family stacks, multiple
+    // shadows, gradient stops, etc.). End-of-value is determined by either a RightBrace
+    // or a new identifier on a new line that looks like a property name (not a CSS value
+    // keyword, not inside parens, not a function call).
+    type Part = { kind: 'token' | 'string'; value: string };
+    const parts: Part[] = [];
     let parenDepth = 0;
+    const startLine = this.peek().line;
+    let lastLine = startLine;
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       const next = this.peek();
-      if (next.type === TokenType.LeftParen) { parenDepth++; this.advance(); parts.push('('); continue; }
-      if (next.type === TokenType.RightParen) { parenDepth = Math.max(0, parenDepth - 1); this.advance(); parts.push(')'); continue; }
-      if (parenDepth > 0) { parts.push(this.advance().value); continue; }
-      if (next.type === TokenType.Comma) { this.advance(); break; }
+      if (next.type === TokenType.LeftParen) { parenDepth++; this.advance(); parts.push({ kind: 'token', value: '(' }); lastLine = next.line; continue; }
+      if (next.type === TokenType.RightParen) { parenDepth = Math.max(0, parenDepth - 1); this.advance(); parts.push({ kind: 'token', value: ')' }); lastLine = next.line; continue; }
+      if (parenDepth > 0) {
+        if (next.type === TokenType.String) { this.advance(); parts.push({ kind: 'string', value: next.value }); lastLine = next.line; continue; }
+        parts.push({ kind: 'token', value: this.advance().value });
+        lastLine = next.line;
+        continue;
+      }
+      // Commas are part of the value (font stacks, multi-shadow, etc.)
+      if (next.type === TokenType.Comma) {
+        this.advance();
+        parts.push({ kind: 'token', value: ',' });
+        lastLine = next.line;
+        continue;
+      }
+      if (next.type === TokenType.String) {
+        // Strings are part of the value. Only break if this string starts a new
+        // logical property (i.e. we already collected something AND the string
+        // is on a new line AND it's not a continuation after a comma).
+        if (parts.length > 0 && next.line > lastLine) {
+          const prevPart = parts[parts.length - 1];
+          if (prevPart.value !== ',') break;
+        }
+        this.advance();
+        parts.push({ kind: 'string', value: next.value });
+        lastLine = next.line;
+        continue;
+      }
       if (next.type === TokenType.Identifier && parts.length > 0) {
         const after = this.tokens[this.pos + 1];
         // If next identifier is followed by (, it's a function call (rgba(), etc) — continue
         if (after && after.type === TokenType.LeftParen) { /* continue to push */ }
         // If next identifier looks like a CSS value keyword, keep collecting
         else if (this.isCSSValueKeyword(next.value)) { /* continue to push */ }
-        // Otherwise it's likely a new property name — break
+        // After a comma, any identifier is a continuation (next font in stack, etc.)
+        else if (parts[parts.length - 1].value === ',') { /* continue to push */ }
+        // Same line as previous token — still part of this value
+        else if (next.line === lastLine) { /* continue to push */ }
+        // Otherwise new line + identifier = new property name — break
         else break;
       }
-      parts.push(this.advance().value);
+      parts.push({ kind: 'token', value: this.advance().value });
+      lastLine = next.line;
     }
-    // Smart join: space between word/number tokens, no space around punctuation
+    // Smart join: preserve quoted strings verbatim, space between word/number tokens,
+    // no space around certain punctuation.
     let result = '';
     for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      const pv = p.kind === 'string' ? '"' + p.value + '"' : p.value;
       if (i > 0) {
         const prev = parts[i-1];
-        const curr = parts[i];
-        // No space: before ), before ,, after (, before (, after -
-        const noSpace = curr === ')' || curr === ',' || curr === '(' || prev === '(' || prev === '-' || prev === '--';
+        const prevV = prev.kind === 'string' ? '"' + prev.value + '"' : prev.value;
+        const currV = pv;
+        // No space: before ), before ,, after (, before (, after -, after --
+        const noSpace = currV === ')' || currV === ',' || currV === '(' || prevV === '(' || prevV === '-' || prevV === '--';
         if (!noSpace) result += ' ';
       }
-      result += parts[i];
+      result += pv;
     }
     return result.trim();
   }
@@ -1925,7 +2013,23 @@ export class Parser {
     const styles: Array<{name: string; value: string}> = [];
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       if (this.peek().type !== TokenType.Identifier) break;
-      const prop = this.advance().value;
+      let prop = this.advance().value;
+      // Bug #103: vendor-prefixed properties like `-webkit-background-clip`
+      // lex as `-` + `webkit` + `-` + `background` + `-` + `clip`. The leading
+      // `-` is a standalone Identifier token, so without this rescue the
+      // property name becomes just "-" and the rest of the line leaks into
+      // the value ("-: webkit-background-clip text" in the output). Mirror
+      // the guard that already exists in parseStyleProperty().
+      if (prop === '-' && this.check(TokenType.Identifier)) {
+        prop = '-' + this.advance().value;
+      }
+      // Property names may contain multiple hyphens (-webkit-background-clip,
+      // grid-template-columns, etc.). Glue subsequent `-ident` pairs onto the
+      // property name so the value collector starts at the true value.
+      while (this.peek()?.value === '-' && this.peekAt(1)?.type === TokenType.Identifier) {
+        this.advance(); // consume '-'
+        prop = prop + '-' + this.advance().value;
+      }
       const value = this.collectCSSValue();
       if (value) styles.push({ name: prop, value });
     }

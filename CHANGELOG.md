@@ -1,3 +1,28 @@
+## v0.24.3 — "Dogfood" (2026-04-17)
+
+Six compiler bugs found by building nyxcode.io in NyxCode itself. All fixed.
+
+### Fixed
+
+- **[#101](https://github.com/fabudde/nyxcode/issues/101) — `var(--custom-property)` corrupted.** Parser treated `--` inside `var()` as binary minus operators, emitting `var(- - colors-muted)`. Now detects `--` as atomic CSS custom-property prefix.
+
+- **[#102](https://github.com/fabudde/nyxcode/issues/102) — `rgba()` in theme tokens whitespace-expanded.** Token values like `rgba(20, 20, 37, 0.6)` became `rgba ( 20 , 20 , 37 , 0.6 )`. Post-process normalization now tightens parens and commas.
+
+- **[#103](https://github.com/fabudde/nyxcode/issues/103) — `-webkit-` properties in presets broken.** Leading hyphen consumed as property name, emitting `-: webkit-background-clip`. Preset parser now glues `-ident` segments into full vendor-prefixed property names.
+
+- **[#104](https://github.com/fabudde/nyxcode/issues/104) — Multi-line style blocks merge properties.** `bg rgba(...) \n bdf blur(...)` merged into one value. Parser now enforces newline-based property boundaries at paren depth 0.
+
+- **[#105](https://github.com/fabudde/nyxcode/issues/105) — Font-family with comma in presets.** `font-family "JetBrains Mono", monospace` caused parse error. `collectCSSValue()` rewritten to preserve commas in values and track line boundaries.
+
+- **[#106](https://github.com/fabudde/nyxcode/issues/106) — `nav burger` invisible in flex layouts.** `display:contents` on `<details>` gave zero width in flex parents. Changed to `display:flex; align-items:center`.
+
+### Stats
+
+- **218 tests**, all green (was 185 in v0.24.2 — +33 new tests)
+- Found via dogfooding: nyxcode.io is built in NyxCode
+
+---
+
 ## v0.24.2 — "Kiro's Revenge" (2026-04-17)
 
 Three bugs found by @Kiro-Rudel 🐺 during mindsmatter.now QA. All real, all fixed.

@@ -943,7 +943,7 @@ export class Compiler {
       // Base: everything is hidden; the inner <nav> is only visible at desktop sizes
       // or when <details> is open on mobile.
       const baseCss =
-        `.nx-burger{all:unset;display:contents}` +
+        `.nx-burger{all:unset;display:flex;align-items:center}` +
         `.nx-burger>summary{display:none;cursor:pointer;list-style:none;user-select:none}` +
         `.nx-burger>summary::-webkit-details-marker{display:none}` +
         `.nx-burger>nav{display:flex;gap:1.5rem;align-items:center}` +

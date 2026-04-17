@@ -126,7 +126,7 @@ describe('v0.24.0: nav burger — CSS emission', () => {
     const { html } = compile(`
       page / { nav burger { a "H" href="/" } }
     `);
-    assert.match(html, /\.nx-burger\{all:unset;display:contents\}/);
+    assert.match(html, /\.nx-burger\{all:unset;display:flex;align-items:center\}/);
     assert.match(html, /\.nx-burger>summary\{display:none/);
     assert.match(html, /\.nx-burger\[open\] \.nx-burger-closed\{display:none\}/);
     assert.match(html, /\.nx-burger\[open\] \.nx-burger-open\{display:inline\}/);
