@@ -545,21 +545,42 @@ export class Parser {
 
           entries[key] = rawValue;
         } else {
-          // Colors/other: simple single value (no multi-word needed)
+          // Colors/shadows/borders/radius/spacing/layouts/breakpoints: multi-word values supported.
+          // Value continues until: `;`, `,`, `}`, OR next token is an Identifier on a NEW LINE.
+          // This lets `divider: 1px solid color.border-subtle` span multiple words
+          // while still allowing `primary: #fff\n  secondary: #000` to separate entries.
+          //
+          // Bug #86 fix: previously any identifier after value started = break → broke composite values.
           let parts: string[] = [];
           let parenDepth = 0;
+          // Track line of the last consumed value token
+          let lastValueLine = this.peek().line;
           while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-            if (this.check(TokenType.LeftParen)) { parenDepth++; parts.push(this.advance().value); continue; }
-            if (this.check(TokenType.RightParen)) { parenDepth--; parts.push(this.advance().value); continue; }
-            if (parenDepth > 0) { parts.push(this.advance().value); continue; }
+            if (this.check(TokenType.LeftParen)) { parenDepth++; const t = this.advance(); parts.push(t.value); lastValueLine = t.line; continue; }
+            if (this.check(TokenType.RightParen)) { parenDepth--; const t = this.advance(); parts.push(t.value); lastValueLine = t.line; continue; }
+            if (parenDepth > 0) { const t = this.advance(); parts.push(t.value); lastValueLine = t.line; continue; }
             if (this.check(TokenType.Comma)) { this.advance(); break; }
             // Semicolons act as separators (lexed as Identifier with value ";")
             if (this.check(TokenType.Identifier) && this.peek().value === ';') { this.advance(); break; }
-            // If we have a value and next is an identifier, it's a new key
-            if (parts.length > 0 && this.check(TokenType.Identifier)) break;
-            parts.push(this.advance().value);
+            // NEW LINE heuristic: if next token is an Identifier on a different line than
+            // the last value token, AND we already have parts, it's a new key.
+            if (parts.length > 0 && this.check(TokenType.Identifier) && this.peek().line > lastValueLine) {
+              break;
+            }
+            const tok = this.advance();
+            parts.push(tok.value);
+            lastValueLine = tok.line;
           }
-          entries[key] = parts.join('');
+          // Join with spaces between alphabetic tokens; preserve tight-join for `color.primary`, `#fff`, numbers with units.
+          // Strategy: join all parts with single space, then collapse spaces around `.` (so `color . primary` → `color.primary`).
+          let joined = parts.join(' ');
+          // Collapse spaces around dots: `foo . bar` → `foo.bar`
+          joined = joined.replace(/\s*\.\s*/g, '.');
+          // Tighten hex colors and units: the lexer emits `#` and hex as separate or joined tokens;
+          // but numbers followed by units (e.g., `1 px`) should be `1px`. Handle common units:
+          joined = joined.replace(/(\d)\s+(px|rem|em|%|vw|vh|fr|ms|s|deg|rad|turn)\b/g, '$1$2');
+          // Collapse `rgba( x , y , z , a )` style → already handled inside parenDepth; no-op here.
+          entries[key] = joined.trim();
         }
       }
 
@@ -1515,6 +1536,14 @@ export class Parser {
 
       // Outside parentheses: normal rules
       if (next.type === TokenType.RightBrace || next.type === TokenType.At) break;
+      // Semicolons act as property separators in style blocks (CSS habit).
+      // Lexer emits ';' as an Identifier token with value ';'.
+      // Bug #87 fix: previously this trailing ';' leaked into the value string,
+      // producing `color: var(--x) ;;` (space + double semicolon) in output CSS.
+      if (next.type === TokenType.Identifier && next.value === ';') {
+        this.advance(); // consume ';'
+        break;
+      }
       // Stop at nested selector combinators (> ~ +)
       if (next.type === TokenType.GreaterThan || next.value === '~' || next.value === '+') break;
 

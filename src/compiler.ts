@@ -1585,10 +1585,12 @@ export class Compiler {
 
     if (isDark) {
       // Dark mode CSS: emit @media + [data-theme] blocks
+      // Resolve dot-notation refs in dark values too (#86).
       if (this.darkThemeVars.size > 0) {
         let darkVarCSS = '';
         for (const [key, value] of this.darkThemeVars) {
-          darkVarCSS += '--' + key + ':' + value + ';';
+          const resolved = this.resolveDotNotationRefs(value);
+          darkVarCSS += '--' + key + ':' + resolved + ';';
         }
         const mediaCSS = '@media(prefers-color-scheme:dark){:root{' + darkVarCSS + '}}';
         const attrCSS = '[data-theme="dark"]{' + darkVarCSS + '}';
@@ -1597,12 +1599,15 @@ export class Compiler {
       return;
     }
 
-    // Generate CSS custom properties for main (light) theme
+    // Generate CSS custom properties for main (light) theme.
+    // Resolve dot-notation refs in values (e.g. `1px solid color.primary` → `1px solid var(--colors-primary)`)
+    // so that composite tokens like `borders.divider: 1px solid color.subtle` work (#86).
     let css = '';
     if (this.themeVars.size > 0) {
       css = ':root{';
       for (const [key, value] of this.themeVars) {
-        css += '--' + key + ':' + value + ';';
+        const resolved = this.resolveDotNotationRefs(value);
+        css += '--' + key + ':' + resolved + ';';
       }
       css += '}';
     }

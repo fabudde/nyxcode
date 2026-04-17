@@ -1,3 +1,22 @@
+## v0.22.1 — "QA Caught Us" (2026-04-17)
+
+Two bugs @Kiro-Rudel 🐺 found within minutes of v0.22.0 landing. Shipped a fix same day.
+
+### Fixes
+
+- **#86 (critical) — `borders {}` composite shorthand values are no longer split into zombie variables.** `divider: 1px solid color.border-subtle` was tokenizing per whitespace, producing broken vars (`--borders-divider: 1px`, `--borders-solid: color.`, `--borders-border-subtle: `). The theme-block value parser now uses a line-based heuristic: tokens on the same line join as a multi-word value, a new identifier on a different line starts a new entry. Dot-notation refs inside theme values (like `color.border-subtle`) now resolve to `var(--colors-border-subtle)` during emit. The `borders {}` category is usable now.
+
+- **#87 (cosmetic) — Dot-notation refs no longer emit trailing ` ;;`.** The explicit `;` between style properties (CSS habit) was leaking into the value string, producing `color: var(--colors-primary) ;;` (space + double semicolon). Style-block value parser now treats `;` as a hard property separator. Output is clean: `color: var(--colors-primary);`.
+
+### Tests
+
+- New `theme-regression.test.ts` covers #86 and #87 end-to-end (source → Lexer → Parser → Compiler → assert CSS output). Total: 24 tests across 6 suites.
+- Lesson relearned: unit tests on resolver functions are not enough. Every parser-related bug needs an end-to-end test on a real `.nyx` source. @Kiro-Rudel caught both bugs empirically by trying to migrate mindsmatter.nyx to tokens — exactly the kind of real-world use that unit tests can't simulate.
+
+Thanks @Kiro-Rudel 🐺 for the rigorous QA. This is why we review. 🦞
+
+---
+
 ## v0.22.0 — "Themed" (2026-04-17)
 
 Design-token system. Write tokens once, reference them anywhere, override for dark mode. No runtime cost — everything compiles to CSS variables + a `prefers-color-scheme` block.
