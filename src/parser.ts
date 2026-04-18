@@ -1995,10 +1995,25 @@ export class Parser {
       }
       value += (value ? ' ' : '') + tok.value;
       // Check for hyphenated continuation (e.g., text-align, border-radius)
+      // But NOT if the dash starts a new vendor-prefixed property on a new line (#124)
       if (this.peek()?.type === TokenType.Identifier && this.peek()?.value === '-') {
-        value += this.advance().value; // consume -
-        if (this.peek()?.type === TokenType.Identifier) {
-          value += this.advance().value; // consume next part
+        const dashTok = this.peek()!;
+        const afterDash = this.peekAt(1);
+        // #124: If the dash is on a LATER line, don't glue — it's a new property
+        if (dashTok.line > tok.line) {
+          // Don't consume — let the next iteration handle it as a new property
+        }
+        // #124: If what follows the dash is a vendor prefix, it's a new property
+        else if (afterDash?.type === TokenType.Identifier &&
+                 (afterDash.value.startsWith('webkit') || afterDash.value.startsWith('moz') ||
+                  afterDash.value.startsWith('ms') || afterDash.value.startsWith('o-'))) {
+          // Don't consume — new vendor-prefixed property
+        }
+        else {
+          value += this.advance().value; // consume -
+          if (this.peek()?.type === TokenType.Identifier) {
+            value += this.advance().value; // consume next part
+          }
         }
       }
     }
@@ -2192,7 +2207,73 @@ export class Parser {
     return result.trim();
   }
 
-  private collectCSSValue(): string {
+  /**
+   * Like collectCSSValue but stops at semicolons (lexed as Identifier ";").
+   * Used inside preset blocks where "preset btn { bg red; c blue }" uses
+   * semicolons as property separators on a single line.
+   */
+  private collectCSSValueUntilSemicolon(): string {
+    type Part = { kind: 'token' | 'string'; value: string };
+    const parts: Part[] = [];
+    let parenDepth = 0;
+    const startLine = this.peek().line;
+    let lastLine = startLine;
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      const next = this.peek();
+      // Stop at semicolons (they delimit properties in preset one-liners)
+      if (next.type === TokenType.Identifier && next.value === ';') break;
+      if (next.type === TokenType.LeftParen) { parenDepth++; this.advance(); parts.push({ kind: 'token', value: '(' }); lastLine = next.line; continue; }
+      if (next.type === TokenType.RightParen) { parenDepth = Math.max(0, parenDepth - 1); this.advance(); parts.push({ kind: 'token', value: ')' }); lastLine = next.line; continue; }
+      if (parenDepth > 0) {
+        if (next.type === TokenType.String) { this.advance(); parts.push({ kind: 'string', value: next.value }); lastLine = next.line; continue; }
+        parts.push({ kind: 'token', value: this.advance().value });
+        lastLine = next.line;
+        continue;
+      }
+      if (next.type === TokenType.Comma) {
+        this.advance();
+        parts.push({ kind: 'token', value: ',' });
+        lastLine = next.line;
+        continue;
+      }
+      if (next.type === TokenType.String) {
+        if (parts.length > 0 && next.line > lastLine) {
+          const prevPart = parts[parts.length - 1];
+          if (prevPart.value !== ',') break;
+        }
+        this.advance();
+        parts.push({ kind: 'string', value: next.value });
+        lastLine = next.line;
+        continue;
+      }
+      if (next.type === TokenType.Identifier && parts.length > 0) {
+        const after = this.tokens[this.pos + 1];
+        if (after && after.type === TokenType.LeftParen) { /* function call */ }
+        else if (this.isCSSValueKeyword(next.value)) { /* CSS value keyword */ }
+        else if (parts[parts.length - 1].value === ',') { /* after comma */ }
+        else if (next.line === lastLine) { /* same line */ }
+        else break;
+      }
+      parts.push({ kind: 'token', value: this.advance().value });
+      lastLine = next.line;
+    }
+    let result = '';
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      const pv = p.kind === 'string' ? '"' + p.value + '"' : p.value;
+      if (i > 0) {
+        const prev = parts[i-1];
+        const prevV = prev.kind === 'string' ? '"' + prev.value + '"' : prev.value;
+        const currV = pv;
+        const noSpace = currV === ')' || currV === ',' || currV === '(' || prevV === '(' || prevV === '-' || prevV === '--';
+        if (!noSpace) result += ' ';
+      }
+      result += pv;
+    }
+    return result.trim();
+  }
+
+    private collectCSSValue(): string {
     // Bug #105 fix (v0.24.3): values can contain commas (font-family stacks, multiple
     // shadows, gradient stops, etc.). End-of-value is determined by either a RightBrace
     // or a new identifier on a new line that looks like a property name (not a CSS value
@@ -2291,8 +2372,12 @@ export class Parser {
         this.advance(); // consume '-'
         prop = prop + '-' + this.advance().value;
       }
-      const value = this.collectCSSValue();
+      const value = this.collectCSSValueUntilSemicolon();
       if (value) styles.push({ name: prop, value });
+      // Skip semicolons between properties (lexed as Identifier ";")
+      while (this.peek()?.type === TokenType.Identifier && this.peek()?.value === ';') {
+        this.advance();
+      }
     }
     this.consume(TokenType.RightBrace);
     return { type: 'Preset', name, styles, line: start.line, col: start.col };
