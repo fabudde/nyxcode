@@ -6,7 +6,7 @@ import { Parser } from '../parser.js';
 
 function compileMulti(src: string) {
   const tokens = new Lexer(src).tokenize();
-  const ast = new Parser(tokens, src).parse();
+  const ast = new Parser(tokens).parse();
   const c = new Compiler();
   return c.compileMultiFile(ast);
 }
