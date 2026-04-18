@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.25.0)
+# NYXCODE.md — AI Context File (v0.26.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -88,6 +88,15 @@ Property shorthands work in `style {}` blocks, `preset` definitions, inline styl
 | `oy` / `of-y` | overflow-y | `v` | visibility |
 | `br` | border-radius | `brad` | border-radius (alias) |
 | `tr` | transition | `tf` | transform |
+| `ar` | aspect-ratio | `cv` | content-visibility |
+| `sb` | scroll-behavior | `osb` | overscroll-behavior |
+| `tof` | text-overflow | `hy` | hyphens |
+| `acc` | accent-color | `caret` | caret-color |
+| `cs` | color-scheme | `bv` | backface-visibility |
+| `ps` | perspective | `to` | transform-origin |
+| `wm` | writing-mode | `dir` | direction |
+| `ind` | text-indent | `smt` | scroll-margin-top |
+| `mi` | mask-image | `trs` | transform-style |
 | `anim` | animation | `shadow` | box-shadow |
 | `tshadow` | text-shadow | `o` | outline |
 | `oc` | outline-color | `ow` | outline-width |
@@ -1716,5 +1725,76 @@ button on:click="refs.container.style.color='red'" { text "Paint" }
 ```
 `ref=name` → access via `refs.name` (auto-generates `getElementById`).
 
+## Auto-prefix mask-* (v0.26.0)
+All `mask-*` CSS properties auto-emit `-webkit-` prefixed versions for Safari:
+```nyx
+div {
+  style {
+    mask-image radial-gradient(ellipse at center, black 0%, transparent 75%)
+    mask-size cover
+  }
+}
+```
+Emits both `-webkit-mask-image` and `mask-image`. Shorthands: `mi`/`mimg` → `mask-image`.
+
+## Compile-time Conditionals (v0.26.0)
+Strip or include content at build time:
+```nyx
+when __env__ == "production" {
+  script src="analytics.js"
+}
+when __debug__ {
+  div { p "Debug mode" }
+}
+```
+CLI: `nyx build app.nyx --define env=production --define debug=true`
+- `__double_underscore__` refs = compile-time (stripped if falsy)
+- `.dot` refs = runtime (generates JS, unchanged)
+- Supports `==`, `!=`, `&&`, `||`, bare truthy
+
+## Native picture/source (v0.26.0)
+Responsive images with native HTML5 `<picture>`:
+```nyx
+picture {
+  source srcset="hero.avif" type="image/avif"
+  source srcset="hero.webp" type="image/webp"
+  img src="hero.jpg" alt="Hero"
+}
+```
+`source` is void (self-closing). Supports `media` attribute for art direction.
+
+## New CSS Shorthands (v0.26.0)
+| Short | CSS Property | Example |
+|-------|-------------|----------|
+| `cv` | content-visibility | `cv auto` |
+| `sb` | scroll-behavior | `sb smooth` |
+| `ar` | aspect-ratio | `ar 16/9` |
+| `tof` | text-overflow | `tof ellipsis` |
+| `acc` | accent-color | `acc #ff0` |
+| `caret` | caret-color | `caret red` |
+| `cs` | color-scheme | `cs dark` |
+| `hy` | hyphens | `hy auto` |
+| `bv` | backface-visibility | `bv hidden` |
+| `ps` | perspective | `ps 1000px` |
+| `to` | transform-origin | `to center top` |
+| `wm` | writing-mode | `wm vertical-rl` |
+| `dir` | direction | `dir rtl` |
+| `ind` | text-indent | `ind 2rem` |
+| `osb` | overscroll-behavior | `osb contain` |
+| `smt` | scroll-margin-top | `smt 80px` |
+| `trs` | transform-style | `trs preserve-3d` |
+| `pso` | perspective-origin | `pso center` |
+| `mi` | mask-image | `mi url(mask.svg)` |
+
+## Partials (v0.26.0)
+Components without props ARE partials — no new keyword needed:
+```nyx
+component social-links() {
+  a "Twitter" href="https://x.com"
+  a "GitHub" href="https://github.com"
+}
+page / { footer { use social-links() } }
+```
+
 ## Version
-v0.16.2 — 47 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺. All 50 GitHub issues closed.
+v0.26.0 — 52 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺. 342 tests.

@@ -1,3 +1,18 @@
+## v0.25.2 — "Masked" (2026-04-18)
+
+Issue #113: mask-* properties now auto-emit a `-webkit-` prefixed twin.
+
+### Fixed
+
+- **[#113](https://github.com/fabudde/nyxcode/issues/113) — Auto-prefix `mask-*` with `-webkit-`.** Safari 17.2 (Jan 2024) shipped unprefixed mask-*, but older Safari, iOS WebViews, and in-app browsers still need the prefix. NyxCode now emits BOTH the `-webkit-` prefixed form and the standard form for every mask property (`mask-image`, `mask-size`, `mask-position`, `mask-repeat`, `mask-origin`, `mask-clip`, `mask-composite`, `mask-mode`, and the five `mask-border-*` subproperties). Prefixed form is emitted first so the cascade picks the standard form when supported. New shorthand: `mi` / `mimg` → `mask-image`. Also works inside `preset{}`, `hover{}` pseudo-classes, and `@mobile` responsive blocks.
+
+### Stats
+
+- **11 new tests** in `v0252-mask-prefix.test.ts` (342 passing overall)
+- No breaking changes — pure additive fix
+
+---
+
 ## v0.25.0 — "Multi-Value" (2026-04-17)
 
 Bug #115: multi-value CSS functions on a single line finally work.

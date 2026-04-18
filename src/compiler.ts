@@ -39,6 +39,14 @@ export interface CompilerOptions {
   pretty: boolean;
   /** Include NyxCode runtime helpers */
   includeRuntime: boolean;
+  /**
+   * Issue #114 — Build-time variables for compile-time `when __xxx__` blocks.
+   * Populated from the CLI via `--define key=value` (keys are looked up with
+   * surrounding underscores stripped, e.g. `__env__` → `env`).
+   * Values are strings; truthiness uses JS rules with two extras:
+   *   "" / "0" / "false" are treated as falsy.
+   */
+  buildVars: Record<string, string>;
 }
 
 export interface CompilerOutput {
@@ -96,6 +104,7 @@ export class Compiler {
       target: options.target ?? 'dynamic',
       pretty: options.pretty ?? true,
       includeRuntime: options.includeRuntime ?? true,
+      buildVars: options.buildVars ?? {},
     };
   }
 
@@ -1050,7 +1059,7 @@ export class Compiler {
         cssBlock += `.${className}:${pseudoName} {\n`;
         for (const prop of pseudoProps) {
           const cp = this.mapCSSProperty(prop.name);
-          cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+          cssBlock += this.emitCSSDecl(cp, this.resolveThemeValue(cp, prop.value), '  ');
         }
         cssBlock += '}\n';
       }
@@ -1068,7 +1077,7 @@ export class Compiler {
         }
         for (const prop of pe.properties) {
           const cp = this.mapCSSProperty(prop.name);
-          cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+          cssBlock += this.emitCSSDecl(cp, this.resolveThemeValue(cp, prop.value), '  ');
         }
         cssBlock += '}\n';
       }
@@ -1080,7 +1089,7 @@ export class Compiler {
         cssBlock += `@media (max-width: ${bp}) {\n  .${className} {\n`;
         for (const prop of r.properties) {
           const cp = this.mapCSSProperty(prop.name);
-          cssBlock += `    ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+          cssBlock += this.emitCSSDecl(cp, this.resolveThemeValue(cp, prop.value), '    ');
         }
         cssBlock += '  }\n}\n';
       }
@@ -1101,7 +1110,7 @@ export class Compiler {
           cssBlock += isSelf && selfElements.includes(rule.selector) ? `${rule.selector}.${className} {\n` : `.${className}${isSelf ? '' : ' '}${rule.selector} {\n`;
           for (const prop of rule.properties) {
             const cp = this.mapCSSProperty(prop.name);
-            cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+            cssBlock += this.emitCSSDecl(cp, this.resolveThemeValue(cp, prop.value), '  ');
           }
           cssBlock += '}\n';
         }
@@ -1118,11 +1127,11 @@ export class Compiler {
       const expanded = this.expandUtility(prop.name, prop.value);
       if (expanded) {
         for (const e of expanded) {
-          css += `    ${e.name}: ${e.value};\n`;
+          css += this.emitCSSDecl(e.name, e.value, '    ');
         }
       } else {
         const cp = this.mapCSSProperty(prop.name);
-        css += `    ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+        css += this.emitCSSDecl(cp, this.resolveThemeValue(cp, prop.value), '    ');
       }
     }
     css += `  }\n}\n`;
@@ -1151,11 +1160,11 @@ export class Compiler {
         const expanded = this.expandUtility(prop.name, prop.value);
         if (expanded) {
           for (const e of expanded) {
-            css += `    ${e.name}: ${e.value};\n`;
+            css += this.emitCSSDecl(e.name, e.value, '    ');
           }
         } else {
           const cp = this.mapCSSProperty(prop.name);
-          css += `    ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+          css += this.emitCSSDecl(cp, this.resolveThemeValue(cp, prop.value), '    ');
         }
       }
       css += `  }\n`;
@@ -1634,6 +1643,17 @@ export class Compiler {
   // --- When compilation ---
 
   private compileWhen(when: WhenStatement): string {
+    // Issue #114 — Compile-time `when __xxx__` is evaluated here, not at runtime.
+    // Parser sets `compileTime: true` when the condition references any
+    // `__double_underscore__` identifier. We resolve against `buildVars` and
+    // emit either the `then` branch or the `else` branch verbatim — no div
+    // wrapper, no JS, no runtime cost. If false and no else, we emit nothing.
+    if (when.compileTime) {
+      const result = this.evalCompileTimeCondition(when.condition);
+      const chosen = result ? when.body : (when.elseBody ?? []);
+      return chosen.map(s => this.compileStatement(s)).join('');
+    }
+
     const condId = this.nextId('cond');
     const condition = this.expressionToJS(when.condition);
 
@@ -1655,6 +1675,75 @@ export class Compiler {
     return `${this.ind()}<div id="${condId}"></div>\n`;
   }
 
+  /**
+   * Issue #114 — Evaluate a compile-time `when` condition against `buildVars`.
+   *
+   * Supported shapes:
+   *   __var__                      → truthy lookup
+   *   __var__ == "literal"         → equality (string compare)
+   *   __var__ != "literal"         → inequality
+   *   __var__ == 42                → equality (string compare against number literal)
+   *   (inverted: literal on left side also works)
+   *
+   * Unknown vars are treated as undefined → falsy / not-equal-to-anything-defined.
+   * Truthiness: "", "0", "false" count as falsy (matches CLI/env conventions).
+   */
+  private evalCompileTimeCondition(expr: any): boolean {
+    if (!expr) return false;
+
+    if (expr.type === 'BinaryExpression') {
+      const op = expr.operator;
+      if (op === '==' || op === '!=') {
+        const leftVal = this.resolveCompileTimeValue(expr.left);
+        const rightVal = this.resolveCompileTimeValue(expr.right);
+        const eq = leftVal === rightVal;
+        return op === '==' ? eq : !eq;
+      }
+      // && / || — support nested logical operators for composability.
+      if (op === '&&') {
+        return this.evalCompileTimeCondition(expr.left) && this.evalCompileTimeCondition(expr.right);
+      }
+      if (op === '||') {
+        return this.evalCompileTimeCondition(expr.left) || this.evalCompileTimeCondition(expr.right);
+      }
+      // Unsupported operator — fail closed (treat as false).
+      return false;
+    }
+
+    // Bare identifier / literal → truthy check.
+    const val = this.resolveCompileTimeValue(expr);
+    return this.isTruthyBuildValue(val);
+  }
+
+  /**
+   * Resolve one side of a compile-time expression to a string/undefined.
+   *  - `__xxx__` identifier  → lookup in buildVars (key stripped of underscores)
+   *  - String literal        → the string
+   *  - Number literal        → stringified (so == compares fine against defines)
+   *  - Bare identifier       → treat as string literal (for convenience, e.g. `production`)
+   */
+  private resolveCompileTimeValue(expr: any): string | undefined {
+    if (!expr) return undefined;
+    if (expr.type === 'StringLiteral') return expr.value;
+    if (expr.type === 'NumberLiteral') return String(expr.value);
+    if (expr.type === 'Identifier') {
+      const name = expr.name as string;
+      if (/^__\w+__$/.test(name)) {
+        const key = name.slice(2, -2);
+        return this.options.buildVars[key];
+      }
+      // Non-underscore identifier — treat as literal name (rare in these conds).
+      return name;
+    }
+    return undefined;
+  }
+
+  private isTruthyBuildValue(val: string | undefined): boolean {
+    if (val === undefined) return false;
+    if (val === '' || val === '0' || val === 'false') return false;
+    return true;
+  }
+
   // --- Style compilation ---
 
   private compileStyle(style: StyleBlock): string {
@@ -1669,7 +1758,7 @@ export class Compiler {
 
     for (const prop of style.properties) {
       const cp = this.mapCSSProperty(prop.name);
-      cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+      cssBlock += this.emitCSSDecl(cp, this.resolveThemeValue(cp, prop.value), '  ');
     }
     cssBlock += '}\n';
 
@@ -1683,7 +1772,7 @@ export class Compiler {
         cssBlock += `.${scopeClass}:${pseudoName} {\n`;
         for (const prop of pseudoProps) {
           const cp = this.mapCSSProperty(prop.name);
-          cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+          cssBlock += this.emitCSSDecl(cp, this.resolveThemeValue(cp, prop.value), '  ');
         }
         cssBlock += '}\n';
       }
@@ -1699,7 +1788,7 @@ export class Compiler {
         if (!hasContent) cssBlock += `  content: '';\n`;
         for (const prop of pe.properties) {
           const cp = this.mapCSSProperty(prop.name);
-          cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+          cssBlock += this.emitCSSDecl(cp, this.resolveThemeValue(cp, prop.value), '  ');
         }
         cssBlock += '}\n';
       }
@@ -1711,7 +1800,7 @@ export class Compiler {
         cssBlock += `@media (max-width: ${bp}) {\n  .${scopeClass} {\n`;
         for (const prop of r.properties) {
           const cp = this.mapCSSProperty(prop.name);
-          cssBlock += `    ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+          cssBlock += this.emitCSSDecl(cp, this.resolveThemeValue(cp, prop.value), '    ');
         }
         cssBlock += '  }\n}\n';
       }
@@ -1732,7 +1821,7 @@ export class Compiler {
           cssBlock += isSelfScope && selfElems.includes(rule.selector) ? `${rule.selector}.${scopeClass} {\n` : `.${scopeClass}${isSelfScope ? '' : ' '}${rule.selector} {\n`;
           for (const prop of rule.properties) {
             const cp = this.mapCSSProperty(prop.name);
-            cssBlock += `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+            cssBlock += this.emitCSSDecl(cp, this.resolveThemeValue(cp, prop.value), '  ');
           }
           cssBlock += '}\n';
         }
@@ -1744,9 +1833,9 @@ export class Compiler {
   }
   private compilePreset(preset: any): void {
     const className = 'nyx-p_' + preset.name;
-    const props = preset.styles.map((s: any) => {
+    const props = preset.styles.flatMap((s: any) => {
       const prop = this.mapCSSProperty(s.name);
-      return prop + ': ' + this.resolveThemeValue(prop, s.value);
+      return this.emitCSSDeclInline(prop, this.resolveThemeValue(prop, s.value));
     }).join('; ');
     this.css.push('.' + className + ' { ' + props + '; }');
     this.presets.set(preset.name, className);
@@ -1942,18 +2031,18 @@ export class Compiler {
     // v0.25.0 (#109): native `theme { body { ... } }` block emits a real `body { }` CSS rule.
     // Goes AFTER :root (so vars are available) and BEFORE page-specific styles (page can override).
     if (theme.body && theme.body.length > 0) {
-      const bodyProps = theme.body.map((s: any) => {
+      const bodyProps = theme.body.flatMap((s: any) => {
         const prop = this.mapCSSProperty(s.name);
-        return prop + ': ' + this.resolveThemeValue(prop, s.value);
+        return this.emitCSSDeclInline(prop, this.resolveThemeValue(prop, s.value));
       }).join('; ');
       css += 'body{' + bodyProps + '}';
     }
     // v0.25.0 (#111): native `theme { selection { ... } }` block emits a real `::selection { }` CSS rule.
     // Goes AFTER :root + body so theme vars are available and page styles can still override.
     if (theme.selection && theme.selection.length > 0) {
-      const selProps = theme.selection.map((s: any) => {
+      const selProps = theme.selection.flatMap((s: any) => {
         const prop = this.mapCSSProperty(s.name);
-        return prop + ': ' + this.resolveThemeValue(prop, s.value);
+        return this.emitCSSDeclInline(prop, this.resolveThemeValue(prop, s.value));
       }).join('; ');
       css += '::selection{' + selProps + '}';
     }
@@ -1963,9 +2052,9 @@ export class Compiler {
     if (theme.defaults && theme.defaults.length > 0) {
       for (const def of theme.defaults) {
         if (!def.properties || def.properties.length === 0) continue;
-        const props = def.properties.map((p: any) => {
+        const props = def.properties.flatMap((p: any) => {
           const prop = this.mapCSSProperty(p.name);
-          return prop + ': ' + this.resolveThemeValue(prop, p.value);
+          return this.emitCSSDeclInline(prop, this.resolveThemeValue(prop, p.value));
         }).join('; ');
         css += ':where(' + def.element + '){' + props + '}';
       }
@@ -2967,6 +3056,46 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
   }
 
 
+  // v0.25.2 #113 — CSS properties that need a `-webkit-` prefix emitted alongside the
+  // standard form. Safari 17.2 (Jan 2024) made these unprefixed, but older Safari,
+  // WebKit-based in-app browsers, and iOS versions still in the wild require the prefix.
+  // We always emit BOTH so styling Just Works everywhere.
+  private static WEBKIT_PREFIX_PROPERTIES = new Set<string>([
+    'mask-image', 'mask-size', 'mask-position', 'mask-repeat',
+    'mask-origin', 'mask-clip', 'mask-composite', 'mask-mode',
+    'mask-border', 'mask-border-source', 'mask-border-slice',
+    'mask-border-width', 'mask-border-outset', 'mask-border-repeat',
+  ]);
+
+  /**
+   * Emit a single CSS declaration string, auto-doubling for properties that need
+   * a `-webkit-` prefix (e.g. mask-*). Returns lines joined by `\n`, always ending
+   * in `\n` (matching the existing emit style).
+   *
+   *   emitCSSDecl('mask-image', 'url(...)', '  ')
+   *     -> '  -webkit-mask-image: url(...);\n  mask-image: url(...);\n'
+   *   emitCSSDecl('color', 'red', '  ')
+   *     -> '  color: red;\n'
+   */
+  private emitCSSDecl(prop: string, value: string, indent: string): string {
+    if (Compiler.WEBKIT_PREFIX_PROPERTIES.has(prop)) {
+      return `${indent}-webkit-${prop}: ${value};\n${indent}${prop}: ${value};\n`;
+    }
+    return `${indent}${prop}: ${value};\n`;
+  }
+
+  /**
+   * Emit a single CSS declaration for inline/joined contexts (presets, theme body, etc.)
+   * where declarations are joined by `; `. Returns an array of `prop: value` strings
+   * (one entry for non-prefixed, two for mask-*).
+   */
+  private emitCSSDeclInline(prop: string, value: string): string[] {
+    if (Compiler.WEBKIT_PREFIX_PROPERTIES.has(prop)) {
+      return [`-webkit-${prop}: ${value}`, `${prop}: ${value}`];
+    }
+    return [`${prop}: ${value}`];
+  }
+
   // Typography utility expansions (#60)
   private expandUtility(name: string, value: string): {name: string, value: string}[] | null {
     switch (name) {
@@ -3003,10 +3132,10 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
   private compilePropToCSS(prop: {name: string, value: string}): string {
     const expanded = this.expandUtility(prop.name, prop.value);
     if (expanded) {
-      return expanded.map(e => `  ${e.name}: ${e.value};\n`).join('');
+      return expanded.map(e => this.emitCSSDecl(e.name, e.value, '  ')).join('');
     }
     const cp = this.mapCSSProperty(prop.name);
-    return `  ${cp}: ${this.resolveThemeValue(cp, prop.value)};\n`;
+    return this.emitCSSDecl(cp, this.resolveThemeValue(cp, prop.value), '  ');
   }
 
   private mapCSSProperty(name: string): string {
@@ -3144,7 +3273,38 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
       'fil': 'filter',            // alias (docs compat, #74)
       'bdf': 'backdrop-filter',
       'bf': 'backdrop-filter',    // alias (docs compat, #74)
-      
+
+      // Issue #118 — Missing CSS shorthands (v0.25.2)
+      // Skipped: 'ww' (already maps to overflow-wrap, the modern name for word-wrap)
+      // Skipped: 'hyphens' (already mapped above)
+      'cv': 'content-visibility',
+      'sb': 'scroll-behavior',
+      'osb': 'overscroll-behavior',
+      'osbx': 'overscroll-behavior-x',
+      'osby': 'overscroll-behavior-y',
+      'smt': 'scroll-margin-top',
+      'tof': 'text-overflow',
+      'hy': 'hyphens',            // short alias for hyphens
+      'caret': 'caret-color',
+      'acc': 'accent-color',
+      'cs': 'color-scheme',
+      'ar': 'aspect-ratio',
+      'ind': 'text-indent',
+      'bv': 'backface-visibility',
+      'ps': 'perspective',
+      'pso': 'perspective-origin',
+      'to': 'transform-origin',
+      'trs': 'transform-style',
+      'wm': 'writing-mode',
+      'dir': 'direction',
+
+      // Masking (#113). `ms` is intentionally skipped — too ambiguous (margin-start,
+      // milliseconds). The `-webkit-` prefix is added automatically at emit time.
+      'mi': 'mask-image',
+      'mimg': 'mask-image',
+      'masksize': 'mask-size',
+      'maskpos': 'mask-position',
+
       // Legacy (keep working)
       'text': 'color',
       'content': 'content',
@@ -3170,7 +3330,12 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
       const value = part.substring(colonIdx + 1).trim();
       if (!prop) return part;
       const mappedProp = this.mapCSSProperty(prop);
-      return ` ${mappedProp}:${this.resolveThemeValue(mappedProp, value)}`;
+      const resolved = this.resolveThemeValue(mappedProp, value);
+      // #113 — Auto-prefix mask-* properties with -webkit- inside inline style="..." too.
+      if (Compiler.WEBKIT_PREFIX_PROPERTIES.has(mappedProp)) {
+        return ` -webkit-${mappedProp}:${resolved}; ${mappedProp}:${resolved}`;
+      }
+      return ` ${mappedProp}:${resolved}`;
     }).join(';').trim();
   }
   /**

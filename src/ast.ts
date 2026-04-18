@@ -187,6 +187,15 @@ export interface WhenStatement extends BaseNode {
   condition: Expression;
   body: Statement[];
   elseBody?: Statement[];
+  /**
+   * Issue #114 — Compile-time `when` with `__double_underscore__` identifiers.
+   * When true, the compiler evaluates `condition` at build time using `buildVars`
+   * and emits either `body` or `elseBody` verbatim (no JS, no runtime check).
+   * Parser sets this flag when any identifier inside `condition` matches
+   * `__word__`. Regular runtime `when` (with dot-refs / state / stores) leaves
+   * this unset.
+   */
+  compileTime?: boolean;
 }
 
 /** `style { ... }` */

@@ -535,6 +535,44 @@ function getOutputFlag(argv: string[]): string | null {
   return null;
 }
 
+/**
+ * Issue #114 — Parse `--define KEY=VALUE` flags for compile-time `when` blocks.
+ *
+ * Accepts:
+ *   --define key=value          (two args)
+ *   --define=key=value          (one arg, eq-form)
+ *   -D key=value / -D=key=value (short alias)
+ *
+ * Multiple flags accumulate. `--define key` (no value) is treated as `key=true`
+ * so bare `when __debug__` toggles work: `nyx build x.nyx --define debug`.
+ */
+function getDefineFlags(argv: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  const addKV = (raw: string | undefined) => {
+    if (!raw) return;
+    const eq = raw.indexOf('=');
+    if (eq === -1) {
+      out[raw] = 'true';
+    } else {
+      const k = raw.slice(0, eq);
+      const v = raw.slice(eq + 1);
+      if (k) out[k] = v;
+    }
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--define' || a === '-D') {
+      addKV(argv[i + 1]);
+      i++;
+    } else if (a.startsWith('--define=')) {
+      addKV(a.slice('--define='.length));
+    } else if (a.startsWith('-D=')) {
+      addKV(a.slice('-D='.length));
+    }
+  }
+  return out;
+}
+
 // Early handler: `nyx theme import --figma <file>` (v0.23.5, Issue #88)
 // Dispatched before the generic `command + file` argument shape check below,
 // because `theme` is a subcommand-style verb with its own argument layout.
@@ -782,7 +820,9 @@ try {
       console.log(''); // blank line after warnings
     }
 
-    const compiler = new Compiler({ pretty: true });
+    // Issue #114 — Collect `--define KEY=VALUE` flags for compile-time `when`.
+    const buildVars = getDefineFlags(args);
+    const compiler = new Compiler({ pretty: true, buildVars });
 
     // Count pages to determine output mode
     const pages = ast.body.filter((n: any) => n.type === 'Page');
@@ -982,7 +1022,9 @@ try {
           return { ok: false, pages: 0, bytes: 0, ms: performance.now() - start };
         }
 
-        const compiler = new Compiler({ pretty: true });
+        // Issue #114 — `--define` flags flow through to the dev/watch pipeline too.
+        const buildVars = getDefineFlags(args);
+        const compiler = new Compiler({ pretty: true, buildVars });
 
         const pages = ast.body.filter((n: any) => n.type === 'Page');
 

@@ -61,12 +61,40 @@ const CSS_SHORTHANDS = new Set([
   'pe', 'us', 'ap', 'rs', 'ol', 'wc', 'ct', 'iso',
   'obf', 'obp', 'bf', 'fil', 'mix', 'si', 'sa',
   'ji', 'js', 'oc', 'ow', 'o',
+  // Issue #118 — Missing CSS shorthands (v0.25.2)
+  'cv', 'sb', 'osb', 'osbx', 'osby', 'smt', 'tof', 'hy',
+  'caret', 'acc', 'cs', 'ar', 'ind', 'bv', 'ps', 'pso',
+  'to', 'trs', 'wm', 'dir',
   // Full CSS names that are common
   'background', 'color', 'padding', 'margin', 'width', 'height',
   'display', 'position', 'top', 'bottom', 'left', 'right',
   'font-size', 'font-weight', 'border-radius', 'opacity', 'overflow',
   'transition', 'transform', 'animation', 'cursor', 'box-shadow',
 ]);
+
+
+/**
+ * Issue #114 — Does an Expression subtree reference any `__xxx__` identifier?
+ *
+ * We mark `when` as compile-time if ANY identifier in the condition matches
+ * `^__\w+__$`. This keeps things simple (mixed conditions are the user's bug)
+ * and keeps runtime `when` (dot-refs, state, stores) untouched.
+ */
+export function isCompileTimeIdent(name: string): boolean {
+  return /^__\w+__$/.test(name);
+}
+
+function hasCompileTimeIdentifier(expr: any): boolean {
+  if (!expr || typeof expr !== 'object') return false;
+  if (expr.type === 'Identifier' && typeof expr.name === 'string' && isCompileTimeIdent(expr.name)) {
+    return true;
+  }
+  if (expr.type === 'BinaryExpression') {
+    return hasCompileTimeIdentifier(expr.left) || hasCompileTimeIdentifier(expr.right);
+  }
+  // StringLiteral / NumberLiteral / PropertyAccess / StoreAccess — no nested expressions to scan
+  return false;
+}
 
 
 export class Parser {
@@ -1400,7 +1428,12 @@ export class Parser {
       }
     }
 
-    return { type: 'When', condition, body, elseBody, line: start.line, col: start.col };
+    // Issue #114 — Compile-time `when`: if the condition references any
+    // `__double_underscore__` identifier, mark the block so the compiler
+    // evaluates it at build time using `--define` build vars.
+    const compileTime = hasCompileTimeIdentifier(condition);
+
+    return { type: 'When', condition, body, elseBody, compileTime, line: start.line, col: start.col };
   }
 
   private parseStyle(): StyleBlock {
@@ -1646,6 +1679,10 @@ export class Parser {
     'areas', 'area', 'container', 'container-name',
     'obf', 'obp', 'bf', 'bdf', 'fil', 'mix', 'si', 'sa',
     'ji', 'js', 'oc', 'ow', 'o', 't', 'l', 'b',
+    // Issue #118 — Missing CSS shorthands (v0.25.2)
+    'cv', 'sb', 'osb', 'osbx', 'osby', 'smt', 'tof', 'hy',
+    'caret', 'acc', 'cs', 'ar', 'ind', 'bv', 'ps', 'pso',
+    'to', 'trs', 'wm', 'dir',
   ]);
 
   /**
