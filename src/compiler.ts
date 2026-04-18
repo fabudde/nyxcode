@@ -915,6 +915,9 @@ export class Compiler {
     const navAriaAttr = el.attributes.find(a => a.name === 'aria-label');
     const sumAriaAttr = el.attributes.find(a => a.name === 'summary-aria-label');
     const openLabelAttr = el.attributes.find(a => a.name === 'open-label');
+    const brandAttr   = el.attributes.find(a => a.name === 'brand');
+    const logoAttr    = el.attributes.find(a => a.name === 'logo');
+    const logoHeightAttr = el.attributes.find(a => a.name === 'logo-height');
 
     // Breakpoint: `burger` (bare) defaults to 768px; `burger=<token>` looks up theme.breakpoints
     let breakpointPx = 768;
@@ -981,7 +984,10 @@ export class Compiler {
       // Base: everything is hidden; the inner <nav> is only visible at desktop sizes
       // or when <details> is open on mobile.
       const baseCss =
+        `.nx-burger-wrap{display:flex;justify-content:space-between;align-items:center;width:100%;padding:1rem 2rem}` +
+        `.nx-burger-brand{font-weight:800;font-size:1.3rem;text-decoration:none;color:inherit}` +
         `.nx-burger-desktop{display:flex;gap:1.5rem;align-items:center}` +
+        `.nx-burger-desktop a,.nx-burger-mobile a{color:inherit;text-decoration:none}` +
         `.nx-burger-mobile{display:none}` +
         `.nx-burger-mobile>summary{cursor:pointer;list-style:none;user-select:none}` +
         `.nx-burger-mobile>summary::-webkit-details-marker{display:none}` +
@@ -1015,7 +1021,7 @@ export class Compiler {
     // ----- Compile children (the links inside the nav) -----
     // We strip attributes that we've already consumed on the outer <nav>
     // so they don't leak into the rewritten markup.
-    const CONSUMED = new Set(['burger', 'icon', 'aria-label', 'summary-aria-label', 'open-label']);
+    const CONSUMED = new Set(['burger', 'icon', 'aria-label', 'summary-aria-label', 'open-label', 'brand', 'logo', 'logo-height']);
     const passthroughAttrs = el.attributes.filter(a => !CONSUMED.has(a.name));
 
     // Render inner nav children (anchors etc.) at an extra indent
@@ -1036,6 +1042,45 @@ export class Compiler {
 
     const detailsClasses = ['nx-burger', bpKey, scopeClass].filter(Boolean).join(' ');
     const passthroughStr = this.compileAttributes(passthroughAttrs);
+
+    // Brand / logo HTML — supports text (brand="Name") or image (logo="/img/logo.png")
+    const brandText = brandAttr && typeof brandAttr.value === 'string' ? this.escapeHtml(brandAttr.value) : '';
+    const logoSrc = logoAttr && typeof logoAttr.value === 'string' ? this.escapeHtml(logoAttr.value) : '';
+    const logoHeight = logoHeightAttr && typeof logoHeightAttr.value === 'string' ? logoHeightAttr.value : '32px';
+    let brandHtml = '';
+    if (logoSrc && brandText) {
+      // Image + text: logo image followed by brand name
+      brandHtml = `<a class="nx-burger-brand" href="/"><img src="${logoSrc}" alt="${brandText}" style="height:${logoHeight};vertical-align:middle;margin-right:0.5rem">${brandText}</a>`;
+    } else if (logoSrc) {
+      // Image only
+      brandHtml = `<a class="nx-burger-brand" href="/"><img src="${logoSrc}" alt="Home" style="height:${logoHeight}"></a>`;
+    } else if (brandText) {
+      // Text only
+      brandHtml = `<a class="nx-burger-brand" href="/">${brandText}</a>`;
+    }
+
+    if (brandText) {
+      // With brand: wrap everything in a flex container (brand left, links right)
+      return (
+        `${this.ind()}<div class="nx-burger-wrap">\n` +
+        `${this.ind()}  ${brandHtml}\n` +
+        // Desktop: plain div with links
+        `${this.ind()}  <div class="nx-burger-desktop">\n` +
+        innerChildren +
+        `${this.ind()}  </div>\n` +
+        // Mobile: details/summary for zero-JS toggle
+        `${this.ind()}  <details class="${detailsClasses} nx-burger-mobile"${passthroughStr}>\n` +
+        `${this.ind()}    <summary aria-label="${summaryAria}">` +
+        `<span class="nx-burger-closed">${closedLabel}</span>` +
+        `<span class="nx-burger-open" aria-hidden="true">${openLabel}</span>` +
+        `</summary>\n` +
+        `${this.ind()}    <nav aria-label="${navAria}">\n` +
+        innerChildren +
+        `${this.ind()}    </nav>\n` +
+        `${this.ind()}  </details>\n` +
+        `${this.ind()}</div>\n`
+      );
+    }
 
     return (
       // Desktop: plain div with links (no details/summary needed)
