@@ -1,28 +1,32 @@
-# NyxCode — Contributing Guidelines & Quality Rules
+# NyxCode — Contributing Guidelines
 
 ## Team
 - **Fabian Budde** — Co-Creator, Language Design
 - **Nyx** 🦞 — Co-Creator, Implementation Lead
-- **Tyto** 🦉 — Security Advisor
+- **Tyto** 🦉 — Security Advisor, QC
+- **Kiro** 🐺 — Staff Engineer QA
 
-## 🔥 Quality Rules (Non-Negotiable)
+## Quality Rules (Non-Negotiable)
 
-1. **Jede Funktion dokumentiert** — JSDoc, Beispiele, Edge Cases
-2. **Tests für ALLES** — Parser-Output muss deterministisch sein
-3. **NYXCODE.md ist die Referenz** — alle sprachlichen Features dort dokumentieren, sonst existieren sie nicht
-4. **Clean Commits** — keine "fix stuff" Messages, jeder Commit erklärt WARUM
-5. **Keine Shortcuts** — lieber langsamer und richtig als schnell und fragil
-6. **Error Messages sind FEATURES** — wenn `.nyx` Code falsch ist, sagt der Compiler GENAU was und wo
-7. **Security by Default** — SQL immer parameterisiert, kein eval(), kein unsanitized output
-8. **Review vor Merge** — kein Code ohne Review
+1. **Every function documented** — JSDoc, examples, edge cases
+2. **Tests for everything** — Parser output must be deterministic
+3. **NYXCODE.md is the reference** — all language features must be documented there, or they don't exist
+4. **Clean commits** — no "fix stuff" messages, every commit explains WHY
+5. **No shortcuts** — slow and correct beats fast and fragile
+6. **Error messages are features** — when `.nyx` code is wrong, the compiler says EXACTLY what and where
+7. **Security by default** — SQL always parameterized, no eval(), no unsanitized output
+8. **Review before merge** — no code without review
 
-## Architecture Decisions
-- Parser: Pratt Parser (precedence climbing)
-- Output: Deterministic — same input = same output, always
-- Types: Inferred where possible, explicit where needed
-- Errors: Position-aware with line:col + helpful suggestions
+## Architecture
+
+- **Parser:** Pratt Parser (precedence climbing)
+- **Output:** Deterministic — same input = same output, always
+- **Types:** Inferred where possible, explicit where needed
+- **Errors:** Position-aware with line:col + helpful suggestions
+- **Zero dependencies** — compiler + dev server have zero third-party runtime deps
 
 ## Commit Convention
+
 ```
 type(scope): description
 
@@ -32,6 +36,33 @@ docs(spec): clarify query keyword behavior
 test(parser): add edge cases for nested components
 ```
 
-## This is Grundlagentechnologie
+## Getting Started
+
+```bash
+git clone https://github.com/fabudde/nyxcode.git
+cd nyxcode
+npm install
+npm run build
+node dist/cli.js examples/blog.nyx -o out/
+```
+
+## Running Tests
+
+```bash
+node --test dist/tests/*.test.js
+```
+
+## Style Guide
+
+See the [NyxCode Style Guide](https://github.com/fabudde/nyxcode/issues/119) for language design decisions.
+
+Key principles:
+- No `@` on top-level keywords (`theme`, `preset`, `component`, `page`, `layout`)
+- `@` only inside style blocks (`@mobile`, `@tablet`, `@desktop`)
+- Single-word keywords only
+- Position determines meaning (top-level = compiler declaration, inside page = author content)
+
+## This is Foundation Technology
+
 Every bug in the foundation multiplies x1000.
 No shortcuts. No "good enough." Production-grade or nothing.
