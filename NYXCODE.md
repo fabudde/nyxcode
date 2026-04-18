@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.26.0)
+# NYXCODE.md — AI Context File (v0.27.1)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -436,6 +436,9 @@ Compiles to a native HTML5 `<details>`/`<summary>` pair with responsive CSS that
 | `open-label="..."`          | `Close`            | Open-state label.                                      |
 | `aria-label="..."`          | `Main navigation`  | `aria-label` on the inner `<nav>`.                     |
 | `summary-aria-label="..."`  | `Toggle menu`      | `aria-label` on the `<summary>` toggle.                |
+| `brand="..."`               | —                  | Site name displayed as text logo (left side).          |
+| `logo="..."`                | —                  | Image path for logo (left side, replaces text brand).  |
+| `logo-height="..."`         | `32px`             | Custom logo image height.                              |
 
 ### Examples
 
@@ -451,6 +454,21 @@ nav burger=lg { a "Home" href="/", a "Products" href="/products" }
 nav burger icon="☰" open-label="Hide menu" aria-label="Site nav" {
   a "Home" href="/"
   a "Docs" href="/docs"
+}
+
+# Brand text logo (v0.27.1)
+nav burger brand="MySite" {
+  a "Home" href="/", a "About" href="/about"
+}
+
+# Image logo (v0.27.1)
+nav burger logo="/img/logo.png" {
+  a "Home" href="/", a "Docs" href="/docs"
+}
+
+# Image + text brand (v0.27.1)
+nav burger logo="/img/logo.png" brand="MySite" logo-height="40px" {
+  a "Home" href="/", a "About" href="/about"
 }
 ```
 

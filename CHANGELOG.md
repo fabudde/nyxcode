@@ -1,3 +1,28 @@
+## v0.27.1 — "Brand Identity" (2026-04-18)
+
+### Features
+
+- **Nav Burger Brand & Logo (#126)** — `nav burger brand="SiteName"` adds a text logo on the left. `logo="/img/logo.png"` adds an image logo. `logo-height="40px"` customizes height. Supports text-only, image-only, or both. Burger links inherit body color, wrap has default padding. Backwards compatible.
+
+### Bug Fixes
+
+- **Preset CSS in Layouts (#125)** — Preset CSS was being lost during layout compilation. Fixed.
+
+### Stats
+- 365 tests, 0 failures
+- NYXCODE.md updated to v0.27.1
+
+---
+
+## v0.27.0 — "Preset Power" (2026-04-18)
+
+### Bug Fixes
+
+- **Preset Shorthands (#123)** — Fixed shorthand expansion inside presets.
+- **-webkit Property Merge (#124)** — Fixed consecutive `-webkit-*` properties being incorrectly merged.
+
+---
+
 ## v0.26.1 — "Fail-Safe" (2026-04-18)
 
 **SECURITY PATCH.** Two findings, both fixed. No breaking changes.
