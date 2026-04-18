@@ -256,6 +256,10 @@ export class Compiler {
       // inherits them. Single-page builds previously worked by accident (theme injections were
       // still in this.headInjections from compileTheme and never reset before emit).
       layoutHeadInjections = [...themeHeadInjections];
+      // #125 fix: preserve preset CSS for no-layout multi-page builds.
+      // Presets were compiled to this.css before this block, but layoutCssBlocks stayed [].
+      // Each page reset this.css = [...layoutCssBlocks] (empty) → preset CSS lost.
+      layoutCssBlocks = this.css.filter(rule => rule.includes('.nyx-p_'));
     }
 
     const results: Array<{path: string, html: string}> = [];
