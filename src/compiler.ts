@@ -218,6 +218,9 @@ export class Compiler {
     let layoutInteractiveElements: Set<string> = new Set();
     if (this.layout) {
       // Do a single compile to collect layout CSS, head injections + HTML template
+      // #125: Preserve preset CSS — presets are compiled before layout but
+      // this.css gets wiped here. Save and restore after layout compilation.
+      const presetCSS = this.css.filter(rule => rule.includes('.nyx-p_'));
       this.css = [];
       this.js = [];
       this.headInjections = [];
@@ -238,7 +241,7 @@ export class Compiler {
       this.staticMode = true;
       layoutHtmlTemplate = this.compileLayoutBody(this.layout.body, '<!--SLOT-->');
       this.staticMode = false;
-      layoutCssBlocks = [...this.css];
+      layoutCssBlocks = [...presetCSS, ...this.css];
       layoutHeadInjections = [...this.headInjections];
       // Prepend all theme head injections (light :root, dark mode, Google Fonts)
       layoutHeadInjections.unshift(...themeHeadInjections);
