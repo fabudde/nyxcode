@@ -30,7 +30,7 @@ import {
 /** Set of tags that are recognized as built-in elements */
 const ELEMENT_TAGS = new Set([
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  'p', 'text', 'span', 'link', 'img', 'video', 'audio', 'source', 'track', 'iframe',
+  'p', 'text', 'span', 'link', 'img', 'picture', 'video', 'audio', 'source', 'track', 'iframe',
   'button', 'input', 'select', 'option', 'optgroup', 'checkbox', 'radio', 'toggle', 'slider', 'textarea',
   'card', 'badge', 'table', 'list', 'metric', 'chart', 'avatar', 'tag',
   'alert', 'toast', 'modal', 'tooltip', 'progress', 'spinner',
