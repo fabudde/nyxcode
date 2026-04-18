@@ -32,6 +32,16 @@ try {
   NYXCODE_VERSION = '0.16.4'; // fallback
 }
 
+/**
+ * v0.26.1 SECURITY — Attributes that hold URLs and must be sanitized against
+ * dangerous schemes (javascript:, vbscript:, data:text/html, …). See
+ * `Compiler.sanitizeUrlAttr`.
+ */
+const URL_ATTRS = new Set<string>([
+  'src', 'srcset', 'href', 'action', 'formaction',
+  'poster', 'data', 'cite', 'background', 'ping',
+]);
+
 export interface CompilerOptions {
   /** Output mode */
   target: 'static' | 'dynamic';
@@ -1305,18 +1315,87 @@ export class Compiler {
         const expandedStyle = this.expandInlineShorthands(attr.value as string);
         parts.push(`style="${expandedStyle}"`);
       } else if (attr.name === 'href') {
-        parts.push(`href="${attr.value}"`);
+        const safe = this.sanitizeUrlAttr('href', attr.value as string);
+        if (safe !== null) parts.push(`href="${safe}"`);
       } else {
         const val = typeof attr.value === 'string' ? attr.value : '';
         if (val === 'true') {
           parts.push(attr.name);
         } else {
-          parts.push(`${this.mapAttrName(attr.name)}="${val}"`);
+          // v0.26.1 SECURITY FIX — block javascript:/data:/vbscript: schemes on URL attrs.
+          if (URL_ATTRS.has(attr.name)) {
+            const safe = this.sanitizeUrlAttr(attr.name, val);
+            if (safe === null) continue; // strip the attribute entirely
+            parts.push(`${this.mapAttrName(attr.name)}="${safe}"`);
+          } else {
+            parts.push(`${this.mapAttrName(attr.name)}="${val}"`);
+          }
         }
       }
     }
 
     return ' ' + parts.join(' ');
+  }
+
+  /**
+   * v0.26.1 SECURITY FIX — Sanitize URL-type attributes.
+   *
+   * Blocks `javascript:`, `vbscript:`, and dangerous `data:` schemes on attributes
+   * that load/navigate to URLs (src, srcset, href, action, formaction, poster,
+   * data, cite). Without this, `source srcset="javascript:alert(1)"` would pass
+   * through verbatim — XSS.
+   *
+   * Exception: `data:image/*` is allowed (common for inline images). All other
+   * `data:` variants (`data:text/html`, `data:application/*`, etc.) are blocked.
+   *
+   * Special case: `srcset` is a comma-separated list of candidates; we sanitize
+   * each candidate's URL portion independently. If ANY candidate is dangerous,
+   * we drop the entire attribute (fail-safe — srcset with one bad entry is
+   * already an attack surface).
+   *
+   * Returns the (possibly unchanged) value, or `null` if the attribute should
+   * be stripped entirely.
+   */
+  private sanitizeUrlAttr(attrName: string, raw: string): string | null {
+    if (typeof raw !== 'string' || raw.length === 0) return raw;
+
+    const check = (url: string): boolean => {
+      // Decode common HTML-entity tricks (tab/newline/unicode) before comparing.
+      const trimmed = url.trim().replace(/[\t\n\r\f\v]+/g, '').toLowerCase();
+      if (trimmed.startsWith('javascript:') || trimmed.startsWith('vbscript:')) {
+        return false;
+      }
+      if (trimmed.startsWith('data:')) {
+        // Allow only data:image/* — block data:text/html, data:application/*, etc.
+        return trimmed.startsWith('data:image/');
+      }
+      return true;
+    };
+
+    if (attrName === 'srcset') {
+      // `srcset="url1 1x, url2 2x, url3 100w"` — validate each URL.
+      const candidates = raw.split(',');
+      for (const cand of candidates) {
+        const url = cand.trim().split(/\s+/)[0] || '';
+        if (!check(url)) {
+          console.error(
+            `\u26a0\ufe0f  Blocked dangerous URL scheme in srcset: ` +
+            `${url.substring(0, 40)}${url.length > 40 ? '...' : ''}`
+          );
+          return null;
+        }
+      }
+      return raw;
+    }
+
+    if (!check(raw)) {
+      console.error(
+        `\u26a0\ufe0f  Blocked dangerous URL scheme in ${attrName}: ` +
+        `${raw.trim().substring(0, 40)}${raw.length > 40 ? '...' : ''}`
+      );
+      return null;
+    }
+    return raw;
   }
 
   // --- Data compilation ---
@@ -1654,6 +1733,30 @@ export class Compiler {
       return chosen.map(s => this.compileStatement(s)).join('');
     }
 
+    // v0.26.1 SECURITY FIX — Bare-identifier leak protection.
+    //
+    // Problem: `when SECRET == "true" { div "sk-12345" }` compiles to runtime JS
+    // with the secret text as a string literal in innerHTML. Anyone doing
+    // View Source sees the secret — users likely meant `when __SECRET__`
+    // (compile-time strip) or `when .SECRET` (reactive state).
+    //
+    // Fix: If the condition references a BARE identifier (not `.dotRef`, not
+    // `__xxx__`) that is NOT a declared state/store, emit a warning and STRIP
+    // the content (fail-safe). Dotted refs (`.role`) and state/store refs are
+    // fine — they're actual reactive state, not arbitrary globals.
+    const bareIdent = this.findBareUndeclaredIdentifier(when.condition);
+    if (bareIdent) {
+      console.warn(
+        `\u26a0\ufe0f  Warning: 'when ${bareIdent}' uses a bare identifier. ` +
+        `Did you mean 'when __${bareIdent}__'?\n` +
+        `   Without __underscores__, the content would be visible in HTML source.\n` +
+        `   Use 'when __${bareIdent}__' for compile-time stripping, or 'when .${bareIdent}' for runtime state.\n` +
+        `   Content has been STRIPPED (fail-safe) to avoid leaking secrets.`
+      );
+      // Fail-safe: strip both branches — emit nothing, no JS, no wrapper.
+      return '';
+    }
+
     const condId = this.nextId('cond');
     const condition = this.expressionToJS(when.condition);
 
@@ -1673,6 +1776,38 @@ export class Compiler {
   }`);
 
     return `${this.ind()}<div id="${condId}"></div>\n`;
+  }
+
+  /**
+   * v0.26.1 — Walk a `when` condition AST and return the first bare identifier
+   * that is NOT a declared state or store variable, if any. Returns undefined
+   * if the condition is safe (uses `.dotRef`, declared state/store, literals,
+   * or `__xxx__` which would be compile-time already).
+   *
+   * "Bare" means a top-level `Identifier` node — not wrapped in `PropertyAccess`
+   * or `StoreAccess`. Compile-time `__xxx__` identifiers never reach here
+   * (parser marks the whole `when` as compileTime). So any Identifier we see
+   * is either a state/store name (safe) or something undeclared (DANGER).
+   */
+  private findBareUndeclaredIdentifier(expr: any): string | undefined {
+    if (!expr) return undefined;
+    if (expr.type === 'Identifier') {
+      const name = expr.name as string;
+      // Defensive: compile-time idents shouldn't get here, but skip anyway.
+      if (/^__\w+__$/.test(name)) return undefined;
+      // Declared state or store → safe, real reactive reference.
+      if (this.stateVars.has(name)) return undefined;
+      if (this.stores.has(name)) return undefined;
+      if (this.computedVars.has(name)) return undefined;
+      // Bare, undeclared → potential secret leak.
+      return name;
+    }
+    if (expr.type === 'BinaryExpression') {
+      return this.findBareUndeclaredIdentifier(expr.left)
+          ?? this.findBareUndeclaredIdentifier(expr.right);
+    }
+    // PropertyAccess (`.role`), StoreAccess (`user.name`), literals → safe.
+    return undefined;
   }
 
   /**

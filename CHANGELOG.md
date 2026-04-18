@@ -1,3 +1,36 @@
+## v0.26.1 — "Fail-Safe" (2026-04-18)
+
+**SECURITY PATCH.** Two findings, both fixed. No breaking changes.
+
+### Fixed
+
+- **Finding #1 — Runtime `when` leaked secrets into HTML source (CRITICAL).**
+  A user writing `when SECRET == "true" { div "sk-12345" }` — meaning to guard
+  content behind a build flag — would find the secret verbatim in the generated
+  JS bundle, visible via View Source. Only `when __SECRET__` (compile-time) and
+  `when .role` (runtime reactive state) were safe. Now: if `when` references a
+  BARE identifier that is not a declared `state`, `store`, or `computed`, the
+  compiler emits a warning suggesting `__SECRET__` or `.SECRET`, and **strips
+  the content entirely** (fail-safe). Declared state like `when count > 0` with
+  `state count = 0` is unchanged.
+
+- **Finding #2 — `src` / `srcset` / `href` XSS via `javascript:` / `data:` schemes (HIGH).**
+  URL-type attributes passed through unfiltered. `source srcset="javascript:alert(1)"`,
+  `a href="javascript:…"`, and `img src="data:text/html,…"` all executed. The
+  compiler now sanitizes `src`, `srcset`, `href`, `action`, `formaction`,
+  `poster`, `data`, `cite`, `background`, and `ping`: it blocks `javascript:`,
+  `vbscript:`, and dangerous `data:` variants (only `data:image/*` passes).
+  Detection is case-insensitive and tolerant of whitespace/tab obfuscation.
+  For `srcset`, if ANY candidate is dangerous the whole attribute is dropped
+  (fail-safe rather than partial).
+
+### Stats
+
+- **17 new tests** in `v0261-security.test.ts` (359 passing overall)
+- No breaking changes — legitimate URLs and declared state continue to work
+
+---
+
 ## v0.25.2 — "Masked" (2026-04-18)
 
 Issue #113: mask-* properties now auto-emit a `-webkit-` prefixed twin.

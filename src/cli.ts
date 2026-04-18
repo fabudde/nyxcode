@@ -548,13 +548,14 @@ function getOutputFlag(argv: string[]): string | null {
  */
 function getDefineFlags(argv: string[]): Record<string, string> {
   const out: Record<string, string> = {};
+  const stripDunder = (k: string) => k.replace(/^__|__$/g, '');
   const addKV = (raw: string | undefined) => {
     if (!raw) return;
     const eq = raw.indexOf('=');
     if (eq === -1) {
-      out[raw] = 'true';
+      out[stripDunder(raw)] = 'true';
     } else {
-      const k = raw.slice(0, eq);
+      const k = stripDunder(raw.slice(0, eq));
       const v = raw.slice(eq + 1);
       if (k) out[k] = v;
     }
