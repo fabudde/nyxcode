@@ -281,6 +281,10 @@ Single-file is the default. Multi-file when projects grow past ~1500 lines.
 
 | Version | Codename | Highlights |
 |---------|----------|------------|
+| v0.26.1 | Fail-Safe | Security: bare-identifier leak prevention, URL sanitization |
+| v0.26.0 | Feature Complete | mask-* auto-prefix, compile-time `when`, `picture`/`source`, 20 new shorthands |
+| v0.25.1 | Regression Guard | 12 regression tests for #122, `--version` fix |
+| v0.25.0 | Zero Injection | Body styles, keyframes, ::selection, element defaults — all native |
 | v0.24.4 | Tyto's Eyes | Nav burger dual-container, `__version__` template |
 | v0.24.3 | Dogfood | 6 parser bugs fixed from dogfooding nyxcode.io |
 | v0.24.2 | Kiro's Revenge | Double-title fix, canonical URLs, pre/code styles |
@@ -289,17 +293,20 @@ Single-file is the default. Multi-file when projects grow past ~1500 lines.
 | v0.23.x | — | Presets, themes, responsive breakpoints |
 | v0.1.0 | Genesis | Initial release, lexer + parser + compiler |
 
-## What's Next: v0.25 "Zero Injection"
+## Roadmap
 
-Goal: **eliminate ALL head injection.** Everything expressible natively in `.nyx`.
+All v0.25 and v0.26 milestone issues are **complete** — zero open issues! 🎉
 
-- [x] #109 — Body styles via `theme { body { } }`
-- [x] #110 — Native `keyframes` top-level keyword
-- [ ] #111 — `::selection` via `theme { selection { } }`
-- [ ] #112 — Element defaults via `theme { defaults { } }`
-- [ ] #114 — Compile-time conditionals (`when __env__ == "prod"`)
-- [ ] #115 — Multi-value CSS function parsing
-- [ ] And [more...](https://github.com/fabudde/nyxcode/issues)
+- [x] #109–#112 — Native body styles, keyframes, ::selection, element defaults
+- [x] #113 — Auto-prefix mask-* for Safari
+- [x] #114 — Compile-time `when __env__` + `--define` CLI flags
+- [x] #115 — Multi-value CSS function parsing
+- [x] #116 — Native `<picture>`/`<source>` responsive images
+- [x] #117 — Partials (components without props)
+- [x] #118 — 20 new CSS shorthands
+- [x] Security: fail-safe bare-identifier stripping, URL sanitization
+
+Next: v0.27+ — CSS container queries improvements, animation timelines, and more. [Watch the repo](https://github.com/fabudde/nyxcode) for updates.
 
 ## Created By
 
@@ -316,6 +323,6 @@ MIT
 
 ---
 
-*NyxCode v0.24.4 — 222+ tests — [npm](https://www.npmjs.com/package/@fabudde/nyxcode) — [nyxcode.io](https://nyxcode.io)*
+*NyxCode v0.26.1 — 359 tests — [npm](https://www.npmjs.com/package/@fabudde/nyxcode) — [nyxcode.io](https://nyxcode.io)*
 
 🦞
