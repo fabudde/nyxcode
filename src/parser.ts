@@ -2964,6 +2964,10 @@ private parseElement(): ElementNode {
       if (next.type === TokenType.String) {
         content = { type: 'StringLiteral', value: this.advance().value, line: next.line, col: next.col };
       }
+      // v0.30: keyword tokens used as element content (input email, input action, etc.)
+      else if ((next.type === TokenType.Email || next.type === TokenType.Action || next.type === TokenType.Let || next.type === TokenType.Env) && this.peekAt(1)?.type !== TokenType.LeftBrace && this.peekAt(1)?.type !== TokenType.LeftParen) {
+        content = { type: 'Identifier', name: this.advance().value, line: next.line, col: next.col };
+      }
       // Property access: .name or .author.name (nested)
       else if (next.type === TokenType.Dot) {
         this.advance();
@@ -2984,7 +2988,7 @@ private parseElement(): ElementNode {
       }
       // Attribute: key=value or key="complex value" (including keyword tokens like style=)
       // Attribute: key=value — handle keywords that can also be attribute names
-      else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form || next.type === TokenType.Data || next.type === TokenType.State || next.type === TokenType.Preset) && this.peekAt(1)?.type === TokenType.Equals) {
+      else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form || next.type === TokenType.Data || next.type === TokenType.State || next.type === TokenType.Preset || next.type === TokenType.Email || next.type === TokenType.Action || next.type === TokenType.Let || next.type === TokenType.Env) && this.peekAt(1)?.type === TokenType.Equals) {
         const name = this.advance().value;
         this.advance(); // =
         const valToken = this.peek();
