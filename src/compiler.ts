@@ -280,7 +280,7 @@ export class Compiler {
       this.headInjections = [...layoutHeadInjections, ...this.globalHeadInjections]; // Start with layout + global (top-level meta/head) injections
       // v0.27.0 — visible=auth/guest toggle script
       if (this._hasVisibleDirective) {
-        this.headInjections.push('<script>(function(){var t=localStorage.getItem("token");document.querySelectorAll("[data-visible]").forEach(function(el){var v=el.getAttribute("data-visible");if(v==="auth"&&t)el.style.display="";if(v==="guest"&&t)el.style.display="none"})})();</script>');
+        this.headInjections.push('<script>document.addEventListener("DOMContentLoaded",function(){var t=localStorage.getItem("token");document.querySelectorAll("[data-visible]").forEach(function(el){var v=el.getAttribute("data-visible");if(v==="auth")el.style.display=t?"":"none";if(v==="guest")el.style.display=t?"none":""})});</script>');
       }
       this.animations = [];
       this.scripts = []; // Reset scripts per page — prevent cross-page bleed
