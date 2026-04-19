@@ -1769,7 +1769,18 @@ export class Compiler {
     }
 
     // Build the body JSON for the fetch call
-    const bodyParts = hiddenFields.map(f => `'${f.name}':${f.value.startsWith('\${') ? f.value.replace(/^\$\{/, '').replace(/\}$/, '') : "'" + f.value + "'"}` ).join(',');
+    // Values from .field refs must be interpolated at template-literal time (during .map())
+    // so the actual value is baked into the onclick attribute as a literal.
+    // We use \${} to break out of the onclick string into the template literal.
+    const bodyParts = hiddenFields.map(f => {
+      if (f.value.startsWith('\${')) {
+        // Interpolate: 'id': followed by template expression
+        // Output in template: 'id':'\${item.id}' — resolves to 'id':'5' at map time
+        const expr = f.value; // already \${varName.field}
+        return `'${f.name}':'${expr}'`;
+      }
+      return `'${f.name}':'${f.value}'`;
+    }).join(',');
     // Determine HTTP method
     const method = 'POST';
 
@@ -1785,7 +1796,8 @@ export class Compiler {
       }
     }
 
-    // Build the onclick handler
+    // Build the onclick handler — use single quotes throughout since it lives in an HTML attribute
+    // The bodyParts use '+varName.field+' to break out of the string and interpolate via template literal
     const onclick = `(async function(){if(!confirm('Are you sure?'))return;var h={'Content-Type':'application/json'};${authCode}await fetch('${action}',{method:'${method}',headers:h,body:JSON.stringify({${bodyParts}})});${successCode}}).call(this)`;
 
     // Render as button
