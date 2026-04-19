@@ -1,1447 +1,243 @@
-## v0.27.3 — "Background Workers" (2026-04-19)
+# NyxCode v0.30.0 — The Language Release 🔥
 
-### Features
+**NyxCode is now a programming language, not just a DSL.**
 
-- **`every` keyword for background workers (#128)** — New top-level block for recurring tasks. `every 30s 'health-check' { query "..." }` compiles to `setInterval()` in server.js. Supports interval formats (30s/5m/1h/1d), optional labels, error isolation (try/catch per tick), and graceful shutdown (clearInterval on SIGTERM/SIGINT). 5s minimum interval enforced at compile time.
+One `.nyx` file = Frontend + Backend + DB + Auth + Background Workers + Email Alerts + Environment Management + Live Data Bindings. No frameworks, no boilerplate, no config files.
 
-### Bug Fixes
+**Dogfooded on [NyxStatus.com](https://nyxstatus.com)** — a full uptime monitoring SaaS built in 378 lines of NyxCode. One file. Zero frameworks.
 
-- **`flex center` no longer overrides `between`/`around`/`evenly` (#127)** — `flex=row between center` previously emitted two conflicting `justify-content` values. Now `center` only sets `align-items:center` when a justify-content keyword is also present.
+**Proven:** 3.5x fewer tokens than equivalent Next.js. 71% cheaper AI generation. [Comparison](https://nextjsstatus.heynyx.dev).
 
-## v0.27.1 — "Brand Identity" (2026-04-18)
-
-### Features
-
-- **Nav Burger Brand & Logo (#126)** — `nav burger brand="SiteName"` adds a text logo on the left. `logo="/img/logo.png"` adds an image logo. `logo-height="40px"` customizes height. Supports text-only, image-only, or both. Burger links inherit body color, wrap has default padding. Backwards compatible.
-
-### Bug Fixes
-
-- **Preset CSS in Layouts (#125)** — Preset CSS was being lost during layout compilation. Fixed.
-
-### Stats
-- 365 tests, 0 failures
-- NYXCODE.md updated to v0.27.1
+RFC #132 designed by the Rudel: Nyx 🦞, Tyto 🦉, Kiro 🐺, Fabian 🐻.
 
 ---
 
-## v0.27.0 — "Preset Power" (2026-04-18)
+## 🆕 New Backend Primitives
 
-### Bug Fixes
-
-- **Preset Shorthands (#123)** — Fixed shorthand expansion inside presets.
-- **-webkit Property Merge (#124)** — Fixed consecutive `-webkit-*` properties being incorrectly merged.
-
----
-
-## v0.26.1 — "Fail-Safe" (2026-04-18)
-
-**SECURITY PATCH.** Two findings, both fixed. No breaking changes.
-
-### Fixed
-
-- **Finding #1 — Runtime `when` leaked secrets into HTML source (CRITICAL).**
-  A user writing `when SECRET == "true" { div "sk-12345" }` — meaning to guard
-  content behind a build flag — would find the secret verbatim in the generated
-  JS bundle, visible via View Source. Only `when __SECRET__` (compile-time) and
-  `when .role` (runtime reactive state) were safe. Now: if `when` references a
-  BARE identifier that is not a declared `state`, `store`, or `computed`, the
-  compiler emits a warning suggesting `__SECRET__` or `.SECRET`, and **strips
-  the content entirely** (fail-safe). Declared state like `when count > 0` with
-  `state count = 0` is unchanged.
-
-- **Finding #2 — `src` / `srcset` / `href` XSS via `javascript:` / `data:` schemes (HIGH).**
-  URL-type attributes passed through unfiltered. `source srcset="javascript:alert(1)"`,
-  `a href="javascript:…"`, and `img src="data:text/html,…"` all executed. The
-  compiler now sanitizes `src`, `srcset`, `href`, `action`, `formaction`,
-  `poster`, `data`, `cite`, `background`, and `ping`: it blocks `javascript:`,
-  `vbscript:`, and dangerous `data:` variants (only `data:image/*` passes).
-  Detection is case-insensitive and tolerant of whitespace/tab obfuscation.
-  For `srcset`, if ANY candidate is dangerous the whole attribute is dropped
-  (fail-safe rather than partial).
-
-### Stats
-
-- **17 new tests** in `v0261-security.test.ts` (359 passing overall)
-- No breaking changes — legitimate URLs and declared state continue to work
-
----
-
-## v0.25.2 — "Masked" (2026-04-18)
-
-Issue #113: mask-* properties now auto-emit a `-webkit-` prefixed twin.
-
-### Fixed
-
-- **[#113](https://github.com/fabudde/nyxcode/issues/113) — Auto-prefix `mask-*` with `-webkit-`.** Safari 17.2 (Jan 2024) shipped unprefixed mask-*, but older Safari, iOS WebViews, and in-app browsers still need the prefix. NyxCode now emits BOTH the `-webkit-` prefixed form and the standard form for every mask property (`mask-image`, `mask-size`, `mask-position`, `mask-repeat`, `mask-origin`, `mask-clip`, `mask-composite`, `mask-mode`, and the five `mask-border-*` subproperties). Prefixed form is emitted first so the cascade picks the standard form when supported. New shorthand: `mi` / `mimg` → `mask-image`. Also works inside `preset{}`, `hover{}` pseudo-classes, and `@mobile` responsive blocks.
-
-### Stats
-
-- **11 new tests** in `v0252-mask-prefix.test.ts` (342 passing overall)
-- No breaking changes — pure additive fix
-
----
-
-## v0.25.0 — "Multi-Value" (2026-04-17)
-
-Bug #115: multi-value CSS functions on a single line finally work.
-
-### Fixed
-
-- **[#115](https://github.com/fabudde/nyxcode/issues/115) — Multi-value CSS functions broke.** Two independent problems collided:
-  1. Shorthand property names (`bg`, `tf`, `fi`, `bdf`, `tr`, `anim`, `bgi`, `gtc`, `gtr`, …) weren't in `COMMA_VALUE_PROPERTIES`, so a comma at paren-depth 0 was treated as a property separator. `bg radial-gradient(...), radial-gradient(...)` became `background: ...; radial-gradient: (...)`.
-  2. Inside parens the parser glued consecutive identifier/number tokens together with no whitespace, so `radial-gradient(ellipse at 15% 10%, …)` came out as `radial-gradient(ellipseat15%10%, …)`.
-  Both are fixed. Adjacent identifier/number tokens inside function calls now join with a single space (while `--custom-prop`, unary `-`, and binary `-` spacing rules are preserved). Multiple stacked gradients, multiple box-shadows, chained filters, chained transforms — all parse correctly now.
-
-### Stats
-
-- **14 new tests** in `v0250-multi-value.test.ts` (263 passing overall)
-- No breaking changes — pure bugfix
-
----
-
-## v0.24.4 — "Tyto's Eyes" (2026-04-17)
-
-Two more issues from Tyto's eagle-eyed QA.
-
-### Fixed
-
-- **[#107](https://github.com/fabudde/nyxcode/issues/107) — `nav burger` links invisible on desktop.** Compiler now generates dual containers: `<div class="nx-burger-desktop">` (always visible) + `<details class="nx-burger-mobile">` (toggle on mobile). Solves the `<details>` closed-state hiding issue.
-
-- **[#108](https://github.com/fabudde/nyxcode/issues/108) — `__version__` not replaced in text content.** Bare `__version__` (without `${}` wrapper) now resolves at compile time everywhere: quoted strings, element content, and inline text.
-
-### Stats
-
-- **222 tests**, all green (+4 new)
-- Dual-container nav burger architecture inspired by Tyto 🦉 and Kiro 🐺
-
----
-
-## v0.24.3 — "Dogfood" (2026-04-17)
-
-Six compiler bugs found by building nyxcode.io in NyxCode itself. All fixed.
-
-### Fixed
-
-- **[#101](https://github.com/fabudde/nyxcode/issues/101) — `var(--custom-property)` corrupted.** Parser treated `--` inside `var()` as binary minus operators, emitting `var(- - colors-muted)`. Now detects `--` as atomic CSS custom-property prefix.
-
-- **[#102](https://github.com/fabudde/nyxcode/issues/102) — `rgba()` in theme tokens whitespace-expanded.** Token values like `rgba(20, 20, 37, 0.6)` became `rgba ( 20 , 20 , 37 , 0.6 )`. Post-process normalization now tightens parens and commas.
-
-- **[#103](https://github.com/fabudde/nyxcode/issues/103) — `-webkit-` properties in presets broken.** Leading hyphen consumed as property name, emitting `-: webkit-background-clip`. Preset parser now glues `-ident` segments into full vendor-prefixed property names.
-
-- **[#104](https://github.com/fabudde/nyxcode/issues/104) — Multi-line style blocks merge properties.** `bg rgba(...) \n bdf blur(...)` merged into one value. Parser now enforces newline-based property boundaries at paren depth 0.
-
-- **[#105](https://github.com/fabudde/nyxcode/issues/105) — Font-family with comma in presets.** `font-family "JetBrains Mono", monospace` caused parse error. `collectCSSValue()` rewritten to preserve commas in values and track line boundaries.
-
-- **[#106](https://github.com/fabudde/nyxcode/issues/106) — `nav burger` invisible in flex layouts.** `display:contents` on `<details>` gave zero width in flex parents. Changed to `display:flex; align-items:center`.
-
-### Stats
-
-- **218 tests**, all green (was 185 in v0.24.2 — +33 new tests)
-- Found via dogfooding: nyxcode.io is built in NyxCode
-
----
-
-## v0.24.2 — "Kiro's Revenge" (2026-04-17)
-
-Three bugs found by @Kiro-Rudel 🐺 during mindsmatter.now QA. All real, all fixed.
-
-### Fixed
-
-- **[#97](https://github.com/fabudde/nyxcode/issues/97) — Double `<title>` tag.** Pages with both site-level and page-level `meta { title }` emitted two `<title>` tags. Browsers use the first, so page-level titles were silently ignored. New `dedupeHeadInjections()` helper ensures page-level meta keys **replace** site-level keys of the same name. Applies to `<title>`, `<meta name=...>`, `<meta property=...>`, `<link rel="canonical">`. (9 new tests)
-
-- **[#99](https://github.com/fabudde/nyxcode/issues/99) — Hardcoded `nyxcode.io` canonical URL.** Every built site emitted `<link rel="canonical" href="https://nyxcode.io/...">` regardless of actual deploy domain. mindsmatter.now canonicals pointed to nyxcode.io → 404. Fix: canonical is only emitted when explicitly set via `meta { canonical "..." }`. No more lying to search engines. (7 new tests)
-
-- **[#100](https://github.com/fabudde/nyxcode/issues/100) — `<pre>` styles silently dropped.** Plot twist: not a `<pre>`-specific bug. Two shorthand mappings were wrong/missing: `of-x` wasn’t mapped (emitted as-is, browser ignored it), and `br` mapped to `border-right` instead of `border-radius`. Both fixed. `brad` added as explicit long-form alias. (7 new tests)
-
-### Stats
-
-- **185 tests**, all green (was 162 in v0.24.1 — +23 new tests)
-- No breaking changes (unless you relied on `br` meaning `border-right`, which nobody did)
-
----
-
-## v0.24.1 — "Lockdown" (2026-04-17)
-
-Three security & UX fixes. All found by the Rudel — Tyto 🦉 (security review), Kiro 🐺 (QA), Nyx 🦞 (implementation via 4.7 sub-agents).
-
-### Fixed
-
-- **[#98](https://github.com/fabudde/nyxcode/issues/98) — iOS body-scroll-lock for burger nav.** When the burger menu is open on mobile, `html` and `body` now receive `overflow:hidden` + `overscroll-behavior:contain` via a CSS-only `body:has(.nx-burger[open])` rule. No JavaScript added — the zero-JS promise holds. Only active inside the mobile `@media` query; desktop layout is unaffected. (5 new tests)
-
-- **[#95](https://github.com/fabudde/nyxcode/issues/95) — Figma import input sanitization.** Token values from third-party Figma/DTCG JSON are now validated against per-type allowlists before being emitted. Five validators (`isValidColor`, `isValidDimension`, `isValidFontFamily`, `isValidShadow`, `isValidBorder`) plus a belt-and-suspenders `hasDangerousSubstring()` guard that rejects `javascript:`, `data:`, `expression(`, `url(`, `@import`, control characters, and more. Invalid tokens are skipped with a warning — they never reach the output. Security review: @TytoTheOwl 🦉. (35 new tests)
-
-- **[#92](https://github.com/fabudde/nyxcode/issues/92) — TOCTOU race condition in CLI imports.** The import resolver (`use` / `theme extends`) had three stacked race windows: symlink escape (path vs target), separate stat+read syscalls, and double-read in `flattenToSource`. New `safeLoad()` helper: `realpathSync()` → canonical bounds-check → `openSync(O_RDONLY | O_NOFOLLOW | O_NONBLOCK)` → `fstatSync(fd)` inode verification → `readFileSync(fd)`. One file descriptor, one inode, no second path lookup. Symlink chains, FIFO swaps, and post-check file replacements are all rejected. (9 new tests)
-
-### Stats
-
-- **162 tests**, all green (was 113 in v0.24.0 — +49 new security/UX tests)
-- No breaking changes
-
----
-
-## v0.24.0 — "Burger" (2026-04-17)
-
-**FEATURE: [#96](https://github.com/fabudde/nyxcode/issues/96)** — Zero-JS responsive burger nav.
-
-### Syntax
-
+### `let` — Variable Bindings
+Multi-step server logic in API and action blocks.
 ```nyx
-nav burger {
-  a "Home"  href="/"
-  a "About" href="/about"
+api GET /api/stats auth {
+  let userCount = query "SELECT COUNT(*) as count FROM users"
+  let postCount = query "SELECT COUNT(*) as count FROM posts"
+  respond 200 { status "ok" }
 }
 ```
+- Smart detection: `LIMIT 1` or `WHERE id=?` → `.get()`, otherwise → `.all()`
+- Built-in functions: `sum()`, `count()`, `avg()`, `min()`, `max()`, `len()`
+- External calls: `let session = stripe.checkout(amount)`
 
-### What it does
-
-One attribute turns any `<nav>` into a responsive collapsible menu using native HTML `<details>`/`<summary>`. Above the configured breakpoint, the nav renders as a normal link row. Below it, a toggle button expands/collapses the nav. Zero JavaScript, full keyboard and screen-reader support.
-
-### Options
-
-| Attribute                   | Default            | Purpose                                                |
-|-----------------------------|--------------------|--------------------------------------------------------|
-| `burger`                    | `768px` breakpoint | Bare flag enables the collapsible behavior.            |
-| `burger=<breakpoint-token>` | —                  | Use a theme breakpoint token (`sm`, `md`, `lg`, ...).  |
-| `icon="..."`                | `Menu`             | Closed-state label.                                    |
-| `open-label="..."`          | `Close`            | Open-state label.                                      |
-| `aria-label="..."`          | `Main navigation`  | Inner `<nav>` `aria-label`.                            |
-| `summary-aria-label="..."`  | `Toggle menu`      | `<summary>` `aria-label`.                              |
-
-### State-correct accessibility (Tyto 🦉 catch)
-
-The `<summary>` emits two sibling spans toggled via CSS `[open]`:
-
-```html
-<summary aria-label="Toggle menu">
-  <span class="nx-burger-closed">Menu</span>
-  <span class="nx-burger-open" aria-hidden="true">Close</span>
-</summary>
-```
-
-`aria-label` stays state-neutral; the visible label flips on open/close without JS. The earlier `aria-label="Open menu"` design would have lied to screen readers after the first toggle — this version doesn't.
-
-### Did-you-mean errors for breakpoints
-
-Unknown breakpoint tokens raise a v0.23.3-style suggestion:
-
-```
-nav burger: unknown breakpoint 'xl'. Did you mean 'lg'?
-```
-
-Missing `theme.breakpoints.<token>` raises a hard error telling you to define it or use the default bare `burger` attribute (768px).
-
-### Known limits
-
-- **No Escape-to-close.** Deliberate: native `<details>` doesn't close on <kbd>Esc</kbd>, and fixing this requires JavaScript. Keeping the zero-JS promise is the stronger property.
-- **No body-scroll-lock.** Opening the burger on iOS may let background content scroll. Filed as [#98](https://github.com/fabudde/nyxcode/issues/98) for future exploration.
-- **`icon=` is compile-time only.** Must be a string literal. Never bind to user input.
-
-### Review credits
-
-Spec: @NyxTheLobster. Design review: @Kiro-Rudel (nested-nav warning, `[open]` state hook, 1-2 day scope estimate, auto-`aria-label`). A11y/security review: @TytoTheOwl (state-correct dual spans replacing the static label, Esc-handler deferral, `content-visibility` debate, `icon=` XSS flag). Consolidated and implemented by @NyxTheLobster.
-
-### Added
-
-- `compileBurgerNav` helper in `src/compiler.ts` (~130 lines).
-- Parser: `burger` added to `LAYOUT_BOOLEANS` so it parses as a bare attribute.
-- 15 new tests in `src/tests/v0240-burger-nav.test.ts`. **113/113 green.**
-
-### Not in scope (future)
-
-- Escape-to-close handler (requires JS).
-- `content-visibility: hidden` on closed nav (deferred pending real AT-stack regression reports).
-- Body-scroll-lock on iOS (#98).
-- Animated hamburger-to-X glyph transitions (possible today via user-provided CSS on `details[open] summary`).
-
----
-
-## v0.23.5 — "Figma import" (2026-04-17)
-
-**FEATURE: [#88](https://github.com/fabudde/nyxcode/issues/88)** — Figma / W3C DTCG token importer.
-
-### New command
-
-```bash
-nyx theme import tokens.json                    # print @theme block to stdout
-nyx theme import tokens.json -o theme.nyx       # write to file
-nyx theme import tokens.json --name brand       # theme as "brand" { ... }
-```
-
-Reads a JSON token file exported from Tokens Studio for Figma (or any W3C DTCG-compliant tool) and emits a NyxCode `@theme { ... }` block.
-
-### Supported
-
-| Figma / DTCG `$type` | NyxCode section | Example |
-|---|---|---|
-| `color` | `colors` | `primary: #8b5cf6` |
-| `dimension` / `spacing` | `spacing` | `md: 16px` |
-| `borderRadius` / `radius` | `radius` | `md: 8px` |
-| `fontFamily` / `typography` | `fonts` | `body: Inter, system-ui, sans-serif` |
-| `shadow` / `boxShadow` | `shadows` | `md: 0 4px 8px rgba(0,0,0,0.1)` |
-
-### Format compatibility
-
-- **W3C DTCG** (`$value`, `$type`) — primary, default
-- **Tokens Studio legacy** (`value`, `type`) — also supported transparently
-- **Nested groups** — dash-joined (`color.brand.primary` → `brand-primary`)
-- **Global wrapper** — auto-unwrapped when a single top-level key exists
-- **fontFamily arrays** — comma-joined stacks with automatic quoting for multi-word families
-- **Composite shadows** — `{offsetX, offsetY, blur, spread, color}` object form collapses to CSS string (spread=0 omitted per CSS convention)
-
-### Roundtrip example
-
-Given `figma-tokens.json` with 17 tokens across 5 sections:
-
-```
-$ nyx theme import figma-tokens.json -o theme.nyx
-✅ Imported 17 tokens (5 colors, 5 spacing, 3 radius, 2 fonts, 2 shadows) → theme.nyx
-```
-
+### `action` — Reusable Server Functions
+Define once, call from any `api` block.
 ```nyx
-# theme.nyx (generated)
-theme {
-  colors {
-    brand-primary: #8b5cf6
-    brand-secondary: #ec4899
-    text-body: #4a4a4a
-    ...
-  }
-  spacing { xs: 4px, sm: 8px, md: 16px, ... }
-  radius { sm: 4px, md: 8px, lg: 16px }
-  fonts {
-    body: Inter, system-ui, sans-serif
-    heading: "Playfair Display"
-  }
-  shadows {
-    sm: 0 1px 3px rgba(0,0,0,0.1)
-    lg: 0 10px 20px rgba(0,0,0,0.15)
-  }
+action sendWelcome(email) {
+  email to=email subject="Welcome!" body="Thanks for joining."
+  on error { respond 500 { error "Email failed" } }
 }
 ```
+- Compiles to async functions with try/catch
+- Composable: actions can call other actions
 
-Use the imported theme directly:
-
+### `on` — Table Lifecycle Events
+React to data changes automatically.
 ```nyx
-use "./theme.nyx"
-page / {
-  p "hi" style="color:color.brand-primary;padding:spacing.md"
+on users.created {
+  email to=row.email subject="Welcome!" body="You're in!"
+}
+on posts.deleted {
+  query "DELETE FROM comments WHERE post_id = $row.id"
 }
 ```
+Events: `created`, `updated`, `deleted`. Hooks auto-injected into CRUD routes.
 
-### Added
-
-- `src/figma-import.ts` — standalone importer module (programmatic API too).
-- `nyx theme import` CLI subcommand with `--name`, `-o`, `--figma`, `--dtcg` flags.
-- 20 new tests in `src/tests/v0235-figma-import.test.ts`. **98/98 green.**
-
-### Not in scope (v0.24+)
-
-- Reverse direction (`nyx theme export --figma > tokens.json`)
-- Token references (DTCG `{color.primary}` alias resolution)
-- Dark mode / Figma Modes → `theme dark { }`
-- Composite typography tokens (currently extracts `fontFamily` only)
-- Figma plugin (requires auth + hosting, out of scope for a CLI)
-
----
-
-## v0.23.4 — "Digit routes" (2026-04-17)
-
-**BUG FIX: [#94](https://github.com/fabudde/nyxcode/issues/94)** — Routes starting with a digit failed to lex.
-
-### The bug
-
+### `env` — Environment Variables
+Fail fast at startup, not at runtime.
 ```nyx
-page /650-hex-values/ { p "hi" }
+env {
+  DATABASE_URL required
+  STRIPE_KEY required
+  DEBUG default="false"
+}
 ```
 
-Produced:
-```
-[NyxCode Parser Error] Expected LeftBrace, got '650' (Number)
-```
-
-The lexer split on the first char after `/`:
-```
-Page / Number(650) Identifier(-) Identifier(hex-values) Slash ...
-```
-
-### Root cause
-
-`lexer.ts canStartPath()` required the char after `/` to be alpha, `:`, or `*`. Digits weren't allowed, so digit-starting route segments fell through to the generic digit handler and were tokenized as numbers.
-
-### Fix
-
-Track the previous emitted token in the lexer. When `/` follows a path-introducing keyword (`page`, `api`, `layout`), accept any valid path character — including digits. Preserves conservative default in all other contexts so arithmetic/division (`calc(100% / 2)`) is unaffected.
-
-### Added
-
-- 8 new tests in `src/tests/v0234-digit-routes.test.ts`. **78/78 green.**
-
-### Discovery
-
-Found while dog-fooding v0.23 to build [heynyx.dev/blog](https://heynyx.dev/blog/) — the initial route I tried was `/650-hex-values/`. Had to rename to `/tacit-design/` to ship the blog. Bug was always there; v0.22/0.23 didn't surface it because no route happened to start with a digit. Same pattern as #86: the first person who throws the tool at a new-shaped input is the first person who finds the bug.
-
----
-
-## v0.23.3 — "Did you mean?" (2026-04-17)
-
-**Developer experience upgrade.** Error messages now help you fix what's wrong instead of pointing at what's broken.
-
-### What changed
-
-**1. Compiler `Undefined theme token` errors now include "Did you mean?" hints**
-
-Levenshtein-ranked suggestions, top 3, filtered by edit-distance relative to token length. Two-tier search: first within the section you referenced (e.g. typo in `color.*`), then globally if no close match in-section.
-
-Before:
-```
-[NyxCode Compiler Error] Undefined theme token: color.primry (available: color.primary, color.accent, color.bg, ...)
-```
-
-After:
-```
-[NyxCode Compiler Error] Undefined theme token: color.primry. Did you mean `color.primary`?
-```
-
-**2. Parser errors now show a source-frame with caret**
-
-CLI decorates parse errors with the offending line and a caret at the column. The file path shows `:line:col` for editor jump-to-error.
-
-Before:
-```
-[file.nyx] parse error: [NyxCode Parser Error] Unclosed block: opened at line 2:10 (colors) — expected } before EOF
-```
-
-After:
-```
-[file.nyx:2:10] parse error: [NyxCode Parser Error] Unclosed block: opened at line 2:10 (colors) — expected } before EOF
-  2 |   colors {
-    |          ^
-```
-
-### Why it matters
-
-Kiro's v0.22 migration of mindsmatter.now (2255 LOC, 650 token references) was the first time a real-world codebase stress-tested theme-token errors. A typo in a deep file with no caret is minutes of scrolling; a typo with "Did you mean?" is a 2-second fix. This shipped in preparation for the next migration.
-
-### Added
-
-- `src/suggest.ts` — Levenshtein distance + `nearestMatches()` + `didYouMean()` + `formatSourceFrame()` helpers.
-- 16 new tests in `src/tests/v0233-errors.test.ts`. **70/70 green.**
-
-### Changed
-
-- `compiler.ts resolveDotToken()` — suggestion list now Levenshtein-ranked, max 3, filtered by distance.
-- `cli.ts` — parse-error emission wraps via `decorateError()` with source-frame.
-
-### Backwards-compat
-
-Non-breaking. Error message text content is more helpful; programmatic callers that parsed the old `(available: ...)` tail should instead match on `Undefined theme token:` prefix (documented convention).
-
----
-
-## v0.23.2 — "Font-Stack Fix" (2026-04-17)
-
-**BUG FIX (HIGH): [#91](https://github.com/fabudde/nyxcode/issues/91)** — Comma-separated font stacks.
-
-### The bug
-
+### `email` — First-Class Email
+No imports, no transport config.
 ```nyx
-theme { fonts { body: "Inter", system-ui, sans-serif } }
+email to=user.email subject="Order confirmed" body="Your order is ready."
 ```
+Usable inside `action` and `api` blocks. Powered by nodemailer.
 
-Previously emitted:
-```css
---fonts-body: "Inter";
---fonts-system-ui: "";      /* phantom */
---fonts-sans-serif: "";     /* phantom */
-```
-
-And worse, multi-line:
+### `use` — Three-Tier Package System
 ```nyx
-fonts {
-  body: "Inter", system-ui, sans-serif
-  heading: Georgia, serif
-}
+use stripe           # Tier 1: built-in adapter (auto-init from env)
+use nodemailer       # Tier 1: SMTP transport + sendEmail() helper
+use npm:"slugify"    # Tier 2: raw npm require (compiler warning)
+# use npm:"child_process"  → BLOCKED (security)
 ```
+Tier 1 (9 packages): stripe, nodemailer, redis, bcrypt, jsonwebtoken, better-sqlite3, sharp, resend, uuid.
 
-Previously:
-```css
---fonts-sans-serif: "heading : Georgia";   /* next-line bleed! */
-```
+CLI: `nyx add stripe` — adds `use` statement + runs `npm install`.
 
-### Root cause
-
-The fonts parser in both the string-branch and the identifier-branch treated comma as "end of entry". For font stacks (the standard CSS way to write font fallbacks: `body: "Inter", system-ui, sans-serif`), that's wrong — comma continues the stack.
-
-This was in the same family as [#86](https://github.com/fabudde/nyxcode/issues/86) (whitespace split) but on a different terminator (comma), so the v0.22.1 fix didn't cover it.
-
-### Fix
-
-- **String-value fonts**: after the string + comma, look ahead. If the next tokens are `<font-key>:` (known key + colon), the comma separates two entries; otherwise, continue collecting the stack.
-- **Identifier-value fonts**: collect stack entries delimited by commas, stop on newline-followed-by-known-font-key+colon, or on `source` keyword.
-- **Output semantic**: single-entry stacks keep old behavior (single value). Multi-entry stacks join with `, ` — valid CSS font-family syntax.
-
-### Tests
-
-- 7 new regression tests in `v0231-font-stacks.test.ts` (single-line stacks, multi-line stacks, stack + source: google, extends with stacks, next-key-bleed prevention)
-- **54/54 total green**
-
-### Migration impact
-
-Production themes with font stacks (basically every real-world theme) will now emit correctly. No syntax changes required — existing `.nyx` files will just start working.
-
-Thanks @Kiro-Rudel 🐺 for the HIGH-priority catch during v0.23.0 QA. That's **four production catches in under 24 hours** (#86, #87, #90, #91).
-
----
-
-## v0.23.1 — "Allowlist" (2026-04-17)
-
-Security hardening in the CLI's import-path resolver (`use` + `theme extends`).
-
-### Change
-
-Switched from **denylist** (`^(https?|ftp|file|//)`) to **allowlist** for URI schemes. The previous regex blocked known bad schemes but missed `javascript:`, `data:`, `ws://`, `wss://`, `ssh://`, `git://`, `s3://`, `gs://`, compound `git+ssh://`, and any future scheme we haven't anticipated.
-
-New rule: a `use "..."` or `theme extends "..."` path is rejected if it matches `/^[a-zA-Z][a-zA-Z0-9+.-]+:/` (scheme-like) or starts with `//` (protocol-relative). Windows `C:\` drive letters are still accepted (the regex requires 2+ alpha chars before `:`).
-
-### Accepted:
-- `./foo.nyx`, `../foo.nyx` (relative)
-- `@/foo.nyx` (project-root alias)
-- `/abs/foo.nyx` (absolute, but still checked against projectRoot)
-- `foo.nyx`, `foo/bar.nyx` (bare filename / subdir, relative to importing file's dir)
-- `C:\foo.nyx` (Windows drive letters not confused with URI schemes)
-
-### Rejected:
-- `http://`, `https://`, `ftp://`, `file://`
-- `javascript:`, `data:`, `ws://`, `wss://`, `ssh://`, `git://`, `s3://`, `gs://`
-- `git+ssh://`
-- `//host/` (protocol-relative)
-- Any future URI scheme
-
-### Tests
-
-- 9 new CLI security tests in `cli-security.test.ts`
-- **47/47 total green**
-
-Thanks @TytoTheOwl 🦉 for the defense-in-depth review.
-
----
-
-## v0.23.0 — "Composable" (2026-04-17)
-
-Theme inheritance. Compose sites from a shared geometry base + site-specific identity.
-
-### `theme as "name" { ... }` — register a named base theme
-
+### `respond` — Status Codes
 ```nyx
-# base.nyx
-theme as "editorial-reader" {
-  spacing  { xs: 0.25rem, sm: 0.5rem, md: 1rem, lg: 1.5rem, xl: 2rem, 2xl: 3rem, 3xl: 4rem }
-  radius   { sm: 4px, md: 8px, lg: 12px, 2xl: 20px }
-  fonts    { body: "Inter", heading: "Playfair Display" }
-}
+respond 201 { message "Created" }
+respond 404 { error "Not found" }
 ```
 
-A named theme is a **definition only**: it does NOT emit CSS on its own. It exists to be inherited by other themes.
+### Backend Auto-Detection
+No flags needed. If your `.nyx` has `table`/`api`/`action`/`security`/`use`/`on`/`env`/`every` → `server.js` generated. Otherwise → HTML only.
 
-### `theme extends "./path.nyx" { ... }` — inherit + override
+---
 
+## 🔧 Compiler Improvements
+
+### Forms Inside `each` Loops
+Forms nested inside `each` templates now compile to inline `onclick` fetch buttons.
 ```nyx
-# site.nyx
-theme extends "./base.nyx" {
-  colors  { primary: #8b5cf6, text: #2c3e50 }
-  spacing { 4xl: 6rem }   # adds; base's xs..3xl remain
+each alerts -> alert {
+  form "/api/alerts/delete" auth {
+    input id hidden value=.id
+    submit "✕" preset=btn-delete
+    success -> reload
+  }
 }
 ```
+Previously: silently dropped. Now: compiles to confirm → fetch → reload.
 
-Semantics (locked via review with @TytoTheOwl 🦉 + @Kiro-Rudel 🐺):
-
-- **TOKEN-MERGE ONLY.** Base file's `@style` blocks are NOT auto-imported. This avoids the Sass `@extend` footgun where inheritance explodes generated CSS. Want shared styles? Use `use "./base.nyx"` explicitly.
-- **Overrides replace matching keys only.** Base tokens not mentioned in the extending theme pass through unchanged.
-- **New sections and keys can be added.** The extending theme can introduce `radius`, more spacing keys, whatever.
-- **Relative paths only.** `theme extends "brand-base"` ❌. `theme extends "https://..."` ❌. `theme extends "@org/theme"` ❌. Only `./` and `../` — same rules as `use`. (Supply-chain safety.)
-- **Extending themes across files work automatically.** The CLI follows `extends` like it follows `use`, so you don't need both.
-
-### Numeric-prefix theme keys (`2xl`, `3xl`, `4xl`, `5xl`…)
-
-Fixed limitation from v0.22: you can now write:
-
+### Multi-Query API Blocks
+POST/PUT/DELETE API blocks with multiple `query` statements execute ALL queries sequentially.
 ```nyx
-theme {
-  spacing { 2xl: 3rem, 3xl: 4rem }
-  radius  { 2xl: 20px }
-  breakpoints { 2xl: 1536px }
+api POST /api/monitors/delete auth {
+  query "DELETE FROM checks WHERE monitor_id = $id"
+  query "DELETE FROM alerts WHERE monitor_id = $id"
+  query "DELETE FROM monitors WHERE id = $id AND user_id = $req.user.id"
 }
 ```
+Previously: only first query executed. Now: all run, last result returned.
 
-And references work: `style { p spacing.2xl }` → `padding: var(--spacing-2xl)`.
+### Template Literal Value Resolution
+Hidden input values with `.field` refs inside each loops now resolve at `.map()` time, not onclick time.
 
-### Migration strategy (Kiro's insight)
-
-Count your repeated token references. A real base theme is often smaller than you think:
-
-- **Structural base** (universal): `spacing`, `radius`, `font-family`, `transition`. Typically ~15 tokens.
-- **Site identity** (per-site): `colors.primary`, `colors.text-*`, brand-accent. These stay in the extending theme.
-
-So a multi-site setup (main + archive + blog) can share one geometry base of ~15 tokens, and each site defines its 3–8 identity colors.
-
-### Tests
-
-- 11 new tests in `v023-compose.test.ts`
-- 27 existing tests still green
-- **38/38 total**
-
-### Known limitations (deferred to v0.24+)
-
-- Multi-parent composition: `theme compose [a, b] { ... }` (one parent is enough for v0.23)
-- Cherry-pick sections: `theme pick from "base" { spacing }` (YAGNI until users ask)
-- Better error messages: file-path + caret + "did you mean" — planned for v0.23.1
-- Figma token import: planned for v0.24
-
-### Thanks
-
-- @TytoTheOwl 🦉 — token-merge-only semantics + relative-path-only security (caught the Sass footgun + supply-chain risk)
-- @Kiro-Rudel 🐺 — base-theme sizing insight + `extends`-over-`compose` rationale + migration data from mindsmatter.now
+### Keyword Token Context Awareness
+`email` only triggers email statement parsing when followed by `to=`. Otherwise treated as normal element/content. Keywords like `action`, `env`, `email`, `use` work as element content and attributes.
 
 ---
 
-## v0.22.2 — "Multi-Page Crisis" (2026-04-17)
+## 📊 v0.27 Features (Included in v0.30)
 
-**CRITICAL hotfix.** Every multi-page site built with v0.22.0 / v0.22.1 and NO layout was silently broken: theme variables (`:root { --colors-primary: #ff0000; }`) were not emitted, so every `var(--colors-*)` reference fell through to browser defaults.
-
-### The bug (Issue #90, found by @Kiro-Rudel 🐺 during mindsmatter.now deploy)
-
-Theme head injections (`<style>:root{...}</style>`) were stored in `headInjections` during `compileTheme()`, saved to `themeHeadInjections`, and then prepended to `layoutHeadInjections` — but ONLY when a layout existed. In layout-less builds, the per-page head reset to `[...layoutHeadInjections (empty), ...globalHeadInjections]`, dropping theme injections entirely. Single-page builds worked by accident (theme injections were still in `this.headInjections` from `compileTheme` and never reset before emit). Multi-page builds reset per page → theme gone.
-
-### The fix
-
-When no layout exists, seed `layoutHeadInjections` with `themeHeadInjections` so every page inherits them. Three-line change in the `else` branch.
-
-### Tests
-
-- New `multi-page-theme.test.ts` (3 tests):
-  - Two pages without layout both emit `:root` with all theme vars
-  - Three pages + multi-section theme → all vars on all pages
-  - Dark mode vars reach every page too (`@media prefers-color-scheme:dark`, `[data-theme="dark"]`)
-- Total: **27/27 tests green**
-
-### Impact
-
-If you are running v0.22.0 or v0.22.1 on a multi-page site without a layout, **upgrade now**. Your theme is being ignored by the browser.
-
-Thanks again @Kiro-Rudel 🐺. Second critical catch in one morning. 🦞
-
----
-
-## v0.22.1 — "QA Caught Us" (2026-04-17)
-
-Two bugs @Kiro-Rudel 🐺 found within minutes of v0.22.0 landing. Shipped a fix same day.
-
-### Fixes
-
-- **#86 (critical) — `borders {}` composite shorthand values are no longer split into zombie variables.** `divider: 1px solid color.border-subtle` was tokenizing per whitespace, producing broken vars (`--borders-divider: 1px`, `--borders-solid: color.`, `--borders-border-subtle: `). The theme-block value parser now uses a line-based heuristic: tokens on the same line join as a multi-word value, a new identifier on a different line starts a new entry. Dot-notation refs inside theme values (like `color.border-subtle`) now resolve to `var(--colors-border-subtle)` during emit. The `borders {}` category is usable now.
-
-- **#87 (cosmetic) — Dot-notation refs no longer emit trailing ` ;;`.** The explicit `;` between style properties (CSS habit) was leaking into the value string, producing `color: var(--colors-primary) ;;` (space + double semicolon). Style-block value parser now treats `;` as a hard property separator. Output is clean: `color: var(--colors-primary);`.
-
-### Tests
-
-- New `theme-regression.test.ts` covers #86 and #87 end-to-end (source → Lexer → Parser → Compiler → assert CSS output). Total: 24 tests across 6 suites.
-- Lesson relearned: unit tests on resolver functions are not enough. Every parser-related bug needs an end-to-end test on a real `.nyx` source. @Kiro-Rudel caught both bugs empirically by trying to migrate mindsmatter.nyx to tokens — exactly the kind of real-world use that unit tests can't simulate.
-
-Thanks @Kiro-Rudel 🐺 for the rigorous QA. This is why we review. 🦞
-
----
-
-## v0.22.0 — "Themed" (2026-04-17)
-
-Design-token system. Write tokens once, reference them anywhere, override for dark mode. No runtime cost — everything compiles to CSS variables + a `prefers-color-scheme` block.
-
-Co-designed by [@TytoTheOwl](https://github.com/TytoTheOwl) 🦉 (security) and [@Kiro-Rudel](https://github.com/Kiro-Rudel) 🐺 (empirical scope). Discussion: [#85](https://github.com/fabudde/nyxcode/issues/85).
-
-### Added
-
-- **Design tokens** — new nested blocks under `@theme`: `colors`, `spacing`, `radius`, `shadows`, `fonts`, `layouts`, `borders`, `breakpoints`. Each entry becomes a CSS custom property (`--colors-primary`, `--spacing-md`, etc.).
-
-- **Dot-notation token references** — reference tokens by singular section name:
-  ```nyx
-  style {
-    color: color.primary            # → var(--colors-primary)
-    padding: spacing.md spacing.lg  # → var(--spacing-md) var(--spacing-lg)
-    border-radius: radius.lg        # → var(--radius-lg)
-    box-shadow: shadow.glow         # → var(--shadows-glow)
-  }
-  ```
-  Works in style blocks, CSS rules, keyframes, responsive blocks — everywhere values are accepted.
-
-- **Hard errors on undefined tokens** — `color.primry` (typo) now throws `Undefined theme token: color.primry` at compile time with the list of defined tokens. No more silent drift.
-
-- **Dark mode** — second `@theme` block with the `dark` modifier:
-  ```nyx
-  theme {
-    colors { primary: #0066ff; bg: #ffffff; text: #1a1a1a }
-  }
-  theme dark {
-    colors { primary: #4da6ff; bg: #0a0a0a; text: #f0f0f0 }
-  }
-  ```
-  Compiles to `@media (prefers-color-scheme: dark) { :root { ... } }` **and** `[data-theme="dark"] { ... }` — both OS-level auto and JS-toggled opt-in work out of the box. Only redefined tokens override.
-
-- **Google Fonts auto-injection** — annotate fonts with `source: google`:
-  ```nyx
-  fonts {
-    heading: Inter, source: google
-    body: "Open Sans", source: google
-  }
-  ```
-  Compiler injects 3 `<link>` tags: preconnect + preconnect (crossorigin) + stylesheet (with `crossorigin="anonymous"`). Family names auto-URL-encoded.
-
-- **Local font sources** — `source: local path "./fonts/MyFont.woff2"` for self-hosted fonts. File existence is verified at compile time (loud failure if missing).
-
-- **Named breakpoints** — `@mobile`, `@tablet`, `@desktop` now auto-bind to user-defined `breakpoints {}`:
-  ```nyx
-  theme {
-    breakpoints { sm: 600px; lg: 1024px }
-  }
-  style {
-    padding: spacing.lg
-    @mobile { padding: spacing.md }  # max-width: 600px
-  }
-  ```
-  Without `breakpoints {}`, defaults to 768px / 1024px / 1280px (backward-compatible).
-
-- **Colon & semicolon delimiters** — theme blocks now accept both `primary #ff0000` and `primary: #ff0000`, with optional `;` between entries:
-  ```nyx
-  colors { primary: #ff0000; bg: #ffffff; text: #000000 }
-  ```
-
-### Changed
-
-- `resolveThemeValue()` now resolves dot-notation refs for ALL properties, not just colors. The v0.9 bare-name shortcut (`c primary`) still works for color properties — backward-compatible.
-
-### Security
-
-- **External URL font sources are deprecated.** `source: url "..."` throws at compile time: supply chain + CSP risk. Planned reintroduction behind a `--allow-third-party-fonts` flag with domain allowlist in a future release. Thanks @TytoTheOwl 🦉.
-
-### Known Limitations
-
-- Numeric-prefix token keys like `spacing.2xl` lex as `Number + Identifier` and aren't yet supported. Workaround: use alphabetic names (`xl`, `xxl`) or hyphens (`spacing.2x-l` — ugly, avoid). Full support planned for v0.23.
-
-### Fixes
-
-- **parser**: `section.key` dot-notation is now preserved as a single value token in style blocks. Previously, `color: color.primary` split into `color: .` + stray `color.primary` property, producing broken CSS. (caught by end-to-end dog-fooding.)
-- **parser**: optional colon (`:`) and semicolon (`;`) in theme blocks now accepted.
-- **compiler**: layout head-injections now preserve ALL theme CSS (dark mode block, Google Fonts links) across `compileMultiFile()` boundaries.
-
-### Tests
-
-20 tests across 5 suites covering every feature. Dog-fooded against a real `.nyx` file before shipping — because unit tests that pass mean nothing if parser splits tokens differently in real files. (Lesson relearned from v0.21.2.)
-
----
-
-## v0.21.3 — "Write Where I Told You" (2026-04-16)
-
-Short, late-night fix. Found this while testing `preset` behavior — noticed
-that `nyx build hello.nyx -o /tmp/out/page.html` silently dropped the flag
-and wrote to `./dist-site/index.html` instead. Two latent bugs, one patch.
-
-### Fixes
-
-- **#82 — `nyx build` now honors `-o` / `--output`, and defaults output
-  next to the input file.** Two separate problems:
-
-  1. **Flag was never implemented.** `-o path/to/file.html`,
-     `--output path/`, and `--output=path/` are all parsed now. A
-     `.html` path produces single-file output; anything else is treated
-     as a directory. Passing `-o file.html` against a multi-page
-     project now errors out instead of silently discarding pages.
-
-  2. **Default output was CWD-relative.** The old code did
-     `resolve('dist-site')`, so running `nyx build /a/b/site.nyx` from
-     `/tmp` dumped the build in `/tmp/dist-site/`. The new default is
-     `<input-file-dir>/dist-site/` — sibling of the input file, like
-     every other build tool.
-
-  The fix is mirrored in `nyx watch`, which had the same hard-coded
-  default.
-
-### Docs
-
-- `nyx --help` now lists the `-o <path>` option and gives two
-  copy-paste examples (single-file and directory forms).
-
----
-
-## v0.21.2 — "Version, Plural" (2026-04-16)
-
-Dogfooding-triggered patch: Kiro 🐺 was writing a site-wide footer in
-NyxCode when the version string refused to render properly. Turns out
-`${__version__}` was broken in two different ways on two different code
-paths — one that had been wrong since we added interpolation in
-`v0.20.0`, one that had been wrong even earlier.
-
-### Fixes
-
-- **#81 — `${__version__}` now resolves correctly everywhere.** Two
-  separate bugs in one issue:
-
-  1. **Page scope:** `${__version__}` rendered as the literal string
-     `${0.21.1}` — the `${...}` wrapper was left in the output because
-     `escapeContent()` did a naked `replace(/__version__/g, …)` that
-     substituted the inner identifier without consuming the
-     interpolation delimiters.
-
-  2. **Component scope:** `${__version__}` rendered as the empty
-     string because the component-level `interpolate()` helper only
-     looked up names in `props` and had no knowledge of compiler
-     built-ins like `__version__`.
-
-  Both paths now share a single source of truth. A new private helper
-  `resolveBuiltins()` handles `${__name__}` patterns in escaped text
-  content, and the component `interpolate()` falls back to the same
-  built-in resolver when an identifier isn't in `props`. Unknown
-  built-ins are left as literal text (no crash, no empty string) so
-  future additions don't silently eat user content.
-
-  ```nyx
-  component Footer {
-    p "Built with NyxCode v${__version__}"
-  }
-  page / {
-    p "Running v${__version__}"
-    use Footer
-  }
-  ```
-
-  Both now render `0.21.2` cleanly. Built-ins only resolve inside
-  explicit `${...}` interpolation now — bare `__version__` in text is
-  no longer silently substituted. If you were relying on the bare
-  form, wrap it: `"v${__version__}"`.
-
-### Meta
-
-This is the second bugs-from-production release in a row ("Hosting
-Finds Bugs" found README bugs, this one found footer bugs) and the
-pattern is becoming the point: **ship it, use it, fix what breaks.**
-Kiro deployed mindsmatter.now on v0.21.1 this morning, wrote a footer,
-and the footer revealed #81 inside of ninety minutes. The project's
-growing into its own dogfooding culture in real time.
-
----
-
-## v0.21.1 — "Hosting Finds Bugs" (2026-04-16)
-
-First bugs-from-production release. While hosting the v0.21.0 benchmark
-apps at https://nyxcodeblog.heynyx.dev two real parser/compiler bugs
-surfaced that had been in the README hero example for months but nobody
-had actually compiled and run it as a real deployment.
-
-### Fixes
-
-- **#79 — Inline comma-separated table columns** now parse correctly.
-  ```nyx
-  table posts { title text required, body text, created auto }
-  ```
-  Previously commas were consumed as column names, producing garbage
-  AST and a broken `server.js` with `const { title, ,, text, , }`
-  syntax errors. Multi-line form was unaffected.
-
-- **#80 — `security { table users }` now auto-creates the users table**
-  when it isn't explicitly declared. Previously the compiler generated
-  `INSERT INTO users` and `SELECT ... FROM users` queries without a
-  matching `CREATE TABLE`, so register/login failed at runtime with
-  "no such table: users". The synthetic table uses the `login` rule to
-  pick columns (identity field + password, required + unique identity).
-  Declare a `table users { ... }` explicitly to override the defaults.
-
-- **#78 — False "unused component" warnings for imported components**
-  fixed. The validator now trusts `definedComponents`/`extComps` ahead
-  of the PascalCase heuristic, so `component compA` in one file and
-  `use compA` in another no longer trigger "defined but never used"
-  and "Unknown tag" warnings.
-
-- **#77 — Status message stderr discipline** — closed as not
-  reproducible in v0.21.0. The `flatten` command correctly emits the
-  status line via `console.error`.
-
-### Meta
-
-Two of these (#79, #80) went undiscovered for months because nobody
-had tried to host the README example as a real deployment. Unit tests
-missed them because they exercised the generated code, not the
-shipping hero path. This is now the project's reminder that
-**dogfooding finds bugs that specs can't**.
-
-## v0.21.0 — "Modules" (2026-04-16)
-
-### Features
-
-#### Multi-file projects via extended `use` (#76)
-
-NyxCode is now a real module system. One-file remains the default; multi-file is opt-in.
-
+### Page-Level Authentication
 ```nyx
-# Entry file (app.nyx)
-use "./theme/base.nyx"          # single file, relative
-use "./components/"             # directory — all .nyx files, alphabetical
-use "@/pages/"                  # @/ = project root (directory of entry file)
-
-meta {
-  title "My App"
-}
+page /dashboard auth { ... }
 ```
+Auto-redirects to `/login` if no JWT token.
 
-- **Single file import**: `use "./path/to/file.nyx"`
-- **Directory import**: `use "./components/"` — loads all `.nyx` files alphabetically
-- **Project-root alias**: `use "@/shared/nav.nyx"` — `@/` resolves to the directory containing the entry file
-- **Recursive imports**: imported files can themselves `use` other files; circular dependencies are skipped silently (ES-module style)
-- **All top-level nodes merge**: pages, components, themes, layouts, stores, APIs, tables, meta — everything from imported files ends up in the final AST
-- **Component instantiation is unchanged**: `use nav(current="home")` inside page bodies still works identically
-
-#### `nyx flatten` command
-
-For AI context windows, audits, or shipping a single-file artifact:
-
-```bash
-nyx flatten app.nyx > out.nyx
-```
-
-- Concatenates entry + all transitive imports into one `.nyx` source
-- Operates at **source level**, not AST level — **comments and formatting are preserved byte-for-byte**
-- Only `use "./..."` import lines are stripped; everything else passes through unchanged
-- Source-attribution headers mark which block came from which file:
-  ```nyx
-  # --- from: components/nav.nyx ---
-  component nav(current) { ... }
-
-  # --- from: pages/home.nyx ---
-  page / { ... }
-  ```
-- Dependencies are emitted before dependents (post-order), so imported components exist before pages that instantiate them
-- Flattened output is itself a valid `.nyx` file — `nyx build flat.nyx` produces identical output to the multi-file build
-
-### Security
-
-Imports are **local-only** by design:
-- Remote URLs (`http://`, `https://`, `ftp://`, `//`) are **rejected** with an explicit error
-- Paths that resolve outside the project root (via `..` or absolute paths) are **rejected**
-- No package manager, no CDN, no supply-chain surface
-
-This constraint is in the spec from day 1 (credit to Tyto 🦉 for pushing on it).
-
-### Error Handling
-
-- **Duplicate page routes** across files: build error naming both files
-- **Duplicate component names** across files: build error naming both files
-- **Duplicate layout** across files: build error
-- **Theme split across files**: build error (consolidate into one file)
-- **Missing import file**: build error with both the importing file and the requested path
-- **Path escapes project root**: build error
-- **Remote URL imports**: build error
-- **Circular imports**: silent skip on second visit (no infinite loop)
-
-### Watch Mode
-
-`nyx watch entry.nyx` now tracks **all** imported files recursively. Change any file anywhere in the dependency tree and the site rebuilds. Imports discovered during a rebuild are added to the watch set automatically.
-
-### Architecture Notes
-
-- Import resolution happens at the CLI level, **before** the compiler runs. The compiler itself sees a single merged AST and doesn't know multi-file exists.
-- This made the implementation cleaner than a compiler-internal import resolver would have been, and kept `compile()` / `compileMultiFile()` signatures unchanged.
-- `Compiler.setImportResolver()` is now a no-op (kept for API compatibility; scheduled for removal in v0.22).
-
-### Migration
-
-Zero breaking changes. All existing single-file NyxCode projects continue to build identically. Multi-file is opt-in; you only encounter it when you write a `use "./path.nyx"` statement.
-
-### Contributors
-
-- Kiro 🐺 (issue #76, consolidated spec, syntax vote)
-- Tyto 🦉 (security constraint, source-attribution header format, syntax vote)
-- ShellGames-Nyx 🦞 (scope correction, error semantics)
-- Discord-Nyx 🦞 (implementation, `use` extension approach, source-level flatten)
-- Fabian 🐻 (direction, keyword decision delegation)
-
-Closes #76
-
----
-
-## v0.20.0 — "Components, Properly" (2026-04-16)
-
-### Features
-
-#### Native component syntax with positional + named arguments (#75)
-Kiro 🐺 migrated all of mindsmatter.now to a single 2,378-line `.nyx` file and discovered the "8 copies of the same nav" problem. This release fixes it.
-
+### Conditional Visibility
 ```nyx
-# Define with parenthesized parameter list (new, preferred)
-component nav(current) {
-  nav {
-    style { d flex, gap 2rem }
-    a "Home" href="/" class="${current == 'home' ? 'active' : ''}"
-    a "Manifesto" href="/manifesto/" class="${current == 'manifesto' ? 'active' : ''}"
-  }
-}
-
-component citation-card(num, title, claim, source, status) {
-  div {
-    style { p 1.5rem, border "1px solid #ccc", radius 8px }
-    h3 "#${num} — ${title}"
-    p "${claim}"
-    span "${status}"
-    p "— ${source}"
-  }
-}
-
-# Use with positional OR named arguments
-page /citations/ {
-  use nav(current="citations")
-  use citation-card(1, "Hard Problem", "Subjective experience is the crux.", "Chalmers 1995", "Canonical")
-  use citation-card(num=2, title="Multiple Drafts", claim="...", source="Dennett 1991", status="Canonical")
-}
+a "Login" href="/login" visible=guest
+a "Dashboard" href="/dashboard" visible=auth
 ```
 
-- **`component name(params)` syntax** — Parenthesized parameter list, optional defaults with `=`
-- **`use name(...)` instantiation** — Positional args, named args, or mixed
-- **Legacy `component X { props ... }` block form still works** — No breaking changes
-- **Optional type annotations** — `component X { props name: string }` parses correctly now (type is ignored; NyxCode is dynamically typed)
-- **Also supports attribute-form invocation**: `use NavBar current="home"` (no parens)
-- **And the uppercase shortcut**: `NavBar current="home"` (no `use` keyword, existing behavior preserved)
-
-#### Full `${expr}` interpolation in strings and attributes
-Works inside text content AND attribute values. Supports:
-
-- **Simple identifiers**: `${propName}` → replaced with prop value
-- **Ternary expressions**: `${current == "home" ? "active" : ""}` → evaluated at compile time
-- **Comparisons**: `==` and `!=` against string/identifier
-- **Multiple per string**: `"#${num} — ${title}"` works as expected
-
+### URL Parameters
 ```nyx
-component card(theme, label) {
-  div class="card card-${theme}" {
-    h2 "${label}"
-    span "Mode: ${theme == 'dark' ? 'Night' : 'Day'}"
-  }
-}
+data item = get "/api/items/$param.id" auth
 ```
 
-### Bug Fixes
+### Universal `.field` Resolution
+`.field` resolves in ALL template attributes — `src`, `href`, `alt`, `class`, `data-*`, etc.
 
-- **Stripped stray `<string>` / `<number>` elements** — When `props name: string` appeared without proper type parsing, `string` would leak as an empty element in output. Fixed at parser level (type annotations now consumed) AND compiler level (orphan type-name elements skipped as defensive measure).
-- **Removed unconditional `<div class="nyx-c_X">` wrapper** — Components without a `style {}` block now render their body directly with no wrapper div. Only components that actually need scoped CSS get a wrapper. Huge DOM cleanup for structural components like `nav`, `footer`, `Header`.
-- **Positional args resolve to named props correctly** — `use card(1, "Title")` now maps to `{num: "1", title: "Title"}` based on component parameter declaration order.
-
-### Real-World Impact
-
-Kiro's mindsmatter.nyx refactored:
-- Before: 2,378 lines (nav copy-pasted 8x, footer 8x, citation cards 10x)
-- After: ~1,600 lines estimated (component definitions + use statements)
-- **~33% reduction**, zero functional change
-- All 8 pages build clean
-
-### Contributors
-- Kiro 🐺 (#75 — proposal, syntax design, real-world validation)
-- Fabian 🐻 (release direction: "richtig gut umgesetzt")
-- Nyx 🦞 (parser + compiler implementation)
-
----
-
-## v0.19.0 — "Editorial & Media" (2026-04-16)
-
-### Features
-
-#### Native `@media` / `@supports` queries in `style {}` blocks (#72, #73)
-Full support for CSS media queries and feature queries, with combinators and shorthand expansion.
-
+### Background Workers (`every`)
 ```nyx
-style {
-  fs 2rem
-  @mobile { fs 1rem }                                  # built-in breakpoint (still works)
-  @media(min-width: 800px) { fs 2.5rem }               # NEW: custom min-width
-  @media(min-width: 800px) and (max-width: 1199px) { bg #f0f0f0 }  # NEW: combinators
-  @supports(backdrop-filter: blur(10px)) { bdf blur(10px) }         # NEW: @supports
+every 60s 'health-check' {
+  query "SELECT id, url FROM monitors"
+  fetch $row.url
 }
 ```
+5s minimum floor. SIGTERM cleanup. `fetch $row.url` for HTTP health checks.
 
-- Shorthands resolved inside at-rule bodies (→ proper CSS property names)
-- Theme values resolved (→ CSS var references)
-- Multi-property steps via comma: `{ fs 3rem, c red }`
-- Existing `@mobile` / `@tablet` / `@desktop` keywords still work
-- `@container` queries also upgraded to structured parsing (was previously raw)
+### Pagination, Search & Filtering
+```
+GET /api/posts?page=1&limit=20&search=hello&status=active
+```
+All CRUD endpoints support opt-in pagination, text search, and column filtering.
 
-#### Native footnote syntax (#68)
-Editorial-grade footnotes with automatic linking and backlinks.
+---
 
-```nyx
-p "Claim.[^1] Another claim.[^2]"
-footnotes {
-  1 "Chalmers, David (1995). Facing Up to the Problem of Consciousness."
-  2 "Nagel, Thomas (1974). What Is It Like to Be a Bat?"
-}
+## 🎨 Theme & Styling
+
+- Pseudo-selectors in theme defaults: `:focus`, `::placeholder`, `[type=submit]`
+- Bare selectors (specificity 0,0,1) instead of `:where()` (0,0,0)
+- `::selection` in theme block
+- `flex=row between center` — `between` wins over `center` for `justify-content`
+- Trust proxy auto-generated
+- Route ordering: custom `api` routes before auto-generated CRUD
+
+---
+
+## 📦 NyxStatus — The Dogfood Proof
+
+**378 lines of NyxCode. One file. Full SaaS.**
+
+| Feature | Status |
+|---------|--------|
+| JWT Auth (register/login/logout) | ✅ |
+| SQLite DB (4 tables) | ✅ |
+| CRUD API (auto-generated) | ✅ |
+| Custom API endpoints (7) | ✅ |
+| Background health checks (60s) | ✅ |
+| Email alerts on downtime | ✅ |
+| Delete with cascade (3 queries) | ✅ |
+| Responsive burger nav | ✅ |
+| Dark theme | ✅ |
+
+**Token comparison (cl100k_base):**
+| | NyxCode | Next.js | Savings |
+|---|---------|---------|---------|
+| Lines | 378 | 1,069 | 65% fewer |
+| Bytes | 10,934 | 37,906 | 71% smaller |
+| Tokens | ~2,733 | ~9,476 | **3.5x fewer** |
+| Files | 1 | 27 | 27x fewer |
+| AI cost | ~$0.20 | ~$0.71 | **71% cheaper** |
+
+Live: [nyxstatus.com](https://nyxstatus.com) | Comparison: [nextjsstatus.heynyx.dev](https://nextjsstatus.heynyx.dev)
+
+---
+
+## 🏗 Design Decisions (RFC #132)
+
+1. **Golden Rule:** "If it's not shorter than JS, it shouldn't exist in NyxCode."
+2. `use` = 3 tiers: Built-in → npm (warning) → Blocked
+3. Expression language: `sum`, `count`, `avg`, `min`, `max`, `len`, arithmetic. No lambdas — use SQL.
+4. `on error {}` for error handling — NyxCode-native, not try/catch
+5. `pipe` deferred — `security {}` + `middleware {}` cover most cases
+6. Backend auto-detection — no `--full-stack` flag
+
+---
+
+## 📈 Full Commit Log (20 commits)
+
+```
+9ffb4ee feat: multi-query support in API blocks
+c0518a9 fix: form template interpolates field values at map-time
+6f7196b feat: forms inside each-loops compile to inline fetch buttons
+142184a fix: keyword tokens as element content and attributes
+706480c fix: email keyword context-aware parsing
+938a7bc docs: NYXCODE.md updated with all backend primitives
+3d50ded feat: nyx add CLI — zero-friction package management
+ac8eaf4 feat: use — three-tier package system
+a4dc3af feat: on table.event — table lifecycle hooks
+2e75520 feat: Backend compilation for let, action, env
+26c3f39 feat: AST + Parser for let, action, env, email
+766cd4a docs: comprehensive v0.27.3 CHANGELOG draft
+10f1d13 fix: eliminate all post-build patches
+0b15a31 docs: page auth, visible, $param, field refs
+33f00f9 feat: auto-wrap single objects + created_at in checks
+1ac9bb6 feat: universal .field resolution in all template attributes
+73fb4b3 feat: dynamic href in each templates + checks auth fix
+f213114 fix: visible toggle runs on DOMContentLoaded
+3601f34 feat: pseudo-selectors in theme defaults + every keyword parser
+581e6e4 feat: page auth, visible=auth/guest, $param.id
 ```
 
-- `[^N]` in text → `<sup><a href="#fn-N">[N]</a></sup>` (auto-escaped, no explicit markup needed)
-- `footnotes {}` block → `<aside role="doc-endnotes"><ol>...</ol></aside>` with backlinks (↩)
-- Accepts numeric or named IDs (`1`, `note-a`, `intro`)
-- Default CSS injected once per page (thin top border, smaller text, subtle backlinks)
-- Built for editorial/research/documentation sites (mindsmatter.now was the trigger)
-
-#### Inline SVG elements (#62)
-33 SVG tags are now first-class, including gradients, animations, filters, and text.
-
-```nyx
-svg viewBox="0 0 400 400" width="400" {
-  defs {
-    linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%" {
-      stop offset="0%" stop-color="#00e5ff" { }
-      stop offset="100%" stop-color="#c084fc" { }
-    }
-  }
-  circle cx="200" cy="200" r="150" fill="url(#grad1)" { }
-  path d="M100,200 Q200,50 300,200" stroke="#00ff41" stroke-width="3" fill="none" { }
-  g { ellipse cx="150" cy="180" rx="25" ry="30" fill="white" { } }
-  text "NYX" x="200" y="350" text-anchor="middle" fill="#00ff41"
-}
-```
-
-Supported SVG tags:
-- **Shapes**: `svg`, `g`, `path`, `circle`, `ellipse`, `rect`, `line`, `polyline`, `polygon`
-- **Gradients & paint**: `defs`, `linearGradient`, `radialGradient`, `stop`, `pattern`, `mask`, `clipPath`
-- **Filters**: `filter`, `feGaussianBlur`, `feColorMatrix`, `feBlend`, `feOffset`, `feMerge`, `feMergeNode`, `feFlood`, `feComposite`, `feMorphology`, `feTurbulence`, `feDisplacementMap`
-- **Structure**: `use`, `symbol`, `marker`, `foreignObject`, `image`, `title`, `desc`, `switch`
-- **Animation**: `animate`, `animateTransform`, `animateMotion`, `set`, `mpath`
-- **Text**: `text`, `tspan`, `textPath`
-
-Attribute case is preserved (`viewBox`, `stroke-width`, `text-anchor`, `preserveAspectRatio` all work). Inside `<svg>`, the `text` tag correctly stays as SVG text instead of being remapped to HTML `<span>`.
-
-### Contributors
-- Kiro-Rudel 🐺 (#72/#73, #68 — discovered while building mindsmatter.now)
-- Fabian 🐻 (#62)
-- Nyx 🦞 (implementation)
-
 ---
 
-## v0.18.2 — "Phantom No More" (2026-04-16)
-
-### Features
-- **Shorthand aliases `fil` and `bf`** — Both now map to `filter` and `backdrop-filter` respectively, in addition to the canonical `fi` and `bdf`. Docs-compat for older — and AI-generated — NyxCode. (Fabian Issue #74)
-
-### Docs
-- Shorthand table in NYXCODE.md shows both aliases side-by-side (`fi` / `fil`, `bdf` / `bf`).
-
-### Contributors
-- Fabian 🐻 (Issue #74)
-- Nyx 🦞 (fix + docs)
-
----
-
-## v0.18.1 — "Animate This" (2026-04-16)
-
-### Features
-- **`@keyframes` in `style {}` blocks with full shorthand support** — Animations are now first-class inside style blocks. Write `tf translateY(-15px)` instead of `transform: translateY(-15px)`, combine multiple properties per step with commas, use theme color resolution inside keyframes. (Fabian Issue #61)
-  ```nyx
-  style {
-    @keyframes float {
-      0%, 100% { tf translateY(0) }
-      50% { tf translateY(-15px) }
-    }
-    @keyframes pulse {
-      0%, 100% { op 0.5, shadow 0 0 10px rgba(0,255,65,0.3) }
-      50% { op 1, shadow 0 0 30px rgba(0,255,65,0.8) }
-    }
-    .floating { anim "float 4s ease-in-out infinite" }
-  }
-  ```
-- **New shorthands** — `fi` → `filter`, `bdf` → `backdrop-filter`. Needed for glitch/blur effects inside keyframes.
-
-### Bug Fixes
-- **String values in animation/transition/font-family are no longer double-quoted** — `anim "float 4s..."` now emits `animation: float 4s...;` instead of `animation: "float 4s...";`. Quotes are preserved only for `content` and `quotes` properties (where they're required).
-- **Negative numbers in CSS values no longer get a leading space** — `translateY(-15px)` stays `translateY(-15px)`, not `translateY(- 15px)`. Applies to keyframe selectors and inside parentheses.
-- **`0%, 100%` keyframe selectors emit clean CSS** — No more doubled spaces around commas.
-
-### Contributors
-- Fabian 🐻 (Issue #61, test cases)
-- Nyx 🦞 (structured keyframe AST + shorthand expansion)
-
----
-
-## v0.18.0 — "Page & Polish" (2026-04-16)
-
-### Features
-- **Declarative `meta {}` block** — Define page metadata declaratively. Supports `title`, `description`, `keywords`, `author`, `favicon`, `canonical`, `theme-color`, `viewport`, `og:*` (Open Graph), `twitter:*` (Twitter Cards). Top-level `meta {}` applies to ALL pages in multi-page builds. (Alex Yumi request, Issue #67)
-  ```nyx
-  meta {
-    title "My Page"
-    description "SEO description"
-    favicon "/icon.svg"
-    og:image "https://example.com/og.png"
-    twitter:card "summary_large_image"
-  }
-  ```
-- **New HTML elements** — `canvas`, `audio`, `source`, `track`, `iframe` are now first-class elements. No more `head "<canvas>"` workaround. (Fabian Issue #63, Kiro Issue #62 partial)
-- **Unicode & hex escapes in strings** — `\uXXXX` (4-digit) and `\xXX` (2-digit) escapes now decode correctly: `"Read more \u2192"` → `Read more →`. Also added `\r`, `\'`, and backtick escape support. (Kiro Bug #70)
-- **Multi-page build confirmed working** — Multiple `page /path { ... }` blocks in a single `.nyx` file generate `dist-site/path/index.html` per page, with shared components, themes, and meta. (Kiro Feature #69)
-
-### Bug Fixes
-- **Default `<meta>` tags deduped** — When you define `viewport`, `generator`, `title`, `description`, or `canonical` via `meta {}`, the compiler no longer emits duplicate defaults.
-- **Multi-page output paths** — Cleaned up doubled slashes (`about//index.html` → `about/index.html`) in CLI output.
-
-### Contributors
-- Kiro 🐺 (Issues #69, #70 — QA from rebuilding mindsmatter.now)
-- Alex Yumi (Issue #67 — meta block proposal)
-- Fabian 🐻 (Issue #63 — canvas request)
-- Tyto 🦉 (meta block review label)
-- Nyx 🦞 (implementation)
-
----
-
-## v0.9.3 — "Version Keyword" (2026-04-14)
-
-### Features
-- **`__version__` keyword in content** — Write `p "Built with NyxCode v__version__"` and the compiler replaces it with the actual version. Auto-updates on every rebuild. No more stale version strings on your site!
-
-### Contributors
-- Fabian 🐻 (idea)
-- Nyx 🧡 (implementation)
-
----
-
-## v0.9.2 — "Generator Tag" (2026-04-14)
-
-### Features
-- **Auto `<meta name="generator">` tag** — Every compiled page now includes `<meta name="generator" content="NyxCode vX.Y.Z">`. Both single-page and multi-page SSG output. No more manually writing "Built with NyxCode v0.8.0" and forgetting to update it. (Kiro feature request via Fabian!)
-
-### Contributors
-- Kiro 🐺 (feature request)
-- Nyx 🧡 (implementation)
-
----
-
-## v0.9.1 — "Color Everywhere" (2026-04-14)
-
-### Bug Fixes
-- **Implicit colors in complex CSS values (Kiro Bug #4)** — Theme color names inside compound values now resolve correctly:
-  - `border 1px solid accent-border` → `border: 1px solid var(--colors-accent-border)` ✅
-  - `box-shadow 0 4px 25px accent` → `box-shadow: 0 4px 25px var(--colors-accent)` ✅
-  - `linear-gradient(135deg, primary, accent)` → resolves both color names ✅
-  - Longest-name-first sorting prevents `accent` matching inside `accent-border`
-  - Word-boundary regex prevents partial matches
-- `border` and `box-shadow` added to color-accepting properties list
-
-### Contributors
-- Kiro 🐺 (Bug #4 report — found rebuilding rudel.fun with v0.9)
-- Nyx 🧡 (7-minute fix)
-
----
-
-## v0.9.0 — "Ninth Molt — Implicit Colors" (2026-04-14)
-
-### Features
-- **✨ Implicit Theme Colors** — Use theme color names directly in color properties! `c primary` auto-resolves to `color: var(--colors-primary)`. Works in style blocks, presets, and inline styles. ~16 chars saved per usage, ~600 tokens saved per site.
-  - Color-accepting properties: `color`, `background`, `background-color`, `border-color`, `fill`, `stroke`, `outline-color`, etc.
-  - Both short (`primary`) and full (`colors-primary`) names work
-  - Hex/RGB/HSL/var() values are never touched
-- **Component Prop Styles** — `preset=` on prop-bound elements inside components. `p .desc preset=muted` applies a preset class to dynamically-bound content.
-
-### Documentation
-- **NYXCODE.md updated to v0.9.0** — Implicit theme colors documented with examples. Hero example + preset examples updated to use shorter syntax.
-
-### Contributors
-- Nyx 🧠 (compiler: resolveThemeValue, themeColorNames tracking)
-- Kiro 🐺 (v0.9 roadmap pitch — implicit colors was his idea!)
-
----
-
-## v0.8.2 — "Bug Squash" (2026-04-14)
-
-### Bug Fixes
-- **Layout `head` blocks now work in single-page mode** — Previously, `head` injections inside `layout { }` blocks were silently dropped when only one page existed. The `compile()` path stored the layout but never extracted its head/script nodes. Fixed by pre-extracting Head/Script/Preset nodes from layout body before page compilation.
-- **Element defaults use `:where()` for zero specificity** — Button, input, select, textarea, and anchor defaults now use `:where(a)` instead of `a`, so any custom styles (even without `!important`) override them. No more fighting NyxCode's own defaults.
-- **Layout attributes work on component root elements** — `flex=row`, `center`, `grid=N`, `gap=X`, `between`, `wrap` etc. now correctly expand to inline styles inside `compileElementWithProps()`. Previously they were output as raw HTML attributes (`flex="row"`). Found by Kiro 🐺.
-- **Inline shorthand expansion in component elements** — `style="fs: 1rem; c: red"` on elements inside components now correctly expands to `font-size: 1rem; color: red`.
-- **Preset support in component elements** — `preset=card` on elements inside components now applies the preset CSS class.
-
-### Documentation
-- **NYXCODE.md complete rewrite** — 339→519 lines. All features documented with examples. Added: layout attributes on components, element defaults explanation, `:where()` specificity note, `head` in layout docs, script block docs, form success/error actions, inline shorthand note, 13 AI rules.
-
-### Contributors
-- Nyx 🦞 (compiler fixes, NYXCODE.md rewrite)
-- Kiro 🐺 (Bug #3: layout attrs in components)
-
-# Changelog
-
-## [0.6.0] — 2026-04-13 — "Sixth Molt — Full Stack Forms"
-
-### Added
-- **Native Form Blocks** — `form /api/path auth { input title; submit "Go"; success -> reload }` — zero JS required
-- **Theme Variables** — `theme { colors { primary #667eea } }` → CSS Custom Properties (`:root`)
-- **Script Blocks** — `script { ... }` escape hatch with raw JS capture (lexer-level, string-aware brace counting)
-- **Data Auth** — `data posts = get /api/posts auth` → automatic Bearer token from localStorage
-- **Form Success/Error Handlers** — `success -> reload|redirect|toast|clear`, `error -> toast "msg"`
-- **Form Field Auto-ID** — inputs get `id="form-{endpoint}-{field}"` + `name="{field}"` automatically
-
-### Fixed
-- Theme CSS injection in multi-file mode (was reset by layout compilation)
-- `rgba()` comma parsing in theme values (paren-aware depth tracking)
-- Script blocks preserve raw JS (no more `localStorage . getItem` token splitting)
-- Per-page script isolation (scripts no longer bleed across pages in multi-file output)
-
-### Token Efficiency
-```
-# NyxCode v0.6 form
-form /api/posts auth {
-  input title placeholder="Title" required
-  textarea body placeholder="Write..."
-  submit "Publish"
-  success -> reload
-}
-# = 6 lines, 0 JS
-
-# Equivalent vanilla JS
-# = 25+ lines of fetch(), headers, error handling, DOM manipulation
-```
-
-
-# Changelog
-
-## v0.5.0 "Fifth Molt — Full Stack" 🦞 (2026-04-13)
-
-### 🔥 Full-Stack Backend Compiler
-
-NyxCode is now a **full-stack language**. Write 30 lines of .nyx, get a complete app with database, REST API, and authentication.
-
-- **`table` blocks → SQLite + auto-CRUD**
-  ```nyx
-  table users {
-    name text required
-    email email unique
-    password text required
-    role text default="user"
-    created auto
-  }
-  ```
-  → Generates CREATE TABLE + GET/POST/PUT/DELETE endpoints automatically.
-
-- **`security` blocks → JWT Auth**
-  ```nyx
-  security {
-    table users
-    login email password
-    token jwt
-    protect /api/posts
-  }
-  ```
-  → Register, Login, /me endpoints + route protection middleware.
-
-- **`nyx build app.nyx`** now generates:
-  - `index.html` — frontend
-  - `server.js` — Express + better-sqlite3 + JWT server
-
-### 🔐 Security (Tyto's Review)
-
-- **SQL Injection prevention** — PUT handler uses column allowlist, not raw req.body keys
-- **Rate limiting** — express-rate-limit on /api/auth (20 req/15min)
-- **Password hash filtering** — Never exposed in GET responses
-- **JWT Secret warning** — Logs warning when using random fallback
-
-### 🐛 Parser Fixes
-
-- **Table column parsing** — Type keywords (text, email, number etc.) correctly separated from column names
-- **Security block parsing** — Multi-value rules like `login email password` parsed correctly
-- **`icon` removed from ELEMENT_TAGS** — No more phantom elements when used as prop name
-
-### 📊 Token Efficiency
-- 30 lines NyxCode → 178 lines Express+SQLite+JWT server
-- **~50x token efficiency** for backend code
-
-### 🙏 Contributors
-- **Nyx 🦞** — Backend compiler, auth compiler, parser fixes, integration
-- **Tyto 🦉** — Security review (4 findings, all fixed in 7 minutes!)
-- **Biene Backend 🐝** — Initial backend-compiler.ts
-
-
-
-## v0.4.0 "Fourth Molt" 🦞 (2026-04-13)
-
-### 🔥 New Features
-
-- **`nyxcode dev` — Dev Server with Hot Reload**
-  Zero-config dev server with SSE live reload. Edit your .nyx file, browser updates instantly.
-  ```bash
-  npx @fabudde/nyxcode dev app.nyx          # localhost:3000
-  npx @fabudde/nyxcode dev app.nyx --port=8080
-  ```
-
-- **`nyxcode parse` — AST Debug Command**
-  Inspect the parsed AST of any .nyx file. Essential for debugging and compiler development.
-  ```bash
-  npx @fabudde/nyxcode parse app.nyx
-  ```
-
-- **`--watch` Mode**
-  Rebuild on file changes without a dev server.
-  ```bash
-  npx @fabudde/nyxcode watch app.nyx
-  ```
-
-- **Default Props**
-  Components can now define default values for props.
-  ```nyx
-  component Card {
-    props title="Untitled" theme="dark"
-    h2 .title
-  }
-  Card              # uses defaults
-  Card title="Hi"   # overrides title
-  ```
-
-- **Element CSS Defaults**
-  Buttons, inputs, selects, and textareas get sensible base styles automatically. No more unstyled native elements.
-
-- **NYXCODE.md — AI Context File**
-  Drop this file into any AI's context window and it can generate NyxCode immediately. Complete syntax reference with examples.
-
-- **Icons Documentation**
-  Four ways to use icons: Emoji (zero deps), Lucide, Font Awesome, Material Icons — all via `head` CDN injection.
-
-### 🐛 Bug Fixes
-
-- **CSS Comma Properties** — `font-family: Inter, sans-serif` no longer breaks the parser. Properties like `transition`, `animation`, `background`, `box-shadow` etc. now correctly preserve commas in values.
-
-- **Smart Title Detection** — Custom `<title>` via `head` injection now overrides the default "NyxCode App" title instead of duplicating it.
-
-- **`icon` Reserved Word** — `icon` was incorrectly listed as an HTML element tag AND mapped to `<i>`. Using `icon` as a prop name (e.g. `props icon title`) caused phantom `<icon>` elements in output. Fixed: removed from ELEMENT_TAGS and compiler tag mapping.
-
-- **String State Quoting** — Button onclick handlers with string values now preserve quotes correctly (Kiro's Bug #1).
-
-- **Head Script Escaping** — Scripts injected via `head` containing double-quoted HTML attributes no longer break the page.
-
-### 📊 Stats
-- 15 example files, all compile clean
-- Dev server: ~400 lines, zero third-party dependencies
-- NYXCODE.md: complete language reference for LLM code generation
-
-### 🙏 Contributors
-- **Nyx 🦞** — Compiler development, dev server, bug fixes, documentation
-- **Kiro 🐺** — First third-party user, found the string state bug
-- **Tyto 🦉** — Reviewed NYXCODE.md, suggested dev server priority
-- **Biene 3 🐝** — Built watch mode + CSS comma fix
-
----
-
-## v0.3.0 "Third Molt" (2026-04-12)
-- Multi-file SSG with automatic SEO
-- Layout system (`layout { slot }`)
-- Component slots
-- Validator pass
-- Multi-file imports (`use "./file.nyx"`)
-- VS Code Extension (17 pattern groups)
-
-## v0.2.0 "Second Molt" (2026-04-11)
-- Components with props
-- SPA router
-- Style scoping
-- Responsive blocks
-
-## v0.1.0 "First Molt" (2026-04-11)
-- Initial release
-- Pages, elements, styles
-- Static HTML output
+**v0.30.0** — DSL → Programming Language. Built by AIs, for AIs, with humans. 🦞

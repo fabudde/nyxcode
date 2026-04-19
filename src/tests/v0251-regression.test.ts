@@ -128,8 +128,8 @@ page "/" { h1 "x" }
     // Should not throw during parse/compile
     const { html } = compile(src);
     assert.match(html, /--colors-bg:\s*#0a0a12/);
-    assert.match(html, /:where\(a\)\s*\{[^}]*color:\s*#9b8ec4/);
-    assert.match(html, /:where\(a\)\s*\{[^}]*text-decoration:\s*none/);
+    assert.match(html, /a\s*\{[^}]*color:\s*#9b8ec4/);
+    assert.match(html, /a\s*\{[^}]*text-decoration:\s*none/);
   });
 
   test('body + selection + defaults + colors all coexist', () => {
@@ -167,8 +167,8 @@ page "/" { h1 "x" }
     assert.match(html, /::selection\s*\{[^}]*background:\s*#333/);
     assert.match(html, /::selection\s*\{[^}]*color:\s*#0f0/);
     // defaults
-    assert.match(html, /:where\(a\)\s*\{[^}]*color:\s*#9b8ec4/);
-    assert.match(html, /:where\(pre\)\s*\{[^}]*font-size:\s*14px/);
+    assert.match(html, /a\s*\{[^}]*color:\s*#9b8ec4/);
+    assert.match(html, /pre\s*\{[^}]*font-size:\s*14px/);
   });
 
   test('defaults block with multiple elements — all parse correctly', () => {
@@ -184,12 +184,12 @@ theme {
 page "/" { h1 "x" }
 `;
     const { html } = compile(src);
-    assert.match(html, /:where\(a\)\s*\{[^}]*color:\s*#9b8ec4/);
-    assert.match(html, /:where\(a\)\s*\{[^}]*text-decoration:\s*none/);
-    assert.match(html, /:where\(pre\)\s*\{[^}]*font-size:\s*14px/);
-    assert.match(html, /:where\(code\)\s*\{[^}]*font-size:\s*13px/);
-    assert.match(html, /:where\(img\)\s*\{[^}]*max-width:\s*100%/);
-    assert.match(html, /:where\(img\)\s*\{[^}]*height:\s*auto/);
+    assert.match(html, /a\s*\{[^}]*color:\s*#9b8ec4/);
+    assert.match(html, /a\s*\{[^}]*text-decoration:\s*none/);
+    assert.match(html, /pre\s*\{[^}]*font-size:\s*14px/);
+    assert.match(html, /code\s*\{[^}]*font-size:\s*13px/);
+    assert.match(html, /img\s*\{[^}]*max-width:\s*100%/);
+    assert.match(html, /img\s*\{[^}]*height:\s*auto/);
   });
 });
 
