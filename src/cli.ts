@@ -8,6 +8,7 @@
  *   nyx build <file.nyx>    — Compile a .nyx file to HTML
  *   nyx watch <file.nyx>    — Watch file & rebuild on change
  *   nyx dev <file.nyx>      — Dev server with hot reload
+ *   nyx add <package>        — Add a package (Tier 1/2/blocked)
  * 
  * Examples:
  *   nyx parse examples/hello.nyx
@@ -18,6 +19,7 @@
 import * as fs from 'fs';
 import { readFileSync, writeFileSync, mkdirSync, watch as fsWatch, statSync, readdirSync, realpathSync, openSync, fstatSync, closeSync } from 'fs';
 import { resolve, dirname, relative, isAbsolute, join, extname, basename } from 'path';
+import { execSync as cpExecSync } from 'child_process';
 
 /**
  * v0.24.1 (Issue #92) — TOCTOU-safe file read for imports.
@@ -727,6 +729,77 @@ if (command === 'dev') {
   const server = new DevServer(file, port);
   server.start();
   // Dev server keeps process alive — no code below runs
+} else if (command === 'add') {
+  // === nyx add <package> — early exit, no file needed ===
+  const pkg = args[1];
+  if (!pkg) {
+    console.error('\x1b[31m❌ Usage: nyx add <package>\x1b[0m');
+    console.error('  nyx add stripe       — Tier 1 built-in adapter');
+    console.error('  nyx add npm:sharp    — Tier 2 npm package');
+    process.exit(1);
+  }
+
+  const TIER1 = ['stripe', 'nodemailer', 'redis', 'bcrypt', 'jsonwebtoken', 'better-sqlite3', 'sharp', 'resend', 'uuid'];
+  const BLOCKED = ['child_process', 'fs', 'eval', 'vm', 'cluster', 'worker_threads', 'dgram', 'net', 'tls', 'http2', 'os', 'process', 'crypto'];
+
+  let useStatement = '';
+  let npmPackage = '';
+  let tier = '';
+
+  if (pkg.startsWith('npm:')) {
+    const name = pkg.slice(4);
+    if (BLOCKED.includes(name)) {
+      console.error(`\x1b[31m❌ BLOCKED: '${name}' is not allowed for security reasons.\x1b[0m`);
+      process.exit(1);
+    }
+    useStatement = `use npm:"${name}"`;
+    npmPackage = name;
+    tier = 'Tier 2 (npm)';
+  } else if (TIER1.includes(pkg)) {
+    useStatement = `use ${pkg}`;
+    npmPackage = pkg;
+    tier = 'Tier 1 (built-in)';
+  } else if (BLOCKED.includes(pkg)) {
+    console.error(`\x1b[31m❌ BLOCKED: '${pkg}' is not allowed for security reasons.\x1b[0m`);
+    process.exit(1);
+  } else {
+    useStatement = `use npm:"${pkg}"`;
+    npmPackage = pkg;
+    tier = 'Tier 2 (npm)';
+  }
+
+  // Find .nyx file in current directory
+  const nyxFiles = readdirSync('.').filter((f: string) => f.endsWith('.nyx'));
+  if (nyxFiles.length === 0) {
+    console.log(`\x1b[33m⚠️  No .nyx file found. Add this to your .nyx file:\x1b[0m`);
+    console.log(`  ${useStatement}`);
+  } else {
+    const targetFile = nyxFiles[0];
+    const content = readFileSync(targetFile, 'utf-8');
+    if (content.includes(useStatement)) {
+      console.log(`\x1b[33m⚠️  '${pkg}' already in ${targetFile}\x1b[0m`);
+    } else {
+      const lines = content.split('\n');
+      let insertIdx = 0;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim().startsWith('use ')) insertIdx = i + 1;
+        else if (lines[i].trim().startsWith('theme ') && insertIdx === 0) insertIdx = i;
+      }
+      lines.splice(insertIdx, 0, useStatement);
+      writeFileSync(targetFile, lines.join('\n'));
+      console.log(`\x1b[32m✅ Added \x1b[1m${useStatement}\x1b[0m\x1b[32m to ${targetFile}\x1b[0m`);
+    }
+  }
+
+  console.log(`\x1b[36m📦 Installing ${npmPackage}...\x1b[0m`);
+  
+  try {
+    cpExecSync(`npm install ${npmPackage}`, { stdio: 'inherit' });
+    console.log(`\x1b[32m✅ ${pkg} ready! (${tier})\x1b[0m`);
+  } catch {
+    console.error(`\x1b[33m⚠️  npm install failed. Run manually: npm install ${npmPackage}\x1b[0m`);
+  }
+
 } else {
   // All other commands need to read the file upfront
 
@@ -1149,7 +1222,7 @@ try {
     });
 
   } else {
-    console.error(`\x1b[31m❌ Unknown command: ${command}. Use 'parse', 'tokens', 'build', 'watch', or 'dev'.\x1b[0m`);
+    console.error(`\x1b[31m❌ Unknown command: ${command}. Use 'parse', 'tokens', 'build', 'watch', 'dev', or 'add'.\x1b[0m`);
     process.exit(1);
   }
 } catch (e: any) {
