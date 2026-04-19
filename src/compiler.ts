@@ -1731,6 +1731,11 @@ export class Compiler {
         let val = a.value;
         if (val.startsWith('.')) {
           val = `\${${varName}${this.toOptionalChain(val)}}`;
+        } else if ((a.name === 'href' || a.name === 'link') && /\.[a-zA-Z_]/.test(val)) {
+          // v0.27.0: mixed static+dynamic href: /path/.id -> /path/${item.id}
+          val = val.replace(/\.([a-zA-Z_][a-zA-Z0-9_]*)/g, (_: string, field: string) => {
+            return `\${${varName}.${field}}`;
+          });
         }
         if (a.name === 'preset') return `class="nyx-p_${a.value}"`;
         if (a.name === 'style') {
