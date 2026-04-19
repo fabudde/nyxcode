@@ -592,7 +592,31 @@ export class Parser {
           if (this.peek().type !== TokenType.Identifier) break;
           // Eat stray leading semicolons between element blocks
           if (this.peek().value === ';') { this.advance(); continue; }
-          const element = this.advance().value;
+          let element = this.advance().value;
+          // Support pseudo-selectors: input:focus, input::placeholder, button:hover
+          // and attribute selectors: button[type=submit]
+          while (!this.check(TokenType.LeftBrace) && !this.isAtEnd()) {
+            const next = this.peek();
+            if (next.value === ':') {
+              this.advance(); // consume ':'
+              if (this.peek().value === ':') {
+                this.advance(); // consume second ':'
+                element += '::' + this.advance().value;
+              } else {
+                element += ':' + this.advance().value;
+              }
+            } else if (next.value === '[') {
+              // attribute selector: button[type=submit]
+              let bracket = this.advance().value; // '['
+              while (!this.isAtEnd() && this.peek().value !== ']') {
+                bracket += this.advance().value;
+              }
+              if (this.peek().value === ']') bracket += this.advance().value;
+              element += bracket;
+            } else {
+              break;
+            }
+          }
           this.consume(TokenType.LeftBrace);
           const props: Array<{ name: string; value: string }> = [];
           while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
