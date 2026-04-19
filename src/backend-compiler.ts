@@ -346,7 +346,7 @@ function compileHook(hook: HookNode): string {
     if (stmt.type === 'Query') {
       const q = stmt as QueryStatement;
       const params = [...q.sql.matchAll(/\$(\w+)/g)].map((m: any) => m[1]);
-      const safeSql = q.sql.replace(/\$(\w+)/g, '?');
+      const safeSql = q.sql.replace(/\$([\w.]+)/g, '?');
       const paramList = params.map(p => `req.body.${p}`).join(', ');
       code += `    db.prepare(\`${safeSql}\`).run(${paramList});
 `;
@@ -423,11 +423,14 @@ function compileApiRoute(api: ApiNode): string {
     const q = queries[0];
     const sql = q.sql;
     // Extract $param references from SQL
-    const params = [...sql.matchAll(/\$(\w+)/g)].map(m => m[1]);
+    const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
     const pathParams = [...api.path.matchAll(/:(\w+)/g)].map((m: any) => m[1]);
-    const paramSrc = (p: string) => pathParams.includes(p) ? 'req.params' : (method === 'get' ? 'req.query' : 'req.body');
-    const paramList = params.map(p => `${paramSrc(p)}.${p}`).join(', ');
-    const safeSql = sql.replace(/\$(\w+)/g, '?');
+    const paramSrc = (p: string) => {
+      if (p.startsWith('req.')) return ''; // direct ref like req.user.id
+      return pathParams.includes(p) ? 'req.params' : (method === 'get' ? 'req.query' : 'req.body');
+    };
+    const paramList = params.map(p => p.startsWith('req.') ? p : `${paramSrc(p)}.${p}`).join(', ');
+    const safeSql = sql.replace(/\$([\w.]+)/g, '?');
     
     if (method === 'get') {
       // SELECT → return all rows or single row
@@ -582,6 +585,21 @@ function compileEveryBody(stmts: any[]): string {
 function compileEveryStatementInLoop(stmt: any): string {
   if (stmt.type === 'Query') {
     const sql = stmt.sql || stmt.value || '';
+    // Special: "fetch $row.url" pattern → HTTP health check
+    if (sql.trim().startsWith('fetch ')) {
+      const urlField = sql.trim().replace('fetch ', '').replace('$row.', 'row.');
+      return `const start = Date.now();
+      try {
+        const res = await fetch(${urlField}, { signal: AbortSignal.timeout(10000) });
+        const ms = Date.now() - start;
+        db.prepare("INSERT INTO checks (monitor_id, status, response_ms, status_code) VALUES (?, ?, ?, ?)").run(row.id, res.ok ? 'up' : 'down', ms, res.status);
+        db.prepare("UPDATE monitors SET status = ?, last_check = datetime('now'), avg_response_ms = ? WHERE id = ?").run(res.ok ? 'up' : 'down', ms, row.id);
+      } catch(fetchErr) {
+        const ms = Date.now() - start;
+        db.prepare("INSERT INTO checks (monitor_id, status, response_ms, error_msg) VALUES (?, 'down', ?, ?)").run(row.id, ms, fetchErr.message);
+        db.prepare("UPDATE monitors SET status = 'down', last_check = datetime('now') WHERE id = ?").run(row.id);
+      }`;
+    }
     // Extract $row.field references for parameterized binding
     const rowRefs = [...sql.matchAll(/\$row\.(\w+)/g)].map((m: any) => m[1]);
     if (rowRefs.length > 0) {
@@ -601,8 +619,23 @@ function compileEveryStatementInLoop(stmt: any): string {
 
 function compileEveryStatement(stmt: any): string {
   if (stmt.type === 'Query') {
-    // query "SQL" → db.prepare(sql).run() or .all()
     const sql = stmt.sql || stmt.value || '';
+    // Special: "fetch $row.url" pattern → HTTP health check with response tracking
+    if (sql.trim().startsWith('fetch ')) {
+      const urlField = sql.trim().replace('fetch ', '').replace('$row.', 'row.');
+      return `const start = Date.now();
+    try {
+      const res = await fetch(${urlField}, { signal: AbortSignal.timeout(10000) });
+      const ms = Date.now() - start;
+      db.prepare("INSERT INTO checks (monitor_id, status, response_ms, status_code) VALUES (?, ?, ?, ?)").run(row.id, res.ok ? 'up' : 'down', ms, res.status);
+      db.prepare("UPDATE monitors SET status = ?, last_check = datetime('now'), avg_response_ms = ? WHERE id = ?").run(res.ok ? 'up' : 'down', ms, row.id);
+    } catch(fetchErr) {
+      const ms = Date.now() - start;
+      db.prepare("INSERT INTO checks (monitor_id, status, response_ms, error_msg) VALUES (?, 'down', ?, ?)").run(row.id, ms, fetchErr.message);
+      db.prepare("UPDATE monitors SET status = 'down', last_check = datetime('now') WHERE id = ?").run(row.id);
+    }`;
+    }
+    // Regular SQL
     if (sql.trim().toUpperCase().startsWith('SELECT')) {
       return `const rows = db.prepare(${JSON.stringify(sql)}).all();`;
     } else {
