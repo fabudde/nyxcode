@@ -718,7 +718,7 @@ function compileOnEvents(onEvents: any[]): string {
           const safeSql = stmt.value.sql.replace(/\$(\w[\w.]*)/g, '?');
           const params = [...stmt.value.sql.matchAll(/\$(\w[\w.]*)/g)].map((m: any) => m[1]);
           const paramList = params.map((p: string) => p.startsWith('row.') ? `row.${p.slice(4)}` : p).join(', ');
-          body += `    const ${stmt.name} = db.prepare('${safeSql}').get(${paramList});\n`;
+          body += `    const ${stmt.name} = db.prepare(\`${safeSql}\`).get(${paramList});\n`;
         } else if (stmt.value.kind === 'call') {
           body += `    const ${stmt.name} = await ${stmt.value.target}.${stmt.value.method}(${stmt.value.args.join(', ')});\n`;
         }
@@ -726,7 +726,7 @@ function compileOnEvents(onEvents: any[]): string {
         const safeSql = (stmt as any).sql.replace(/\$(\w[\w.]*)/g, '?');
         const params = [...(stmt as any).sql.matchAll(/\$(\w[\w.]*)/g)].map((m: any) => m[1]);
         const paramList = params.map((p: string) => p.startsWith('row.') ? `row.${p.slice(4)}` : p).join(', ');
-        body += `    db.prepare('${safeSql}').run(${paramList});\n`;
+        body += `    db.prepare(\`${safeSql}\`).run(${paramList});\n`;
       } else if (stmt.type === 'ActionCall') {
         body += `    await action_${(stmt as any).name}(${(stmt as any).args.join(', ')});\n`;
       } else if (stmt.type === 'Email') {
