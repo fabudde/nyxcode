@@ -2247,7 +2247,7 @@ export class Compiler {
           const prop = this.mapCSSProperty(p.name);
           return this.emitCSSDeclInline(prop, this.resolveThemeValue(prop, p.value));
         }).join('; ');
-        css += ':where(' + def.element + '){' + props + '}';
+        css += '' + def.element + '{' + props + '}';
       }
     }
     if (fontCSS) css += fontCSS;
