@@ -140,6 +140,8 @@ export class Parser {
       case TokenType.Layout: return this.parseLayout();
       case TokenType.Preset: return this.parsePreset() as any;
       case TokenType.Keyframes: return this.parseTopLevelKeyframes() as any;
+      case TokenType.Action: return this.parseAction();
+      case TokenType.Env: return this.parseEnv();
       case TokenType.Every: return this.parseEvery() as any;
       case TokenType.Identifier:
         if (token.value === 'middleware') return this.parseMiddleware();
@@ -191,6 +193,67 @@ export class Parser {
     const body = this.parseBody();
     this.consume(TokenType.RightBrace);
     return { type: 'Every', interval, intervalMs, label, body, line: start.line, col: start.col };
+  }
+
+  private parseAction(): any {
+    const start = this.consume(TokenType.Action);
+    const name = this.consumeIdentifier();
+    // Parse params: action name(param1, param2: type)
+    const params: Array<{name: string; paramType?: string}> = [];
+    if (this.check(TokenType.LeftParen)) {
+      this.advance(); // (
+      while (!this.check(TokenType.RightParen) && !this.isAtEnd()) {
+        const pname = this.consumeIdentifier();
+        let paramType: string | undefined;
+        if (this.check(TokenType.Colon)) {
+          this.advance(); // :
+          paramType = this.consumeIdentifier();
+        }
+        params.push({ name: pname, paramType });
+        if (this.check(TokenType.Comma)) this.advance();
+      }
+      this.consume(TokenType.RightParen);
+    }
+    this.consume(TokenType.LeftBrace);
+    const body: any[] = [];
+    let errorHandler: any[] | undefined;
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      if (this.check(TokenType.On) && this.peekNext()?.value === 'error') {
+        this.advance(); // on
+        this.advance(); // error
+        this.consume(TokenType.LeftBrace);
+        errorHandler = this.parseBody();
+        this.consume(TokenType.RightBrace);
+      } else {
+        body.push(...this.parseBody());
+      }
+    }
+    this.consume(TokenType.RightBrace);
+    return { type: 'Action', name, params, body, errorHandler, line: start.line, col: start.col };
+  }
+
+  private parseEnv(): any {
+    const start = this.consume(TokenType.Env);
+    this.consume(TokenType.LeftBrace);
+    const vars: Array<{name: string; required: boolean; defaultValue?: string}> = [];
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      while (this.check(TokenType.Newline)) this.advance();
+      if (this.check(TokenType.RightBrace)) break;
+      const varName = this.consumeIdentifier();
+      let required = false;
+      let defaultValue: string | undefined;
+      if (this.check(TokenType.Identifier) && this.peek().value === 'required') {
+        this.advance();
+        required = true;
+      } else if (this.check(TokenType.Identifier) && this.peek().value === 'default') {
+        this.advance();
+        if (this.check(TokenType.Equals)) this.advance();
+        defaultValue = this.advance().value;
+      }
+      vars.push({ name: varName, required, defaultValue });
+    }
+    this.consume(TokenType.RightBrace);
+    return { type: 'Env', vars, line: start.line, col: start.col };
   }
 
   private parseComponent(): ComponentNode {
@@ -1221,6 +1284,8 @@ export class Parser {
       case TokenType.Respond: return this.parseRespond();
       case TokenType.Limit: return this.parseLimitStmt();
       case TokenType.Query: return this.parseQuery();
+      case TokenType.Let: return this.parseLet();
+      case TokenType.Email: return this.parseEmailStatement();
       case TokenType.State: return this.parseState();
       case TokenType.Effect: return this.parseEffect();
       case TokenType.Computed: return this.parseComputed();
@@ -2537,6 +2602,66 @@ export class Parser {
       value += this.advance().value;
     }
     return { type: 'Limit', value: value.trim(), line: start.line, col: start.col };
+  }
+
+  private parseLet(): any {
+    const start = this.consume(TokenType.Let);
+    const name = this.consumeIdentifier();
+    this.consume(TokenType.Equals);
+    // let x = query "..." | sum(data, "field") | expression
+    if (this.check(TokenType.Query)) {
+      this.advance(); // consume 'query'
+      const sql = this.consume(TokenType.String).value;
+      return { type: 'Let', name, value: { kind: 'query', sql }, line: start.line, col: start.col };
+    }
+    // Built-in function: sum(x, "field")
+    if (this.check(TokenType.Identifier)) {
+      const fn = this.peek().value;
+      if (['sum', 'count', 'avg', 'min', 'max', 'len'].includes(fn)) {
+        this.advance(); // consume function name
+        this.consume(TokenType.LeftParen);
+        const args: string[] = [];
+        while (!this.check(TokenType.RightParen) && !this.isAtEnd()) {
+          args.push(this.advance().value);
+          if (this.check(TokenType.Comma)) this.advance();
+        }
+        this.consume(TokenType.RightParen);
+        return { type: 'Let', name, value: { kind: 'builtin', fn, args }, line: start.line, col: start.col };
+      }
+      // Object.method(args) call: stripe.checkout(amount)
+      const target = this.advance().value;
+      if (this.check(TokenType.Dot)) {
+        this.advance(); // .
+        const method = this.consumeIdentifier();
+        const args: string[] = [];
+        if (this.check(TokenType.LeftParen)) {
+          this.advance(); // (
+          while (!this.check(TokenType.RightParen) && !this.isAtEnd()) {
+            args.push(this.advance().value);
+            if (this.check(TokenType.Comma)) this.advance();
+          }
+          this.consume(TokenType.RightParen);
+        }
+        return { type: 'Let', name, value: { kind: 'call', target, method, args }, line: start.line, col: start.col };
+      }
+      // Simple identifier assignment
+      return { type: 'Let', name, value: { kind: 'arithmetic', expr: target }, line: start.line, col: start.col };
+    }
+    // Fallback: arithmetic/string expression
+    const expr = this.advance().value;
+    return { type: 'Let', name, value: { kind: 'arithmetic', expr }, line: start.line, col: start.col };
+  }
+
+  private parseEmailStatement(): any {
+    const start = this.consume(TokenType.Email);
+    // email to=x subject=y body=z
+    const attrs: Record<string, string> = {};
+    while (this.check(TokenType.Identifier) && !this.isAtEnd()) {
+      const key = this.advance().value;
+      this.consume(TokenType.Equals);
+      attrs[key] = this.advance().value;
+    }
+    return { type: 'Email', to: attrs.to || '', subject: attrs.subject || '', body: attrs.body || '', template: attrs.template, line: start.line, col: start.col };
   }
 
   private parseQuery(): QueryStatement {

@@ -19,7 +19,7 @@ export interface Program extends BaseNode {
 }
 
 export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode | ConfigNode | HookNode | MiddlewareNode | FootnotesStatement
-  | PresetNode | HeadStatement | KeyframesNode | EveryNode;
+  | PresetNode | HeadStatement | KeyframesNode | EveryNode | ActionNode | OnEventNode | EnvNode;
 
 /** `keyframes name { 0% { ... } 50% { ... } 100% { ... } }` — top-level @keyframes definition (v0.25.0 #110) */
 export interface KeyframesNode extends BaseNode {
@@ -467,4 +467,69 @@ export interface CorsConfig {
 export interface SecurityRule {
   name: string;
   value: string;
+}
+
+/** `action name(params) { body }` - reusable server-side function (v0.30) */
+export interface ActionNode extends BaseNode {
+  type: 'Action';
+  name: string;
+  params: ActionParam[];
+  body: ActionStatement[];
+  errorHandler?: ActionStatement[];
+}
+
+export interface ActionParam {
+  name: string;
+  paramType?: string;
+}
+
+export type ActionStatement = LetStatement | QueryStatement | RespondStatement | EmailStatement | ActionCallStatement | ValidateStatement;
+
+/** `let x = query "..." | expression` - variable binding (v0.30) */
+export interface LetStatement extends BaseNode {
+  type: 'Let';
+  name: string;
+  value: LetExpression;
+}
+
+export type LetExpression = 
+  | { kind: 'query'; sql: string }
+  | { kind: 'call'; target: string; method: string; args: string[] }
+  | { kind: 'builtin'; fn: string; args: string[] }
+  | { kind: 'arithmetic'; expr: string };
+
+/** `on table.event { body }` - table lifecycle hooks (v0.30) */
+export interface OnEventNode extends BaseNode {
+  type: 'OnEvent';
+  table: string;
+  event: 'created' | 'updated' | 'deleted';
+  body: ActionStatement[];
+}
+
+/** `env { KEY required }` - env var declarations (v0.30) */
+export interface EnvNode extends BaseNode {
+  type: 'Env';
+  vars: EnvVar[];
+}
+
+export interface EnvVar {
+  name: string;
+  required: boolean;
+  defaultValue?: string;
+}
+
+/** `email to=x subject=y body=z` - first-class email (v0.30) */
+export interface EmailStatement extends BaseNode {
+  type: 'Email';
+  to: string;
+  subject: string;
+  body: string;
+  template?: string;
+}
+
+/** `actionName(args)` - call a defined action (v0.30) */
+export interface ActionCallStatement extends BaseNode {
+  type: 'ActionCall';
+  name: string;
+  args: string[];
 }
