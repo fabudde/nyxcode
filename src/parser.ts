@@ -140,6 +140,7 @@ export class Parser {
       case TokenType.Layout: return this.parseLayout();
       case TokenType.Preset: return this.parsePreset() as any;
       case TokenType.Keyframes: return this.parseTopLevelKeyframes() as any;
+      case TokenType.Every: return this.parseEvery() as any;
       case TokenType.Identifier:
         if (token.value === 'middleware') return this.parseMiddleware();
         if (token.value === 'meta') return this.parseMeta() as any;
@@ -165,6 +166,31 @@ export class Parser {
     this.consume(TokenType.RightBrace);
 
     return { type: 'Page', path, body, auth, line: start.line, col: start.col };
+  }
+
+  // v0.27.0 — `every 60s 'label' { ... }` background workers
+  private parseEvery(): any {
+    const start = this.consume(TokenType.Every);
+    // Parse interval: 30s, 5m, 1h, etc.
+    const intervalToken = this.advance();
+    const interval = intervalToken.value;
+    // Parse interval to milliseconds
+    const match = interval.match(/^(\d+)(s|m|h)$/);
+    if (!match) throw this.error(`Invalid interval '${interval}'. Use format: 30s, 5m, 1h`);
+    const num = parseInt(match[1]);
+    const unit = match[2];
+    const multiplier = unit === 's' ? 1000 : unit === 'm' ? 60000 : 3600000;
+    const intervalMs = num * multiplier;
+    if (intervalMs < 5000) throw this.error(`Interval must be at least 5s (got ${interval})`);
+    // Optional label
+    let label: string | undefined;
+    if (this.check(TokenType.String)) {
+      label = this.advance().value;
+    }
+    this.consume(TokenType.LeftBrace);
+    const body = this.parseBody();
+    this.consume(TokenType.RightBrace);
+    return { type: 'Every', interval, intervalMs, label, body, line: start.line, col: start.col };
   }
 
   private parseComponent(): ComponentNode {
@@ -550,7 +576,14 @@ export class Parser {
           if (this.peek().type !== TokenType.Identifier) break;
           // Eat stray leading semicolons between element blocks
           if (this.peek().value === ';') { this.advance(); continue; }
-          const element = this.advance().value;
+          let element = this.advance().value;
+          // v0.27.0 — support pseudo-selectors in defaults: input:focus, input::placeholder, etc.
+          while (this.peek().type === TokenType.Colon || (this.peek().value === ':' && !this.check(TokenType.LeftBrace))) {
+            element += this.advance().value; // : or ::
+            if (this.peek().type === TokenType.Identifier) {
+              element += this.advance().value; // focus, placeholder, etc.
+            }
+          }
           this.consume(TokenType.LeftBrace);
           const props: Array<{ name: string; value: string }> = [];
           while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
