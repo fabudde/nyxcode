@@ -175,8 +175,18 @@ function generateValidation(columns: ColumnDef[]): string {
   return checks.length ? '    ' + checks.join('\n    ') + '\n' : '';
 }
 
-function crudForTable(table: TableNode, allTables: TableNode[]): string {
+function crudForTable(table: TableNode, allTables: TableNode[], onEvents: any[] = []): string {
   const n = table.name;
+
+  // Generate on-event hook calls for this table (v0.30)
+  const tableEvents = onEvents.filter((e: any) => e.table === n);
+  const createdHook = tableEvents.find((e: any) => e.event === 'created')
+    ? `\n    onEvent_${n}_created(db.prepare('SELECT * FROM ${n} WHERE id = ?').get(info.lastInsertRowid));` : '';
+  const updatedHook = tableEvents.find((e: any) => e.event === 'updated')
+    ? `\n    onEvent_${n}_updated(db.prepare('SELECT * FROM ${n} WHERE id = ?').get(req.params.id));` : '';
+  const deletedHook = tableEvents.find((e: any) => e.event === 'deleted')
+    ? `\n    onEvent_${n}_deleted({ id: req.params.id });` : '';
+
   const insertCols = table.columns.filter(c => !isAutoColumn(c));
   const colNames = insertCols.map(c => c.name);
   // Separate user FK columns (auto-set from JWT) from body columns
@@ -215,7 +225,7 @@ function crudForTable(table: TableNode, allTables: TableNode[]): string {
   vals.push(req.params.id);
   const info = db.prepare('UPDATE ${n} SET ' + sets + ' WHERE id = ?').run(...vals);
   if (!info.changes) return res.status(404).json({ error: 'Not found' });
-  res.json(db.prepare('SELECT * FROM ${n} WHERE id = ?').get(req.params.id));`;
+  res.json(db.prepare('SELECT * FROM ${n} WHERE id = ?').get(req.params.id));${updatedHook}`;
 
   // Relations: auto JOIN + nested response
   const joinCode = buildJoinCode(table, allTables);
@@ -312,7 +322,7 @@ ${validationCode}    const { ${bodyColList} } = req.body;
 ${hasUploadCols ? uploadCols.map(uc => `    const ${uc.name} = req.files?.['${uc.name}']?.[0]?.filename || null;`).join('\n') : ''}
     ${autoUserCols}const info = db.prepare(
       'INSERT INTO ${n} (${colList}) VALUES (${placeholders})'
-    ).run(${colNames.join(', ')});
+    ).run(${colNames.join(', ')});${createdHook}
     ${postResponse}
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -328,7 +338,7 @@ app.put('/api/${n}/:id', writeLimiter, (req, res) => {
 
 app.delete('/api/${n}/:id', writeLimiter, (req, res) => {
 ${cascadeBlock ? cascadeBlock : `  const info = db.prepare('DELETE FROM ${n} WHERE id = ?').run(req.params.id);
-  if (!info.changes) return res.status(404).json({ error: 'Not found' });
+  if (!info.changes) return res.status(404).json({ error: 'Not found' });${deletedHook}
   res.json({ deleted: true });`}
 });`;
 }
@@ -586,6 +596,55 @@ ${checks.join('\n')}
 `;
 }
 
+// ── On Events (table lifecycle hooks) ──────────────────────────────────
+
+function compileOnEvents(onEvents: any[]): string {
+  if (!onEvents || onEvents.length === 0) return '';
+  
+  const blocks: string[] = [];
+  
+  for (const ev of onEvents) {
+    const funcName = `onEvent_${ev.table}_${ev.event}`;
+    let body = '';
+    
+    for (const stmt of ev.body) {
+      if (stmt.type === 'Let') {
+        if (stmt.value.kind === 'query') {
+          const safeSql = stmt.value.sql.replace(/\$(\w[\w.]*)/g, '?');
+          const params = [...stmt.value.sql.matchAll(/\$(\w[\w.]*)/g)].map((m: any) => m[1]);
+          const paramList = params.map((p: string) => p.startsWith('row.') ? `row.${p.slice(4)}` : p).join(', ');
+          body += `    const ${stmt.name} = db.prepare('${safeSql}').get(${paramList});\n`;
+        } else if (stmt.value.kind === 'call') {
+          body += `    const ${stmt.name} = await ${stmt.value.target}.${stmt.value.method}(${stmt.value.args.join(', ')});\n`;
+        }
+      } else if (stmt.type === 'Query') {
+        const safeSql = (stmt as any).sql.replace(/\$(\w[\w.]*)/g, '?');
+        const params = [...(stmt as any).sql.matchAll(/\$(\w[\w.]*)/g)].map((m: any) => m[1]);
+        const paramList = params.map((p: string) => p.startsWith('row.') ? `row.${p.slice(4)}` : p).join(', ');
+        body += `    db.prepare('${safeSql}').run(${paramList});\n`;
+      } else if (stmt.type === 'ActionCall') {
+        body += `    await action_${(stmt as any).name}(${(stmt as any).args.join(', ')});\n`;
+      } else if (stmt.type === 'Email') {
+        body += `    await sendEmail({ to: ${(stmt as any).to}, subject: ${JSON.stringify((stmt as any).subject)}, body: ${JSON.stringify((stmt as any).body)} });\n`;
+      }
+    }
+    
+    blocks.push(`
+// on ${ev.table}.${ev.event}
+async function ${funcName}(row) {
+  try {
+${body}  } catch(e) {
+    console.error('[on:${ev.table}.${ev.event}]', e.message);
+  }
+}`);
+  }
+  
+  return `
+// ── Table Lifecycle Events ─────────────────────────────────────────────
+${blocks.join('\n')}
+`;
+}
+
 // ── Every blocks (background workers) ──────────────────────────────────
 
 function compileEveryBlocks(everys: any[]): string {
@@ -764,7 +823,7 @@ function compileEveryStatement(stmt: any): string {
 
 // ── Main export ────────────────────────────────────────────────────────
 
-export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = [], pagePaths: string[] = [], middlewares: MiddlewareNode[] = [], everys: any[] = [], actions: any[] = [], envNode?: any): string {
+export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = [], pagePaths: string[] = [], middlewares: MiddlewareNode[] = [], everys: any[] = [], actions: any[] = [], envNode?: any, onEvents: any[] = []): string {
   const hasUploads = tables.some(t => t.columns.some(c => c.type === 'upload'));
   const realtimeTables = tables.filter(t => t.columns.some(c => c.constraints.includes('realtime')));
   const hasRealtime = realtimeTables.length > 0;
@@ -795,10 +854,11 @@ export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config
   }
 
   const createStatements = tables.map(t => `db.exec(\`${createTableSQL(t)}\`);`).join('\n');
-  const crudBlocks = tables.map(t => crudForTable(t, tables)).join('\n');
+  const crudBlocks = tables.map(t => crudForTable(t, tables, onEvents)).join('\n');
   const hookBlocks = hooks.map(h => compileHook(h)).join('\n');
   const actionBlocks = actions.map(a => compileAction(a)).join('\n');
   const envValidation = envNode ? compileEnvNode(envNode) : '';
+  const onEventBlocks = compileOnEvents(onEvents);
   const apiBlocks = apis.map(a => compileApiRoute(a)).join('\n');
   // Custom API routes go BEFORE CRUD (so /mine matches before /:id)
   // Order: apiBlocks first, then crudBlocks
@@ -850,6 +910,7 @@ db.pragma('foreign_keys = ON');
 
 ${createStatements}
 ${actionBlocks}
+${onEventBlocks}
 ${envValidation}
 ${apiBlocks}
 ${crudBlocks}

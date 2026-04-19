@@ -142,6 +142,7 @@ export class Parser {
       case TokenType.Keyframes: return this.parseTopLevelKeyframes() as any;
       case TokenType.Action: return this.parseAction();
       case TokenType.Env: return this.parseEnv();
+      case TokenType.On: return this.parseOnEvent();
       case TokenType.Every: return this.parseEvery() as any;
       case TokenType.Identifier:
         if (token.value === 'middleware') return this.parseMiddleware();
@@ -193,6 +194,21 @@ export class Parser {
     const body = this.parseBody();
     this.consume(TokenType.RightBrace);
     return { type: 'Every', interval, intervalMs, label, body, line: start.line, col: start.col };
+  }
+
+  private parseOnEvent(): any {
+    const start = this.consume(TokenType.On);
+    // on table.event { body }
+    const tableName = this.consumeIdentifier();
+    this.consume(TokenType.Dot);
+    const event = this.consumeIdentifier();
+    if (!['created', 'updated', 'deleted'].includes(event)) {
+      throw this.error(`Invalid event '${event}'. Must be created, updated, or deleted.`);
+    }
+    this.consume(TokenType.LeftBrace);
+    const body = this.parseBody();
+    this.consume(TokenType.RightBrace);
+    return { type: 'OnEvent', table: tableName, event, body, line: start.line, col: start.col };
   }
 
   private parseAction(): any {

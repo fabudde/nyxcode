@@ -944,7 +944,8 @@ try {
       const middlewares = ast.body.filter((n: any) => n.type === 'Middleware') as any[];
       const actions = ast.body.filter((n: any) => n.type === 'Action') as any[];
       const envNode = ast.body.find((n: any) => n.type === 'Env') as any;
-      let serverCode = compileBackend(tables, apis, config, hooks, [], middlewares, everys, actions, envNode);
+      const onEvents = ast.body.filter((n: any) => n.type === 'OnEvent') as any[];
+      let serverCode = compileBackend(tables, apis, config, hooks, [], middlewares, everys, actions, envNode, onEvents);
       if (security) {
         // Inject auth AFTER express.json() but BEFORE create tables
         const authCode = compileAuth(security, tables, config);
