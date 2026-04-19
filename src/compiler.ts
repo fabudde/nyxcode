@@ -88,6 +88,7 @@ export class Compiler {
   private headInjections: string[] = [];
   private globalHeadInjections: string[] = []; // From top-level `meta {}` or `head "..."` blocks — shared across all pages
   private themeVars: Map<string, string> = new Map();
+  private themeDefaultElements: Set<string> = new Set();
   private darkThemeVars: Map<string, string> = new Map(); // dark mode overrides
   // v0.23.0 — registry of named base themes: `@theme as "name" { ... }`
   private namedThemes: Map<string, any[]> = new Map();
@@ -2033,7 +2034,7 @@ export class Compiler {
   
   // Built-in theme presets (#59)
   private static THEME_PRESETS: Record<string, string> = {
-    'brutalist': `:root{--colors-bg:#fff;--colors-text:#000;--colors-primary:#000;--colors-accent:#ff0000;--colors-surface:#fff;--colors-muted:#666;--fonts-body:ui-monospace,SFMono-Regular,monospace;--fonts-heading:ui-monospace,SFMono-Regular,monospace;--spacing-base:1rem;--radius:0px}body{background:var(--colors-bg);color:var(--colors-text);font-family:var(--fonts-body)}h1,h2,h3,h4,h5,h6{font-family:var(--fonts-heading);text-transform:uppercase;letter-spacing:0.05em;border-bottom:3px solid var(--colors-text)}a{color:var(--colors-text);text-decoration:underline;text-underline-offset:3px}button,input,select,textarea{font-family:inherit;border:1px solid var(--colors-border,rgba(255,255,255,0.15));border-radius:8px;background:var(--colors-surface,rgba(255,255,255,0.06));color:var(--colors-text);padding:0.65rem 0.9rem;font-size:0.95rem;outline:none;transition:border .2s,background .2s}input:focus,select:focus,textarea:focus{border-color:var(--colors-primary)}input::placeholder,textarea::placeholder{color:var(--colors-muted,rgba(255,255,255,0.35))}form input,form select,form textarea{width:100%;margin-bottom:0.85rem;box-sizing:border-box}form button[type=submit]{width:100%;padding:0.7rem;background:var(--colors-primary);color:var(--colors-bg,#000);font-weight:700;border:none;cursor:pointer;margin-top:0.25rem}form button[type=submit]:hover{opacity:0.9}form .form-msg{margin-top:0.5rem;font-size:0.9rem}button:hover{background:var(--colors-text);color:var(--colors-bg)}img{filter:grayscale(20%)}`,
+    'brutalist': `:root{--colors-bg:#fff;--colors-text:#000;--colors-primary:#000;--colors-accent:#ff0000;--colors-surface:#fff;--colors-muted:#666;--fonts-body:ui-monospace,SFMono-Regular,monospace;--fonts-heading:ui-monospace,SFMono-Regular,monospace;--spacing-base:1rem;--radius:0px}body{background:var(--colors-bg);color:var(--colors-text);font-family:var(--fonts-body)}h1,h2,h3,h4,h5,h6{font-family:var(--fonts-heading);text-transform:uppercase;letter-spacing:0.05em;border-bottom:3px solid var(--colors-text)}a{color:var(--colors-text);text-decoration:underline;text-underline-offset:3px}button,input,select,textarea{font-family:inherit;border:2px solid var(--colors-text);border-radius:0;background:var(--colors-bg);color:var(--colors-text)}button:hover{background:var(--colors-text);color:var(--colors-bg)}button:hover{background:var(--colors-text);color:var(--colors-bg)}img{filter:grayscale(20%)}`,
     'glassmorphism': `:root{--colors-bg:#0f0f1a;--colors-text:#e0e0ff;--colors-primary:#667eea;--colors-accent:#764ba2;--colors-surface:rgba(255,255,255,0.05);--colors-muted:rgba(255,255,255,0.5);--fonts-body:'Inter',system-ui,sans-serif;--fonts-heading:'Inter',system-ui,sans-serif;--spacing-base:1.25rem;--radius:16px}body{background:linear-gradient(135deg,#0f0f1a 0%,#1a1a2e 50%,#16213e 100%);color:var(--colors-text);font-family:var(--fonts-body)}h1,h2,h3,h4,h5,h6{font-family:var(--fonts-heading);font-weight:700}section,div,article,aside,nav{background:var(--colors-surface);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius);padding:1.5rem}a{color:var(--colors-primary)}button{background:linear-gradient(135deg,var(--colors-primary),var(--colors-accent));color:#fff;border:none;border-radius:var(--radius);padding:0.75rem 1.5rem;font-weight:600;transition:transform 0.2s,box-shadow 0.2s}button:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(102,126,234,0.3)}input,select,textarea{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:var(--radius);color:var(--colors-text);padding:0.75rem}`,
     'editorial': `:root{--colors-bg:#faf9f6;--colors-text:#2d2d2d;--colors-primary:#c9a96e;--colors-accent:#8b4513;--colors-surface:#fff;--colors-muted:#8a8a8a;--fonts-body:'Georgia','Times New Roman',serif;--fonts-heading:'Georgia','Times New Roman',serif;--spacing-base:1.5rem;--radius:2px}body{background:var(--colors-bg);color:var(--colors-text);font-family:var(--fonts-body);line-height:1.8;max-width:720px;margin:0 auto;padding:2rem}h1{font-size:2.5rem;font-weight:400;letter-spacing:-0.02em;margin-bottom:0.5rem}h2{font-size:1.75rem;font-weight:400;border-bottom:1px solid var(--colors-muted);padding-bottom:0.5rem}h3{font-size:1.25rem;font-weight:600}p{margin-bottom:1.5rem}a{color:var(--colors-accent);text-decoration:none;border-bottom:1px solid transparent;transition:border-color 0.2s}a:hover{border-bottom-color:var(--colors-accent)}blockquote{border-left:3px solid var(--colors-primary);padding-left:1.5rem;font-style:italic;color:var(--colors-muted)}button{background:var(--colors-text);color:var(--colors-bg);border:none;padding:0.75rem 2rem;font-family:inherit;letter-spacing:0.05em;transition:opacity 0.2s}button:hover{opacity:0.85}img{border-radius:var(--radius)}`,
     'neon': `:root{--colors-bg:#0a0a0a;--colors-text:#e0e0e0;--colors-primary:#00ff88;--colors-accent:#ff00ff;--colors-surface:#111;--colors-muted:#666;--fonts-body:'JetBrains Mono',ui-monospace,monospace;--fonts-heading:system-ui,sans-serif;--spacing-base:1rem;--radius:8px}body{background:var(--colors-bg);color:var(--colors-text);font-family:var(--fonts-body)}h1,h2,h3{font-family:var(--fonts-heading);color:var(--colors-primary);text-shadow:0 0 10px rgba(0,255,136,0.5)}a{color:var(--colors-primary);text-decoration:none;text-shadow:0 0 8px rgba(0,255,136,0.3)}a:hover{color:var(--colors-accent);text-shadow:0 0 12px rgba(255,0,255,0.5)}button{background:transparent;color:var(--colors-primary);border:1px solid var(--colors-primary);border-radius:var(--radius);padding:0.75rem 1.5rem;font-family:inherit;text-transform:uppercase;letter-spacing:0.1em;transition:all 0.3s;box-shadow:0 0 5px rgba(0,255,136,0.2)}button:hover{background:var(--colors-primary);color:var(--colors-bg);box-shadow:0 0 20px rgba(0,255,136,0.4)}input,select,textarea{background:var(--colors-surface);border:1px solid rgba(0,255,136,0.3);border-radius:var(--radius);color:var(--colors-text);padding:0.75rem;font-family:inherit}input:focus,textarea:focus{border-color:var(--colors-primary);box-shadow:0 0 8px rgba(0,255,136,0.2);outline:none}`,
@@ -2241,6 +2242,7 @@ export class Compiler {
     if (theme.defaults && theme.defaults.length > 0) {
       for (const def of theme.defaults) {
         if (!def.properties || def.properties.length === 0) continue;
+        this.themeDefaultElements.add(def.element);
         const props = def.properties.flatMap((p: any) => {
           const prop = this.mapCSSProperty(p.name);
           return this.emitCSSDeclInline(prop, this.resolveThemeValue(prop, p.value));
@@ -3551,24 +3553,22 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
 
     let css = '\n    /* NyxCode Element Defaults */\n';
 
-    if (this.usedInteractiveElements.has('button')) {
-      css += '    :where(button) { font-family: inherit; font-size: inherit; padding: 0.65rem 1rem; border-radius: 8px; border: none; background: var(--colors-primary, #00e5a0); color: var(--colors-bg, #000); font-weight: 600; cursor: pointer; transition: opacity 0.15s; }\n';
+    if (this.usedInteractiveElements.has('button') && !this.themeDefaultElements.has('button')) {
+      css += '    :where(button) { font-family: inherit; font-size: inherit; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #1a1a2e; color: inherit; cursor: pointer; transition: opacity 0.15s; }\n';
       css += '    :where(button):hover { opacity: 0.85; }\n';
 
     }
     if (this.usedInteractiveElements.has('input') || this.usedInteractiveElements.has('select') || this.usedInteractiveElements.has('textarea')) {
       const selectors: string[] = [];
-      if (this.usedInteractiveElements.has('input')) selectors.push(':where(input)');
-      if (this.usedInteractiveElements.has('select')) selectors.push(':where(select)');
-      if (this.usedInteractiveElements.has('textarea')) selectors.push(':where(textarea)');
-      css += `    ${selectors.join(', ')} { font-family: inherit; font-size: inherit; padding: 0.65rem 0.9rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); color: inherit; outline: none; transition: border 0.2s; width: 100%; box-sizing: border-box; margin-bottom: 0.85rem; }\n`;
-      css += '    :where(input):focus, :where(select):focus, :where(textarea):focus { border-color: var(--colors-primary, #00e5a0); }\n';
-      css += '    :where(input)::placeholder, :where(textarea)::placeholder { color: rgba(255,255,255,0.35); }\n';
-      css += '    form button[type=submit] { width: 100%; padding: 0.7rem; background: var(--colors-primary, #00e5a0); color: var(--colors-bg, #000); font-weight: 700; border: none; border-radius: 8px; cursor: pointer; margin-top: 0.25rem; }\n';
-      css += '    form button[type=submit]:hover { opacity: 0.9; }\n';
-      css += '    form .form-msg { margin-top: 0.5rem; font-size: 0.9rem; }\n';
+      if (this.usedInteractiveElements.has('input') && !this.themeDefaultElements.has('input')) selectors.push(':where(input)');
+      if (this.usedInteractiveElements.has('select') && !this.themeDefaultElements.has('select')) selectors.push(':where(select)');
+      if (this.usedInteractiveElements.has('textarea') && !this.themeDefaultElements.has('textarea')) selectors.push(':where(textarea)');
+      if (selectors.length > 0) {
+        css += `    ${selectors.join(', ')} { font-family: inherit; font-size: inherit; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #0d0d1a; color: inherit; }\n`;
+      }
+
     }
-    if (this.usedInteractiveElements.has('a')) {
+    if (this.usedInteractiveElements.has('a') && !this.themeDefaultElements.has('a')) {
       css += '    :where(a) { color: #667eea; text-decoration: none; }\n';
       css += '    :where(a):hover { text-decoration: underline; }\n';
     }
