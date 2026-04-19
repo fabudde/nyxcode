@@ -1729,18 +1729,25 @@ export class Compiler {
       if (typeof a.value === 'string' && a.value !== 'true') {
         // Resolve .field references in attribute values
         let val = a.value;
-        if (val.startsWith('.')) {
-          val = `\${${varName}${this.toOptionalChain(val)}}`;
-        } else if ((a.name === 'href' || a.name === 'link') && /\.[a-zA-Z_]/.test(val)) {
-          // v0.27.0: mixed static+dynamic href: /path/.id -> /path/${item.id}
-          val = val.replace(/\.([a-zA-Z_][a-zA-Z0-9_]*)/g, (_: string, field: string) => {
-            return `\${${varName}.${field}}`;
-          });
-        }
         if (a.name === 'preset') return `class="nyx-p_${a.value}"`;
         if (a.name === 'style') {
-          const expanded = this.expandInlineShorthands(val);
+          let expanded = this.expandInlineShorthands(val);
+          // Style: resolve .field but skip CSS decimals (.5rem)
+          expanded = expanded.replace(/(?<![0-9])\.([a-zA-Z_][a-zA-Z0-9_]*)/g, (_: string, field: string) => {
+            return `\${${varName}.${field}}`;
+          });
           return `style="${expanded}"`;
+        }
+        // Resolve .field references in ALL attributes
+        // Pure .field (whole value is a field ref) or mixed /path/.id
+        if (val.startsWith('.') && /^\.[a-zA-Z_][a-zA-Z0-9_.]*$/.test(val)) {
+          // Pure field: .name or .author.name
+          val = `\${${varName}${this.toOptionalChain(val)}}`;
+        } else if (/(?<![0-9])\.([a-zA-Z_])/.test(val)) {
+          // Mixed: /path/.id, some text .field more text
+          val = val.replace(/(?<![0-9])\.([a-zA-Z_][a-zA-Z0-9_]*)/g, (_: string, field: string) => {
+            return `\${${varName}.${field}}`;
+          });
         }
         return `${a.name}="${val}"`;
       }
