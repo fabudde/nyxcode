@@ -1734,7 +1734,7 @@ export class Compiler {
         if (a.name === 'style') {
           let expanded = this.expandInlineShorthands(val);
           // Style: resolve .field but skip CSS decimals (.5rem)
-          expanded = expanded.replace(/(?<![0-9])\.([a-zA-Z_][a-zA-Z0-9_]*)/g, (_: string, field: string) => {
+          expanded = expanded.replace(/(?<![a-zA-Z0-9_])\.([a-zA-Z_][a-zA-Z0-9_]*)/g, (_: string, field: string) => {
             return `\${${varName}.${field}}`;
           });
           return `style="${expanded}"`;
@@ -1744,9 +1744,9 @@ export class Compiler {
         if (val.startsWith('.') && /^\.[a-zA-Z_][a-zA-Z0-9_.]*$/.test(val)) {
           // Pure field: .name or .author.name
           val = `\${${varName}${this.toOptionalChain(val)}}`;
-        } else if (/(?<![0-9])\.([a-zA-Z_])/.test(val)) {
+        } else if (/(?<![a-zA-Z0-9_])\.([a-zA-Z_])/.test(val)) {
           // Mixed: /path/.id, some text .field more text
-          val = val.replace(/(?<![0-9])\.([a-zA-Z_][a-zA-Z0-9_]*)/g, (_: string, field: string) => {
+          val = val.replace(/(?<![a-zA-Z0-9_])\.([a-zA-Z_][a-zA-Z0-9_]*)/g, (_: string, field: string) => {
             return `\${${varName}.${field}}`;
           });
         }

@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.27.1)
+# NYXCODE.md — AI Context File (v0.27.3)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -1664,6 +1664,94 @@ each posts -> post { div { h3 .title, span .author.name } }
 - `empty` → hidden by default, shown when data is empty array
 - Both inline (`loading -> p "..."`) and block (`loading -> { ... }`) syntax
 - Zero JavaScript — compiler generates all state management
+
+### Field References in Templates (v0.27.3+)
+
+Inside `each` templates, `.field` resolves in **all** contexts:
+
+```nyx
+each users -> user {
+  # Text content
+  h1 .name
+  p .email
+
+  # ALL attributes — not just href!
+  img src=.avatar alt=.name
+  a href="/profile/.id" title=.name
+  div data-role=.role class=.status
+  span data-value=.score .score
+}
+```
+
+**Rules:**
+- `.field` as entire value: `src=.avatar` → `src="${item.avatar}"`
+- `.field` mixed with static text: `href="/users/.id"` → `href="/users/${item.id}"`
+- Nested fields: `.author.name` → `${item.author?.name}` (optional chaining)
+- `style` attribute: `.field` works but CSS decimals (`.5rem`) are preserved
+- JS property chains (e.g. `this.dataset.aid`) are NOT resolved (word-char lookbehind)
+
+### Page Authentication (v0.27.3+)
+
+```nyx
+page /dashboard auth {
+  # This page requires login — auto-redirects to /login if no JWT token
+  h1 "My Dashboard"
+}
+```
+
+The `auth` keyword after the page path generates a client-side guard:
+- Checks `localStorage.getItem("token")`
+- Redirects to `/login` if missing
+- No JavaScript needed in .nyx source
+
+### Conditional Visibility (v0.27.3+)
+
+```nyx
+nav {
+  a "Login" href="/login" visible=guest       # Only shown when NOT logged in
+  a "Dashboard" href="/dashboard" visible=auth # Only shown when logged in
+  a "Logout" href="#" visible=auth onclick="localStorage.removeItem('token');location.href='/login'"
+}
+```
+
+- `visible=auth` → element hidden by default, shown when JWT token exists
+- `visible=guest` → element shown by default, hidden when JWT token exists
+- Auto-injects toggle script only when feature is used
+- Works on any element (nav links, buttons, sections, etc.)
+
+### URL Parameters in Data Sources (v0.27.3+)
+
+```nyx
+page /detail auth {
+  data item = get "/api/items/$param.id" auth {
+    loading -> p "Loading..."
+  }
+  each item -> i {
+    h1 .name
+    p .description
+  }
+}
+```
+
+- `$param.id` extracts `?id=X` from the URL query string
+- Auto-generates guard: redirects to `/dashboard` if parameter is missing
+- Use quoted string syntax for URLs with `$param`: `get "/api/path/$param.id"`
+- Works with multiple params: `$param.id`, `$param.slug`, etc.
+
+### Single-Object API Responses (v0.27.3+)
+
+When a `data` source returns a single object (not an array), it's automatically
+wrapped in an array. This means `each` works for both list and detail pages:
+
+```nyx
+# List page — API returns array
+data users = get /api/users
+each users -> user { p .name }
+
+# Detail page — API returns single object, auto-wrapped in [object]
+data user = get "/api/users/$param.id" auth
+each user -> u { h1 .name, p .email }
+```
 
 ## Default Props (v0.3+)
 ```nyx
