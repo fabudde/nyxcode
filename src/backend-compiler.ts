@@ -429,9 +429,68 @@ ${handlerBody}  } catch (e) {
 });`;
 }
 
+// ── Every blocks (background workers) ──────────────────────────────────
+
+function compileEveryBlocks(everys: any[]): string {
+  if (!everys || everys.length === 0) return '';
+  
+  const intervals: string[] = [];
+  const cleanups: string[] = [];
+  
+  for (const every of everys) {
+    const name = every.label ? every.label.replace(/[^a-zA-Z0-9_]/g, '_') : `worker_${every.intervalMs}`;
+    const body = every.body.map((stmt: any) => compileEveryStatement(stmt)).join('\n    ');
+    
+    intervals.push(`
+// every ${every.interval}${every.label ? ` '${every.label}'` : ''}
+const interval_${name} = setInterval(async () => {
+  try {
+    ${body}
+  } catch(e) {
+    console.error('[every:${name}]', e.message);
+  }
+}, ${every.intervalMs});`);
+    
+    cleanups.push(`clearInterval(interval_${name});`);
+  }
+  
+  return `
+// ── Background Workers (every blocks) ─────────────────────────────────
+${intervals.join('\n')}
+
+process.on('SIGTERM', () => {
+  ${cleanups.join('\n  ')}
+  server.close();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  ${cleanups.join('\n  ')}
+  server.close();
+  process.exit(0);
+});
+
+console.log('⏰ ${everys.length} background worker(s) started');
+`;
+}
+
+function compileEveryStatement(stmt: any): string {
+  if (stmt.type === 'Query') {
+    // query "SQL" → db.prepare(sql).run() or .all()
+    const sql = stmt.sql || stmt.value || '';
+    if (sql.trim().toUpperCase().startsWith('SELECT')) {
+      return `const rows = db.prepare(${JSON.stringify(sql)}).all();`;
+    } else {
+      return `db.prepare(${JSON.stringify(sql)}).run();`;
+    }
+  }
+  // Fallback: treat as raw JS
+  return `// unsupported statement type: ${stmt.type}`;
+}
+
 // ── Main export ────────────────────────────────────────────────────────
 
-export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = [], pagePaths: string[] = [], middlewares: MiddlewareNode[] = []): string {
+export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = [], pagePaths: string[] = [], middlewares: MiddlewareNode[] = [], everys: any[] = []): string {
   const hasUploads = tables.some(t => t.columns.some(c => c.type === 'upload'));
   const realtimeTables = tables.filter(t => t.columns.some(c => c.constraints.includes('realtime')));
   const hasRealtime = realtimeTables.length > 0;
@@ -545,6 +604,7 @@ app.use(express.static(distDir));
 
 const PORT = process.env.PORT || ${defaultPort};
 const server = app.listen(PORT, () => console.log(\`NyxCode server listening on :\${PORT}\`));
+${compileEveryBlocks(everys)}
 ${hasRealtime ? `
 // WebSocket server for realtime tables
 const wss = new WebSocketServer({ server });

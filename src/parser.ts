@@ -24,7 +24,7 @@ import {
   LimitStatement, QueryStatement, ResponsiveBlock, SecurityNode, SecurityRule,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
   HeadStatement, AnimateStatement, PseudoElementBlock, LayoutNode, KeyframesNode,
-  ScriptStatement, FormAction, ConfigNode, EnvVar, HookNode, MiddlewareNode,
+  ScriptStatement, FormAction, ConfigNode, EnvVar, HookNode, MiddlewareNode, EveryNode,
 } from './ast.js';
 
 /** Set of tags that are recognized as built-in elements */
@@ -140,6 +140,7 @@ export class Parser {
       case TokenType.Layout: return this.parseLayout();
       case TokenType.Preset: return this.parsePreset() as any;
       case TokenType.Keyframes: return this.parseTopLevelKeyframes() as any;
+      case TokenType.Every: return this.parseEvery();
       case TokenType.Identifier:
         if (token.value === 'middleware') return this.parseMiddleware();
         if (token.value === 'meta') return this.parseMeta() as any;
@@ -252,6 +253,53 @@ export class Parser {
     const body = this.parseBody();
     this.consume(TokenType.RightBrace);
     return { type: 'Hook', timing, method, path, body, line: start.line, col: start.col };
+  }
+
+  private parseEvery(): EveryNode {
+    const start = this.advance(); // consume 'every'
+    // Parse interval: 30s, 5m, 1h, 1d
+    const intervalToken = this.advance();
+    const interval = intervalToken.value;
+    const intervalMs = this.parseIntervalToMs(interval);
+    if (intervalMs < 5000) {
+      throw this.error(`Minimum interval is 5s (got ${interval}). This prevents accidental server overload.`);
+    }
+    // Optional label (string)
+    let label: string | undefined;
+    if (this.peek().type === TokenType.String) {
+      label = this.advance().value;
+    }
+    // Optional timeout=Ns
+    let timeout: string | undefined;
+    while (this.peek().type === TokenType.Identifier && this.peek().value.startsWith('timeout')) {
+      const t = this.advance().value;
+      if (t.includes('=')) {
+        timeout = t.split('=')[1];
+      } else if (this.peek().type === TokenType.Equals) {
+        this.advance(); // consume =
+        timeout = this.advance().value;
+      }
+    }
+    while (this.peek().type === TokenType.Newline) this.advance();
+    this.consume(TokenType.LeftBrace);
+    const body = this.parseBody();
+    this.consume(TokenType.RightBrace);
+    return { type: 'Every', interval, intervalMs, label, timeout, body, line: start.line, col: start.col };
+  }
+
+  private parseIntervalToMs(interval: string): number {
+    const match = interval.match(/^(\d+)(ms|s|m|h|d)$/);
+    if (!match) throw this.error(`Invalid interval format: '${interval}'. Use: 30s, 5m, 1h, 1d`);
+    const value = parseInt(match[1]);
+    const unit = match[2];
+    switch (unit) {
+      case 'ms': return value;
+      case 's': return value * 1000;
+      case 'm': return value * 60 * 1000;
+      case 'h': return value * 60 * 60 * 1000;
+      case 'd': return value * 24 * 60 * 60 * 1000;
+      default: return value * 1000;
+    }
   }
 
   private parseMiddleware(): MiddlewareNode {

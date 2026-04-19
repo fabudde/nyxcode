@@ -19,7 +19,7 @@ export interface Program extends BaseNode {
 }
 
 export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode | ConfigNode | HookNode | MiddlewareNode | FootnotesStatement
-  | PresetNode | HeadStatement | KeyframesNode;
+  | PresetNode | HeadStatement | KeyframesNode | EveryNode;
 
 /** `keyframes name { 0% { ... } 50% { ... } 100% { ... } }` — top-level @keyframes definition (v0.25.0 #110) */
 export interface KeyframesNode extends BaseNode {
@@ -448,6 +448,15 @@ export interface HookNode extends BaseNode {
   method: string;
   path: string;
   body: Statement[];
+}
+
+export interface EveryNode extends BaseNode {
+  type: 'Every';
+  interval: string;       // e.g. '30s', '5m', '1h'
+  intervalMs: number;     // computed milliseconds
+  label?: string;         // optional label
+  timeout?: string;       // optional max runtime per tick
+  body: Statement[];      // query/fetch/update statements
 }
 
 export interface CorsConfig {

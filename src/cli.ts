@@ -899,6 +899,7 @@ try {
     const security = ast.body.find((n: any) => n.type === 'Security') as SecurityNode | undefined;
     const config = ast.body.find((n: any) => n.type === 'Config') as ConfigNode | undefined;
     const hooks = ast.body.filter((n: any) => n.type === 'Hook') as HookNode[];
+    const everys = ast.body.filter((n: any) => n.type === 'Every') as any[];
 
     // Issue #80: auto-inject users table when security block references one that wasn't declared.
     // Previously the compiler generated INSERT/SELECT against `users` without a corresponding
@@ -941,7 +942,7 @@ try {
         ? security.rules.filter(r => r.name === 'protect').map(r => r.value)
         : [];
       const middlewares = ast.body.filter((n: any) => n.type === 'Middleware') as any[];
-      let serverCode = compileBackend(tables, apis, config, hooks, [], middlewares);
+      let serverCode = compileBackend(tables, apis, config, hooks, [], middlewares, everys);
       if (security) {
         // Inject auth AFTER express.json() but BEFORE create tables
         const authCode = compileAuth(security, tables, config);

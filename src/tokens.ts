@@ -46,6 +46,7 @@ export enum TokenType {
   Before = 'Before',
   After = 'After',
   Keyframes = 'Keyframes',
+  Every = 'Every',
 
   // Operators & Punctuation
   LeftBrace = 'LeftBrace',       // {
@@ -115,6 +116,7 @@ export const KEYWORDS: Record<string, TokenType> = {
   before: TokenType.Before,
   after: TokenType.After,
   keyframes: TokenType.Keyframes,
+  every: TokenType.Every,
 };
 
 export interface Token {
