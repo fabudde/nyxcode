@@ -16,7 +16,7 @@
  *   author [users] → LEFT JOIN + nested JSON response + cascade delete
  */
 
-import { TableNode, ApiNode, ColumnDef, QueryStatement, ValidateStatement, RespondStatement, ConfigNode, HookNode, MiddlewareNode } from './ast.js';
+import { TableNode, ApiNode, ColumnDef, QueryStatement, ValidateStatement, RespondStatement, ConfigNode, HookNode, MiddlewareNode, ActionNode, EnvNode, EmailStatement } from './ast.js';
 
 // ── Type & constraint maps ─────────────────────────────────────────────
 
@@ -385,15 +385,21 @@ function compileApiRoute(api: ApiNode): string {
     middleware = 'authMiddleware, ';
   }
   
-  // Extract query statements, validate statements, respond statements from body
+  // Extract statements from body — sequential order preserved for let/query/respond
   const queries: QueryStatement[] = [];
   const validates: ValidateStatement[] = [];
   const responds: RespondStatement[] = [];
+  const lets: any[] = [];
+  const emails: any[] = [];
+  const actionCalls: any[] = [];
   
   for (const stmt of api.body) {
     if (stmt.type === 'Query') queries.push(stmt as QueryStatement);
     if (stmt.type === 'Validate') validates.push(stmt as ValidateStatement);
     if (stmt.type === 'Respond') responds.push(stmt as RespondStatement);
+    if (stmt.type === 'Let') lets.push(stmt);
+    if (stmt.type === 'Email') emails.push(stmt);
+    if (stmt.type === 'ActionCall') actionCalls.push(stmt);
   }
   
   let handlerBody = '';
@@ -418,6 +424,44 @@ function compileApiRoute(api: ApiNode): string {
     }
   }
   
+  // Generate let bindings (v0.30)
+  for (const l of lets) {
+    if (l.value.kind === 'query') {
+      const sql = l.value.sql;
+      const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
+      const paramList = params.map(p => p.startsWith('req.') ? p : `req.body.${p}`).join(', ');
+      const safeSql = sql.replace(/\$([\w.]+)/g, '?');
+      const isSingleRow = /\blimit\s+1\b/i.test(safeSql) || /\bWHERE\s+\w+\s*=\s*\?/i.test(safeSql);
+      if (isSingleRow) {
+        handlerBody += `    const ${l.name} = db.prepare('${safeSql}').get(${paramList});\n`;
+      } else {
+        handlerBody += `    const ${l.name} = db.prepare('${safeSql}').all(${paramList});\n`;
+      }
+    } else if (l.value.kind === 'builtin') {
+      const fn = l.value.fn;
+      const args = l.value.args;
+      if (['sum', 'count', 'avg', 'min', 'max'].includes(fn)) {
+        handlerBody += `    const ${l.name} = ${args[0]}.reduce((a, b) => a + (Number(b.${args[1]?.replace(/"/g, '')}) || 0), 0);\n`;
+      } else if (fn === 'len') {
+        handlerBody += `    const ${l.name} = ${args[0]}.length;\n`;
+      }
+    } else if (l.value.kind === 'call') {
+      handlerBody += `    const ${l.name} = await ${l.value.target}.${l.value.method}(${l.value.args.join(', ')});\n`;
+    } else if (l.value.kind === 'arithmetic') {
+      handlerBody += `    const ${l.name} = ${l.value.expr};\n`;
+    }
+  }
+
+  // Generate action calls (v0.30)
+  for (const ac of actionCalls) {
+    handlerBody += `    await action_${ac.name}(${ac.args.join(', ')});\n`;
+  }
+
+  // Generate email sends (v0.30)
+  for (const em of emails) {
+    handlerBody += `    await sendEmail({ to: ${em.to}, subject: ${JSON.stringify(em.subject)}, body: ${JSON.stringify(em.body)} });\n`;
+  }
+
   // Generate query execution
   if (queries.length > 0) {
     const q = queries[0];
@@ -468,6 +512,78 @@ ${handlerBody}  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });`;
+}
+
+// ── Action blocks (reusable server-side functions) ─────────────────────
+
+function compileAction(action: any): string {
+  const params = action.params.map((p: any) => p.name).join(', ');
+  let body = '';
+  
+  for (const stmt of action.body) {
+    if (stmt.type === 'Let') {
+      if (stmt.value.kind === 'query') {
+        const sql = stmt.value.sql;
+        const safeSql = sql.replace(/\$([\w.]+)/g, '?');
+        const params = [...sql.matchAll(/\$([\w.]+)/g)].map((m: any) => m[1]);
+        body += `    const ${stmt.name} = db.prepare(\`${safeSql}\`).get(${params.join(', ')});\n`;
+      } else if (stmt.value.kind === 'call') {
+        body += `    const ${stmt.name} = await ${stmt.value.target}.${stmt.value.method}(${stmt.value.args.join(', ')});\n`;
+      } else {
+        body += `    const ${stmt.name} = ${stmt.value.expr || 'null'};\n`;
+      }
+    } else if (stmt.type === 'Email') {
+      body += `    await sendEmail({ to: ${stmt.to}, subject: ${JSON.stringify(stmt.subject)}, body: ${JSON.stringify(stmt.body)} });\n`;
+    } else if (stmt.type === 'Query') {
+      const safeSql = stmt.sql.replace(/\$([\w.]+)/g, '?');
+      const sqlParams = [...stmt.sql.matchAll(/\$([\w.]+)/g)].map((m: any) => m[1]);
+      body += `    db.prepare(\`${safeSql}\`).run(${sqlParams.join(', ')});\n`;
+    } else if (stmt.type === 'ActionCall') {
+      body += `    await action_${stmt.name}(${stmt.args.join(', ')});\n`;
+    } else if (stmt.type === 'Respond') {
+      body += `    return { status: ${stmt.status || 200}, body: ${JSON.stringify(stmt.body || {})} };\n`;
+    }
+  }
+  
+  let errorBlock = '';
+  if (action.errorHandler) {
+    errorBlock = `  } catch (e) {\n`;
+    for (const stmt of action.errorHandler) {
+      if (stmt.type === 'Respond') {
+        errorBlock += `    return { status: ${stmt.status || 500}, body: ${JSON.stringify(stmt.body || { error: 'Internal error' })} };\n`;
+      }
+    }
+  } else {
+    errorBlock = `  } catch (e) {\n    console.error('[action:${action.name}]', e.message);\n    throw e;\n`;
+  }
+  
+  return `
+// action ${action.name}(${params})
+async function action_${action.name}(${params}) {
+  try {
+${body}${errorBlock}  }
+}
+`;
+}
+
+// ── Env validation ─────────────────────────────────────────────────────
+
+function compileEnvNode(env: any): string {
+  if (!env || !env.vars || env.vars.length === 0) return '';
+  
+  const checks: string[] = [];
+  for (const v of env.vars) {
+    if (v.required) {
+      checks.push(`if (!process.env.${v.name}) { console.error('Missing required env: ${v.name}'); process.exit(1); }`);
+    } else if (v.defaultValue) {
+      checks.push(`if (!process.env.${v.name}) process.env.${v.name} = '${v.defaultValue}';`);
+    }
+  }
+  
+  return `
+// ── Environment Validation ─────────────────────────────────────────────
+${checks.join('\n')}
+`;
 }
 
 // ── Every blocks (background workers) ──────────────────────────────────
@@ -648,7 +764,7 @@ function compileEveryStatement(stmt: any): string {
 
 // ── Main export ────────────────────────────────────────────────────────
 
-export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = [], pagePaths: string[] = [], middlewares: MiddlewareNode[] = [], everys: any[] = []): string {
+export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = [], pagePaths: string[] = [], middlewares: MiddlewareNode[] = [], everys: any[] = [], actions: any[] = [], envNode?: any): string {
   const hasUploads = tables.some(t => t.columns.some(c => c.type === 'upload'));
   const realtimeTables = tables.filter(t => t.columns.some(c => c.constraints.includes('realtime')));
   const hasRealtime = realtimeTables.length > 0;
@@ -681,6 +797,8 @@ export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config
   const createStatements = tables.map(t => `db.exec(\`${createTableSQL(t)}\`);`).join('\n');
   const crudBlocks = tables.map(t => crudForTable(t, tables)).join('\n');
   const hookBlocks = hooks.map(h => compileHook(h)).join('\n');
+  const actionBlocks = actions.map(a => compileAction(a)).join('\n');
+  const envValidation = envNode ? compileEnvNode(envNode) : '';
   const apiBlocks = apis.map(a => compileApiRoute(a)).join('\n');
   // Custom API routes go BEFORE CRUD (so /mine matches before /:id)
   // Order: apiBlocks first, then crudBlocks
@@ -731,6 +849,8 @@ db.pragma('foreign_keys = ON');
 // ── Create tables ──────────────────────────────────────────────
 
 ${createStatements}
+${actionBlocks}
+${envValidation}
 ${apiBlocks}
 ${crudBlocks}
 ${hookBlocks}

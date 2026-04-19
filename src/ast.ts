@@ -133,7 +133,10 @@ export type Statement =
   | AnimateStatement
   | PresetNode
   | ScriptStatement
-  | FootnotesStatement;
+  | FootnotesStatement
+  | LetStatement
+  | EmailStatement
+  | ActionCallStatement;
 
 /** `head { ... }` — inject into <head>: fonts, meta, raw CSS */
 export interface HeadStatement extends BaseNode {
