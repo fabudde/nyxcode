@@ -197,6 +197,14 @@ function crudForTable(table: TableNode, allTables: TableNode[]): string {
   const placeholders = colNames.map(() => '?').join(', ');
   const colList = colNames.join(', ');
 
+  // Column metadata for filtering/search (Feature 2 & 3)
+  const allColNames = table.columns.map(c => c.name);
+  const textColNames = table.columns
+    .filter(c => c.type === 'text' || c.type === 'email')
+    .map(c => c.name);
+  const validColSetLiteral = JSON.stringify(allColNames);
+  const textColSetLiteral = JSON.stringify(textColNames);
+
   const validColSet = JSON.stringify(colNames);
   const updateBody = `
   const validCols = new Set(${validColSet});
@@ -213,7 +221,7 @@ function crudForTable(table: TableNode, allTables: TableNode[]): string {
   const joinCode = buildJoinCode(table, allTables);
   
   let mapperBlock = '';
-  let getAllExpr = `db.prepare('SELECT * FROM ${n}').all()${stripPassword}`;
+  let mapperSuffix = stripPassword;
   let getOneExpr = `db.prepare('SELECT * FROM ${n} WHERE id = ?').get(req.params.id)`;
   let getOneResponse = `
   if (row.password) { const { password: _, ...safe } = row; return res.json(safe); }
@@ -227,7 +235,7 @@ function crudForTable(table: TableNode, allTables: TableNode[]): string {
 
   if (joinCode) {
     mapperBlock = '\n' + joinCode.mapperFn;
-    getAllExpr = joinCode.getAllExpr;
+    mapperSuffix = `.map(mapRow_${n})`;
     getOneExpr = joinCode.getOneExpr;
     getOneResponse = `\n  res.json(mapRow_${n}(row));`;
     postResponse = `const created = ${joinCode.getOneExpr.replace('req.params.id', 'info.lastInsertRowid')};
@@ -260,7 +268,37 @@ function crudForTable(table: TableNode, allTables: TableNode[]): string {
 // ── ${n} CRUD ──────────────────────────────────────
 ${mapperBlock}
 app.get('/api/${n}', (req, res) => {
-  res.json(${getAllExpr});
+  // ── Filtering & Search ──
+  const validColumns = new Set(${validColSetLiteral});
+  const textColumns = ${textColSetLiteral};
+  const filters = [];
+  const params = [];
+  for (const [key, value] of Object.entries(req.query)) {
+    if (key === 'page' || key === 'limit' || key === 'search') continue;
+    if (validColumns.has(key)) {
+      filters.push(key + ' = ?');
+      params.push(value);
+    }
+  }
+  if (req.query.search && textColumns.length > 0) {
+    filters.push('(' + textColumns.map(c => c + ' LIKE ?').join(' OR ') + ')');
+    textColumns.forEach(() => params.push('%' + req.query.search + '%'));
+  }
+  const where = filters.length > 0 ? ' WHERE ' + filters.join(' AND ') : '';
+
+  // ── Pagination (opt-in: only when ?page= or ?limit= is provided) ──
+  if (req.query.page || req.query.limit) {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+    const total = db.prepare('SELECT COUNT(*) as count FROM ${n}' + where).get(...params).count;
+    const rows = db.prepare('SELECT * FROM ${n}' + where + ' LIMIT ? OFFSET ?').all(...params, limit, offset)${mapperSuffix};
+    return res.json({ data: rows, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  }
+
+  // ── Default: return plain array (backwards-compatible) ──
+  const rows = db.prepare('SELECT * FROM ${n}' + where).all(...params)${mapperSuffix};
+  res.json(rows);
 });
 
 app.get('/api/${n}/:id', (req, res) => {
@@ -439,13 +477,13 @@ function compileEveryBlocks(everys: any[]): string {
   
   for (const every of everys) {
     const name = every.label ? every.label.replace(/[^a-zA-Z0-9_]/g, '_') : `worker_${every.intervalMs}`;
-    const body = every.body.map((stmt: any) => compileEveryStatement(stmt)).join('\n    ');
+    const body = compileEveryBody(every.body);
     
     intervals.push(`
 // every ${every.interval}${every.label ? ` '${every.label}'` : ''}
 const interval_${name} = setInterval(async () => {
   try {
-    ${body}
+${body}
   } catch(e) {
     console.error('[every:${name}]', e.message);
   }
@@ -474,6 +512,93 @@ console.log('⏰ ${everys.length} background worker(s) started');
 `;
 }
 
+/**
+ * Compile an every-block body with multi-statement support.
+ *
+ * If the first statement is a SELECT query, its result is stored in `rows`.
+ * Subsequent statements that reference `$row.field` are wrapped in a
+ * `for (const row of rows)` loop, with `$row.field` compiled to `row.field`.
+ * This enables patterns like:
+ *
+ *   every 60s 'health-check' {
+ *     query "SELECT id, url FROM monitors"
+ *     query "UPDATE monitors SET last_check = datetime('now') WHERE id = $row.id"
+ *   }
+ */
+function compileEveryBody(stmts: any[]): string {
+  if (!stmts || stmts.length === 0) return '    // empty body';
+
+  // Single statement — simple path
+  if (stmts.length === 1) {
+    return '    ' + compileEveryStatement(stmts[0]);
+  }
+
+  // Multi-statement: check if first is a SELECT (produces rows)
+  const first = stmts[0];
+  const firstSql = (first.type === 'Query') ? (first.sql || first.value || '') : '';
+  const firstIsSelect = firstSql.trim().toUpperCase().startsWith('SELECT');
+
+  if (!firstIsSelect) {
+    // No leading SELECT — just emit all statements sequentially
+    return stmts.map((s: any) => '    ' + compileEveryStatement(s)).join('\n');
+  }
+
+  // First is SELECT → store in `rows`, then check remaining for $row references
+  const lines: string[] = [];
+  lines.push(`    const rows = db.prepare(${JSON.stringify(firstSql)}).all();`);
+
+  // Partition remaining statements into row-dependent and independent
+  const remaining = stmts.slice(1);
+  const hasRowRef = (s: any): boolean => {
+    if (s.type === 'Query') {
+      const sql = s.sql || s.value || '';
+      return /\$row\./.test(sql);
+    }
+    return false;
+  };
+
+  const anyRowRefs = remaining.some(hasRowRef);
+
+  if (anyRowRefs) {
+    lines.push('    for (const row of rows) {');
+    for (const stmt of remaining) {
+      lines.push('      ' + compileEveryStatementInLoop(stmt));
+    }
+    lines.push('    }');
+  } else {
+    // No $row references — just emit sequentially after the SELECT
+    for (const stmt of remaining) {
+      lines.push('    ' + compileEveryStatement(stmt));
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Compile a single statement inside a `for (const row of rows)` loop.
+ * Replaces `$row.field` with `row.field` in SQL and uses parameterized queries.
+ */
+function compileEveryStatementInLoop(stmt: any): string {
+  if (stmt.type === 'Query') {
+    const sql = stmt.sql || stmt.value || '';
+    // Extract $row.field references for parameterized binding
+    const rowRefs = [...sql.matchAll(/\$row\.(\w+)/g)].map((m: any) => m[1]);
+    if (rowRefs.length > 0) {
+      const safeSql = sql.replace(/\$row\.(\w+)/g, '?');
+      const params = rowRefs.map((f: string) => `row.${f}`).join(', ');
+      if (safeSql.trim().toUpperCase().startsWith('SELECT')) {
+        return `const result = db.prepare(${JSON.stringify(safeSql)}).all(${params});`;
+      } else {
+        return `db.prepare(${JSON.stringify(safeSql)}).run(${params});`;
+      }
+    }
+    // No $row refs inside loop — just compile normally
+    return compileEveryStatement(stmt);
+  }
+  return compileEveryStatement(stmt);
+}
+
 function compileEveryStatement(stmt: any): string {
   if (stmt.type === 'Query') {
     // query "SQL" → db.prepare(sql).run() or .all()
@@ -484,8 +609,8 @@ function compileEveryStatement(stmt: any): string {
       return `db.prepare(${JSON.stringify(sql)}).run();`;
     }
   }
-  // Fallback: treat as raw JS
-  return `// unsupported statement type: ${stmt.type}`;
+  // Fallback: emit as comment for unsupported statement types
+  return `// TODO: unsupported statement in every block: ${stmt.type}`;
 }
 
 // ── Main export ────────────────────────────────────────────────────────
