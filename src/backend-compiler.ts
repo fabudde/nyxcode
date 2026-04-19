@@ -443,9 +443,9 @@ function compileApiRoute(api: ApiNode): string {
       const safeSql = sql.replace(/\$([\w.]+)/g, '?');
       const isSingleRow = /\blimit\s+1\b/i.test(safeSql) || /\bWHERE\s+\w+\s*=\s*\?/i.test(safeSql);
       if (isSingleRow) {
-        handlerBody += `    const ${l.name} = db.prepare('${safeSql}').get(${paramList});\n`;
+        handlerBody += `    const ${l.name} = db.prepare(\`${safeSql}\`).get(${paramList});\n`;
       } else {
-        handlerBody += `    const ${l.name} = db.prepare('${safeSql}').all(${paramList});\n`;
+        handlerBody += `    const ${l.name} = db.prepare(\`${safeSql}\`).all(${paramList});\n`;
       }
     } else if (l.value.kind === 'builtin') {
       const fn = l.value.fn;
