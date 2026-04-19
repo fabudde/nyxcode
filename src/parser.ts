@@ -1006,6 +1006,22 @@ export class Parser {
       return { type: 'Use', path, line: start.line, col: start.col };
     }
 
+    // Form 1b: `use npm:"package"` — Tier 2 raw npm import (v0.30)
+    if (this.check(TokenType.Identifier) && this.peek().value === 'npm') {
+      this.advance(); // consume 'npm'
+      if (this.check(TokenType.Colon)) this.advance(); // consume ':'
+      const pkgName = this.consume(TokenType.String).value;
+      return { type: 'Use', path: pkgName, packageMode: 'npm', packageName: pkgName, line: start.line, col: start.col };
+    }
+
+    // Form 1c: `use stripe` — Tier 1 built-in adapter (v0.30)
+    const TIER1_PACKAGES = ['stripe', 'nodemailer', 'redis', 'bcrypt', 'jsonwebtoken', 'better-sqlite3', 'sharp', 'resend', 'uuid'];
+    const BLOCKED_PACKAGES = ['child_process', 'fs', 'eval', 'vm', 'cluster', 'worker_threads', 'dgram', 'net', 'tls', 'http2'];
+    if (this.check(TokenType.Identifier) && TIER1_PACKAGES.includes(this.peek().value)) {
+      const pkgName = this.advance().value;
+      return { type: 'Use', path: pkgName, packageMode: 'builtin', packageName: pkgName, line: start.line, col: start.col };
+    }
+
     // Form 2/3: `use componentName(...)` or `use componentName key=val`
     const name = this.consumeIdentifier();
     const attributes: Attribute[] = [];

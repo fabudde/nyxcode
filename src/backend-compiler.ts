@@ -596,6 +596,99 @@ ${checks.join('\n')}
 `;
 }
 
+// ── Use Statements (package imports) ──────────────────────────────────
+
+const TIER1_ADAPTERS: Record<string, { require: string; varName: string; init: string }> = {
+  stripe: {
+    require: "const Stripe = require('stripe');",
+    varName: 'stripe',
+    init: "const stripe = Stripe(process.env.STRIPE_KEY || process.env.STRIPE_SECRET_KEY);"
+  },
+  nodemailer: {
+    require: "const nodemailer = require('nodemailer');",
+    varName: 'mailer',
+    init: `const mailer = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'localhost',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined
+});
+async function sendEmail({ to, subject, body }) {
+  return mailer.sendMail({ from: process.env.SMTP_FROM || 'noreply@localhost', to, subject, html: body });
+}`
+  },
+  redis: {
+    require: "const Redis = require('ioredis');",
+    varName: 'redis',
+    init: "const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');"
+  },
+  bcrypt: {
+    require: "const bcrypt = require('bcryptjs');",
+    varName: 'bcrypt',
+    init: ''
+  },
+  jsonwebtoken: {
+    require: "const jwt = require('jsonwebtoken');",
+    varName: 'jwt',
+    init: ''
+  },
+  'better-sqlite3': {
+    require: '', // already included
+    varName: '',
+    init: ''
+  },
+  sharp: {
+    require: "const sharp = require('sharp');",
+    varName: 'sharp',
+    init: ''
+  },
+  resend: {
+    require: "const { Resend } = require('resend');",
+    varName: 'resend',
+    init: "const resend = new Resend(process.env.RESEND_API_KEY);"
+  },
+  uuid: {
+    require: "const { v4: uuidv4 } = require('uuid');",
+    varName: 'uuidv4',
+    init: ''
+  }
+};
+
+const BLOCKED_PACKAGES = new Set([
+  'child_process', 'fs', 'eval', 'vm', 'cluster', 'worker_threads',
+  'dgram', 'net', 'tls', 'http2', 'os', 'process', 'crypto'
+]);
+
+function compileUseStatements(useStmts: any[]): { imports: string; init: string } {
+  if (!useStmts || useStmts.length === 0) return { imports: '', init: '' };
+  
+  const imports: string[] = [];
+  const inits: string[] = [];
+  
+  for (const u of useStmts) {
+    if (!u.packageMode) continue; // skip file imports
+    
+    if (u.packageMode === 'builtin') {
+      const adapter = TIER1_ADAPTERS[u.packageName];
+      if (adapter) {
+        if (adapter.require) imports.push(adapter.require);
+        if (adapter.init) inits.push(adapter.init);
+      }
+    } else if (u.packageMode === 'npm') {
+      if (BLOCKED_PACKAGES.has(u.packageName)) {
+        throw new Error(`[NyxCode] BLOCKED: '${u.packageName}' is not allowed for security reasons.`);
+      }
+      // Tier 2: raw require with sanitized variable name
+      const safeName = u.packageName.replace(/[^a-zA-Z0-9_]/g, '_');
+      imports.push(`const ${safeName} = require('${u.packageName}'); // ⚠️ Tier 2: unverified npm package`);
+    }
+  }
+  
+  return {
+    imports: imports.length ? '\n// ── Package Imports ──\n' + imports.join('\n') : '',
+    init: inits.length ? '\n// ── Package Init ──\n' + inits.join('\n') : ''
+  };
+}
+
 // ── On Events (table lifecycle hooks) ──────────────────────────────────
 
 function compileOnEvents(onEvents: any[]): string {
@@ -823,7 +916,7 @@ function compileEveryStatement(stmt: any): string {
 
 // ── Main export ────────────────────────────────────────────────────────
 
-export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = [], pagePaths: string[] = [], middlewares: MiddlewareNode[] = [], everys: any[] = [], actions: any[] = [], envNode?: any, onEvents: any[] = []): string {
+export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config?: ConfigNode, hooks: HookNode[] = [], pagePaths: string[] = [], middlewares: MiddlewareNode[] = [], everys: any[] = [], actions: any[] = [], envNode?: any, onEvents: any[] = [], useStatements: any[] = []): string {
   const hasUploads = tables.some(t => t.columns.some(c => c.type === 'upload'));
   const realtimeTables = tables.filter(t => t.columns.some(c => c.constraints.includes('realtime')));
   const hasRealtime = realtimeTables.length > 0;
@@ -859,6 +952,7 @@ export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config
   const actionBlocks = actions.map(a => compileAction(a)).join('\n');
   const envValidation = envNode ? compileEnvNode(envNode) : '';
   const onEventBlocks = compileOnEvents(onEvents);
+  const { imports: useImports, init: useInit } = compileUseStatements(useStatements);
   const apiBlocks = apis.map(a => compileApiRoute(a)).join('\n');
   // Custom API routes go BEFORE CRUD (so /mine matches before /:id)
   // Order: apiBlocks first, then crudBlocks
@@ -872,12 +966,14 @@ const express = require('express');
 const path = require('path');
 const Database = require('better-sqlite3');
 const rateLimit = require('express-rate-limit');
+${useImports}
 
 const app = express();
 app.set('trust proxy', true);
 
 ${configValidation}
 app.use(express.json());
+${useInit}
 
 ${hasUploads ? `const multer = require('multer');
 const uploadDir = './uploads';

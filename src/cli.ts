@@ -307,7 +307,7 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
     // IMPORTANT: resolve child paths relative to the REAL path of this file — if we used the
     // pre-realpath absPath, a nested symlink could sneak `../` escapes past our bounds check.
     for (const node of imported.body) {
-      if (node.type === 'Use') {
+      if (node.type === 'Use' && !(node as any).packageMode) {
         const subResolved = resolveImportPath((node as UseStatement).path, absReal);
         if (subResolved !== null) {
           loadFile(subResolved, absReal, (node as UseStatement).path);
@@ -331,7 +331,7 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
   function mergeNodes(nodes: TopLevelNode[], fromFile: string): void {
     const fileRel = relative(projectRoot, fromFile);
     for (const node of nodes) {
-      if (node.type === 'Use') continue; // already processed
+      if (node.type === 'Use' && !(node as any).packageMode) continue; // file imports already processed
       if (node.type === 'Page') {
         const route = (node as PageNode).path;
         if (seenPages.has(route)) {
@@ -464,7 +464,7 @@ function flattenToSource(entryPath: string): { source: string; errors: string[];
       return;
     }
     for (const node of ast.body) {
-      if (node.type === 'Use') {
+      if (node.type === 'Use' && !(node as any).packageMode) {
         const sub = resolveInternalPath((node as UseStatement).path, absReal);
         if (sub !== null) walk(sub, absReal, (node as UseStatement).path);
       }
@@ -945,7 +945,8 @@ try {
       const actions = ast.body.filter((n: any) => n.type === 'Action') as any[];
       const envNode = ast.body.find((n: any) => n.type === 'Env') as any;
       const onEvents = ast.body.filter((n: any) => n.type === 'OnEvent') as any[];
-      let serverCode = compileBackend(tables, apis, config, hooks, [], middlewares, everys, actions, envNode, onEvents);
+      const useStmts = ast.body.filter((n: any) => n.type === 'Use' && n.packageMode) as any[];
+      let serverCode = compileBackend(tables, apis, config, hooks, [], middlewares, everys, actions, envNode, onEvents, useStmts);
       if (security) {
         // Inject auth AFTER express.json() but BEFORE create tables
         const authCode = compileAuth(security, tables, config);

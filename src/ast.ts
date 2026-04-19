@@ -102,6 +102,9 @@ export interface SecurityNode extends BaseNode {
 export interface UseStatement extends BaseNode {
   type: 'Use';
   path: string;
+  /** v0.30: package import mode */
+  packageMode?: 'builtin' | 'npm';
+  packageName?: string;
 }
 
 /** `layout { ... slot ... }` — wraps every page */
