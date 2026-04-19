@@ -1575,7 +1575,8 @@ export class Compiler {
       ${source.auth ? "const tk=localStorage.getItem('token');if(tk)headers['Authorization']='Bearer '+tk;" : ''}
       const res = await fetch('${url}', { headers });
       if(!res.ok){var _e=new Error('HTTP '+res.status);_e.status=res.status;throw _e;}
-      ${name} = await res.json();
+      var _d = await res.json();
+      ${name} = Array.isArray(_d) ? _d : [_d];
       ${name}__loading = false;
       ${hasStates ? `if(document.getElementById('${loadingId}'))document.getElementById('${loadingId}').style.display='none';` : ''}
       ${hasStates ? `if(document.getElementById('${emptyId}'))document.getElementById('${emptyId}').style.display=${name}.length===0?'':'none';` : ''}

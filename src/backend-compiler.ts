@@ -592,11 +592,11 @@ function compileEveryStatementInLoop(stmt: any): string {
       try {
         const res = await fetch(${urlField}, { signal: AbortSignal.timeout(10000) });
         const ms = Date.now() - start;
-        db.prepare("INSERT INTO checks (monitor_id, status, response_ms, status_code) VALUES (?, ?, ?, ?)").run(row.id, res.ok ? 'up' : 'down', ms, res.status);
+        db.prepare("INSERT INTO checks (monitor_id, status, response_ms, status_code, created_at) VALUES (?, ?, ?, ?, datetime('now'))").run(row.id, res.ok ? 'up' : 'down', ms, res.status);
         db.prepare("UPDATE monitors SET status = ?, last_check = datetime('now'), avg_response_ms = ? WHERE id = ?").run(res.ok ? 'up' : 'down', ms, row.id);
       } catch(fetchErr) {
         const ms = Date.now() - start;
-        db.prepare("INSERT INTO checks (monitor_id, status, response_ms, error_msg) VALUES (?, 'down', ?, ?)").run(row.id, ms, fetchErr.message);
+        db.prepare("INSERT INTO checks (monitor_id, status, response_ms, error_msg, created_at) VALUES (?, 'down', ?, ?, datetime('now'))").run(row.id, ms, fetchErr.message);
         db.prepare("UPDATE monitors SET status = 'down', last_check = datetime('now') WHERE id = ?").run(row.id);
       }`;
     }
@@ -627,11 +627,11 @@ function compileEveryStatement(stmt: any): string {
     try {
       const res = await fetch(${urlField}, { signal: AbortSignal.timeout(10000) });
       const ms = Date.now() - start;
-      db.prepare("INSERT INTO checks (monitor_id, status, response_ms, status_code) VALUES (?, ?, ?, ?)").run(row.id, res.ok ? 'up' : 'down', ms, res.status);
+      db.prepare("INSERT INTO checks (monitor_id, status, response_ms, status_code, created_at) VALUES (?, ?, ?, ?, datetime('now'))").run(row.id, res.ok ? 'up' : 'down', ms, res.status);
       db.prepare("UPDATE monitors SET status = ?, last_check = datetime('now'), avg_response_ms = ? WHERE id = ?").run(res.ok ? 'up' : 'down', ms, row.id);
     } catch(fetchErr) {
       const ms = Date.now() - start;
-      db.prepare("INSERT INTO checks (monitor_id, status, response_ms, error_msg) VALUES (?, 'down', ?, ?)").run(row.id, ms, fetchErr.message);
+      db.prepare("INSERT INTO checks (monitor_id, status, response_ms, error_msg, created_at) VALUES (?, 'down', ?, ?, datetime('now'))").run(row.id, ms, fetchErr.message);
       db.prepare("UPDATE monitors SET status = 'down', last_check = datetime('now') WHERE id = ?").run(row.id);
     }`;
     }
