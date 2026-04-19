@@ -284,6 +284,7 @@ export class Compiler {
       }
       this.animations = [];
       this.scripts = []; // Reset scripts per page — prevent cross-page bleed
+      this.burgerBreakpointsEmitted = new Set(); // #137: burger CSS must be emitted on every page
       this.usedInteractiveElements = new Set(layoutInteractiveElements); // Start with layout elements
       // Keep components and styleCache across pages for dedup
 
