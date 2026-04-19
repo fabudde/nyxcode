@@ -300,10 +300,15 @@ export interface ValidateField {
 }
 
 /** `respond code { ... }` */
+export interface RespondValue {
+  value: string;
+  isRef: boolean;  // true = variable reference, false = string literal
+}
+
 export interface RespondStatement extends BaseNode {
   type: 'Respond';
   status: number;
-  body?: Record<string, string> | string;
+  body?: Record<string, string | RespondValue> | string;
 }
 
 /** `limit 10/min` */

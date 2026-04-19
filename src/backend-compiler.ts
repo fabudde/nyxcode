@@ -522,7 +522,18 @@ function compileApiRoute(api: ApiNode): string {
     }
   } else if (responds.length > 0) {
     const r = responds[0];
-    handlerBody += `    res.status(${r.status || 200}).json(${JSON.stringify(r.body || { ok: true })});\n`;
+    if (r.body && typeof r.body === 'object') {
+      // Build response object, resolving variable references
+      const entries = Object.entries(r.body).map(([k, v]) => {
+        if (typeof v === 'object' && v !== null && (v as any).isRef) {
+          return `${JSON.stringify(k)}: ${(v as any).value}`;
+        }
+        return `${JSON.stringify(k)}: ${JSON.stringify(v)}`;
+      });
+      handlerBody += `    res.status(${r.status || 200}).json({ ${entries.join(', ')} });\n`;
+    } else {
+      handlerBody += `    res.status(${r.status || 200}).json(${JSON.stringify(r.body || { ok: true })});\n`;
+    }
   } else {
     handlerBody += `    res.json({ ok: true });\n`;
   }

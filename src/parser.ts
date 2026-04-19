@@ -2615,13 +2615,24 @@ export class Parser {
     const start = this.consume(TokenType.Respond);
     const status = parseInt(this.consume(TokenType.Number).value);
 
-    let body: Record<string, string> | string | undefined;
+    let body: Record<string, string | { value: string; isRef: boolean }> | string | undefined;
     if (this.check(TokenType.LeftBrace)) {
       this.advance();
       body = {};
       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
         const key = this.consumeIdentifier();
-        body[key] = this.consume(TokenType.String).value;
+        if (this.check(TokenType.String)) {
+          // String literal: respond 200 { status "ok" }
+          body[key] = this.consume(TokenType.String).value;
+        } else {
+          // Variable reference: respond 200 { count userCount.count }
+          let ref = this.consumeIdentifier();
+          while (this.check(TokenType.Dot)) {
+            this.advance();
+            ref += '.' + this.consumeIdentifier();
+          }
+          body[key] = { value: ref, isRef: true };
+        }
         if (this.check(TokenType.Comma)) this.advance();
       }
       this.consume(TokenType.RightBrace);
