@@ -1612,6 +1612,42 @@ api GET /api/posts/:id/views auth {
 - Path params (`:id`) auto-map to `req.params`. Body params to `req.body`.
 - Smart return: aggregates (`COUNT`/`SUM`) → single object. `LIMIT 1` → single. Else → array.
 
+### Multi-Query API Blocks (v0.30.0+)
+
+POST/PUT/DELETE API blocks can contain multiple `query` statements. All execute sequentially; only the last query's result is returned.
+
+```nyx
+api POST /api/monitors/delete auth {
+  query "DELETE FROM checks WHERE monitor_id = $id"
+  query "DELETE FROM alerts WHERE monitor_id = $id"
+  query "DELETE FROM monitors WHERE id = $id AND user_id = $req.user.id"
+}
+```
+
+Use case: cascade deletes, multi-step mutations, cleanup operations.
+
+### Forms Inside `each` Loops (v0.30.0+)
+
+Forms nested inside `each` templates compile to inline `<button onclick="fetch(...)">` elements.
+
+```nyx
+each alerts -> alert {
+  div flex=row between center {
+    span .target
+    form "/api/alerts/delete" auth {
+      input id hidden value=.id
+      submit "✕" preset=btn-delete
+      success -> reload
+    }
+  }
+}
+```
+
+- Hidden input values with `.field` resolve at render time (baked into HTML)
+- `auth` → includes JWT Bearer token from localStorage
+- `success -> reload` / `success -> redirect /path` supported
+- Confirm dialog auto-added for safety
+
 ### Table Relations (v0.11+)
 ```nyx
 table posts {
