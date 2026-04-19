@@ -1671,6 +1671,9 @@ export class Compiler {
       if (stmt.type === 'Element') {
         return this.compileElementTemplate(stmt as ElementNode, varName);
       }
+      if (stmt.type === 'Form') {
+        return this.compileFormTemplate(stmt as FormStatement, varName);
+      }
       return '';
     }).join('');
 
@@ -1700,10 +1703,95 @@ export class Compiler {
       if (c.type === 'Element') {
         return this.compileElementTemplate(c as ElementNode, varName);
       }
+      if (c.type === 'Form') {
+        return this.compileFormTemplate(c as FormStatement, varName);
+      }
       return '';
     }).join('');
 
     return `<${tag}${attrStr}>${content}${children}</${tag}>`;
+  }
+
+  /**
+   * Compile a form inside an each-loop template literal.
+   * Since template literals can't have traditional form handlers,
+   * we render as a button with an inline onclick fetch call.
+   */
+  private compileFormTemplate(form: FormStatement, varName: string): string {
+    if (!form.action) return '';
+
+    // Resolve .field references in the action URL
+    let action = form.action;
+    action = action.replace(/(?<![a-zA-Z0-9_])\.([a-zA-Z_][a-zA-Z0-9_]*)/g, (_: string, field: string) => {
+      return `\${${varName}.${field}}`;
+    });
+
+    // Find submit button text and styling
+    let submitText = 'Submit';
+    let submitClass = '';
+    let submitStyle = '';
+    // Find hidden fields (value=.field)
+    const hiddenFields: { name: string; value: string }[] = [];
+
+    for (const stmt of form.body) {
+      if (stmt.type !== 'Element') continue;
+      const el = stmt as ElementNode;
+      if (el.tag === 'submit') {
+        submitText = (el.content && typeof el.content !== 'string' && (el.content as any).type === 'StringLiteral') ? (el.content as any).value : 'Submit';
+        const presetAttr = el.attributes.find((a: any) => a.name === 'preset');
+        const styleAttr = el.attributes.find((a: any) => a.name === 'style');
+        if (presetAttr) submitClass = `nyx-p_${presetAttr.value}`;
+        if (styleAttr) submitStyle = this.expandInlineShorthands(styleAttr.value as string);
+      }
+      if (el.tag === 'input') {
+        // Check for hidden inputs with value=.field
+        const typeAttr = el.attributes.find((a: any) => a.name === 'type');
+        const nameAttr = el.attributes.find((a: any) => a.name === 'name');
+        const valAttr = el.attributes.find((a: any) => a.name === 'value');
+        const isHidden = (typeAttr && typeAttr.value === 'hidden') || 
+                         el.attributes.some((a: any) => a.name === 'hidden');
+        // Also detect content-based field name for hidden inputs
+        let fieldName = '';
+        if (nameAttr) fieldName = typeof nameAttr.value === 'string' ? nameAttr.value : '';
+        else if (el.content) {
+          if ((el.content as any).type === 'Identifier') fieldName = (el.content as any).name;
+          else if (typeof el.content === 'string') fieldName = el.content;
+        }
+        if (isHidden && fieldName && valAttr) {
+          let val = typeof valAttr.value === 'string' ? valAttr.value : '';
+          // Resolve .field in value
+          if (val.startsWith('.')) {
+            val = `\${${varName}${val}}`;
+          }
+          hiddenFields.push({ name: fieldName, value: val });
+        }
+      }
+    }
+
+    // Build the body JSON for the fetch call
+    const bodyParts = hiddenFields.map(f => `'${f.name}':${f.value.startsWith('\${') ? f.value.replace(/^\$\{/, '').replace(/\}$/, '') : "'" + f.value + "'"}` ).join(',');
+    // Determine HTTP method
+    const method = 'POST';
+
+    // Build auth header
+    const authCode = form.auth ? "var tk=localStorage.getItem('token');if(tk)h['Authorization']='Bearer '+tk;" : '';
+
+    // Build success action
+    let successCode = 'location.reload()';
+    if (form.onSuccess) {
+      switch (form.onSuccess.kind) {
+        case 'reload': successCode = 'location.reload()'; break;
+        case 'redirect': successCode = `location.href='${form.onSuccess.value || '/'}'`; break;
+      }
+    }
+
+    // Build the onclick handler
+    const onclick = `(async function(){if(!confirm('Are you sure?'))return;var h={'Content-Type':'application/json'};${authCode}await fetch('${action}',{method:'${method}',headers:h,body:JSON.stringify({${bodyParts}})});${successCode}}).call(this)`;
+
+    // Render as button
+    const classAttr = submitClass ? ` class=\"${submitClass}\"` : '';
+    const styleAttr = submitStyle ? ` style=\"${submitStyle}\"` : '';
+    return `<button onclick="${onclick.replace(/"/g, "'")}"${classAttr}${styleAttr}>${this.escapeContent(submitText)}</button>`;
   }
 
   private toOptionalChain(path: string): string {
