@@ -1317,7 +1317,12 @@ export class Parser {
       case TokenType.Limit: return this.parseLimitStmt();
       case TokenType.Query: return this.parseQuery();
       case TokenType.Let: return this.parseLet();
-      case TokenType.Email: return this.parseEmailStatement();
+      // Email only as a statement when followed by to= (not inside elements like `input email`)
+      case TokenType.Email:
+        if (this.peekAt(1)?.type === TokenType.Identifier && this.peekAt(1)?.value === 'to') {
+          return this.parseEmailStatement();
+        }
+        return this.parseElement();
       case TokenType.State: return this.parseState();
       case TokenType.Effect: return this.parseEffect();
       case TokenType.Computed: return this.parseComputed();
