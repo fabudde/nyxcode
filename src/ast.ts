@@ -185,6 +185,7 @@ export interface EachStatement extends BaseNode {
   collection: string;
   alias?: string;
   element: string;
+  attributes?: Attribute[];
   body: Statement[];
 }
 

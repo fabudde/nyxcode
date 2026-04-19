@@ -1531,6 +1531,29 @@ export class Parser {
     this.consume(TokenType.Arrow);
     const element = this.consumeIdentifier();
 
+    // Parse optional attributes on the wrapper element (e.g. each items -> div preset=card flex=row { ... })
+    const attributes: Attribute[] = [];
+    while (!this.check(TokenType.LeftBrace) && !this.isAtEnd()) {
+      const isAttrName = this.check(TokenType.Identifier) || (this.peek().value && this.peekNext()?.value === '=');
+      if (isAttrName && this.peekNext()?.value === '=') {
+        const name = this.advance().value; // consume name (could be keyword token like 'preset')
+        this.advance(); // =
+        let value = '';
+        if (this.check(TokenType.String)) {
+          value = this.consume(TokenType.String).value;
+        } else {
+          value = this.advance().value;
+        }
+        attributes.push({ name, value });
+      } else if (this.check(TokenType.Identifier)) {
+        // Bare attribute like 'center', 'between'
+        const name = this.advance().value;
+        attributes.push({ name, value: 'true' });
+      } else {
+        break;
+      }
+    }
+
     let body: Statement[] = [];
     if (this.check(TokenType.LeftBrace)) {
       this.consume(TokenType.LeftBrace);
@@ -1538,7 +1561,7 @@ export class Parser {
       this.consume(TokenType.RightBrace);
     }
 
-    return { type: 'Each', collection, alias, element, body, line: start.line, col: start.col };
+    return { type: 'Each', collection, alias, element, attributes: attributes.length > 0 ? attributes : undefined, body, line: start.line, col: start.col };
   }
 
   private parseWhen(): WhenStatement {

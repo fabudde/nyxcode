@@ -1684,7 +1684,36 @@ export class Compiler {
     }
 
     const tag = this.mapTag(each.element);
-    return `<${tag}>${children}</${tag}>`;
+    // #136: Apply attributes (preset, flex, style, etc.) to wrapper element
+    let attrStr = '';
+    if (each.attributes && each.attributes.length > 0) {
+      const classes: string[] = [];
+      const styles: string[] = [];
+      for (const attr of each.attributes) {
+        if (attr.name === 'preset') {
+          classes.push(`nyx-p_${attr.value}`);
+        } else if (attr.name === 'flex') {
+          styles.push(`display:flex`);
+          if (typeof attr.value === 'string' && attr.value !== 'true') {
+            styles.push(`flex-direction:${attr.value}`);
+          }
+        } else if (attr.name === 'between') {
+          styles.push(`justify-content:space-between`);
+        } else if (attr.name === 'center') {
+          styles.push(`align-items:center`);
+        } else if (attr.name === 'style') {
+          // inline style already handled
+        } else if (attr.name === 'gap') {
+          styles.push(`gap:${attr.value}`);
+        } else {
+          // Generic attribute
+          attrStr += ` ${attr.name}="${attr.value}"`;
+        }
+      }
+      if (classes.length > 0) attrStr += ` class="${classes.join(' ')}"`;
+      if (styles.length > 0) attrStr += ` style="${styles.join('; ')}"`;
+    }
+    return `<${tag}${attrStr}>${children}</${tag}>`;
   }
 
   private compileElementTemplate(el: ElementNode, varName: string): string {
