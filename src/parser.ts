@@ -24,7 +24,7 @@ import {
   LimitStatement, QueryStatement, ResponsiveBlock, SecurityNode, SecurityRule,
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
   HeadStatement, AnimateStatement, PseudoElementBlock, LayoutNode, KeyframesNode,
-  ScriptStatement, FormAction, ConfigNode, EnvVar, HookNode, MiddlewareNode, EveryNode,
+  ScriptStatement, FormAction, ConfigNode, EnvVar, HookNode, MiddlewareNode,
 } from './ast.js';
 
 /** Set of tags that are recognized as built-in elements */
@@ -140,7 +140,6 @@ export class Parser {
       case TokenType.Layout: return this.parseLayout();
       case TokenType.Preset: return this.parsePreset() as any;
       case TokenType.Keyframes: return this.parseTopLevelKeyframes() as any;
-      case TokenType.Every: return this.parseEvery();
       case TokenType.Identifier:
         if (token.value === 'middleware') return this.parseMiddleware();
         if (token.value === 'meta') return this.parseMeta() as any;
@@ -155,11 +154,17 @@ export class Parser {
   private parsePage(): PageNode {
     const start = this.consume(TokenType.Page);
     const path = this.consumeIdentifier(); // path like /dashboard
+    // v0.27.0 — page /dashboard auth { } marks page as requiring authentication
+    let auth = false;
+    if (this.check(TokenType.Auth)) {
+      this.advance();
+      auth = true;
+    }
     this.consume(TokenType.LeftBrace);
     const body = this.parseBody();
     this.consume(TokenType.RightBrace);
 
-    return { type: 'Page', path, body, line: start.line, col: start.col };
+    return { type: 'Page', path, body, auth, line: start.line, col: start.col };
   }
 
   private parseComponent(): ComponentNode {
@@ -253,53 +258,6 @@ export class Parser {
     const body = this.parseBody();
     this.consume(TokenType.RightBrace);
     return { type: 'Hook', timing, method, path, body, line: start.line, col: start.col };
-  }
-
-  private parseEvery(): EveryNode {
-    const start = this.advance(); // consume 'every'
-    // Parse interval: 30s, 5m, 1h, 1d
-    const intervalToken = this.advance();
-    const interval = intervalToken.value;
-    const intervalMs = this.parseIntervalToMs(interval);
-    if (intervalMs < 5000) {
-      throw this.error(`Minimum interval is 5s (got ${interval}). This prevents accidental server overload.`);
-    }
-    // Optional label (string)
-    let label: string | undefined;
-    if (this.peek().type === TokenType.String) {
-      label = this.advance().value;
-    }
-    // Optional timeout=Ns
-    let timeout: string | undefined;
-    while (this.peek().type === TokenType.Identifier && this.peek().value.startsWith('timeout')) {
-      const t = this.advance().value;
-      if (t.includes('=')) {
-        timeout = t.split('=')[1];
-      } else if (this.peek().type === TokenType.Equals) {
-        this.advance(); // consume =
-        timeout = this.advance().value;
-      }
-    }
-    while (this.peek().type === TokenType.Newline) this.advance();
-    this.consume(TokenType.LeftBrace);
-    const body = this.parseBody();
-    this.consume(TokenType.RightBrace);
-    return { type: 'Every', interval, intervalMs, label, timeout, body, line: start.line, col: start.col };
-  }
-
-  private parseIntervalToMs(interval: string): number {
-    const match = interval.match(/^(\d+)(ms|s|m|h|d)$/);
-    if (!match) throw this.error(`Invalid interval format: '${interval}'. Use: 30s, 5m, 1h, 1d`);
-    const value = parseInt(match[1]);
-    const unit = match[2];
-    switch (unit) {
-      case 'ms': return value;
-      case 's': return value * 1000;
-      case 'm': return value * 60 * 1000;
-      case 'h': return value * 60 * 60 * 1000;
-      case 'd': return value * 24 * 60 * 60 * 1000;
-      default: return value * 1000;
-    }
   }
 
   private parseMiddleware(): MiddlewareNode {
@@ -592,31 +550,7 @@ export class Parser {
           if (this.peek().type !== TokenType.Identifier) break;
           // Eat stray leading semicolons between element blocks
           if (this.peek().value === ';') { this.advance(); continue; }
-          let element = this.advance().value;
-          // Support pseudo-selectors: input:focus, input::placeholder, button:hover
-          // and attribute selectors: button[type=submit]
-          while (!this.check(TokenType.LeftBrace) && !this.isAtEnd()) {
-            const next = this.peek();
-            if (next.value === ':') {
-              this.advance(); // consume ':'
-              if (this.peek().value === ':') {
-                this.advance(); // consume second ':'
-                element += '::' + this.advance().value;
-              } else {
-                element += ':' + this.advance().value;
-              }
-            } else if (next.value === '[') {
-              // attribute selector: button[type=submit]
-              let bracket = this.advance().value; // '['
-              while (!this.isAtEnd() && this.peek().value !== ']') {
-                bracket += this.advance().value;
-              }
-              if (this.peek().value === ']') bracket += this.advance().value;
-              element += bracket;
-            } else {
-              break;
-            }
-          }
+          const element = this.advance().value;
           this.consume(TokenType.LeftBrace);
           const props: Array<{ name: string; value: string }> = [];
           while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
@@ -1410,7 +1344,13 @@ export class Parser {
     }
 
     // get/post/patch/delete — next token is the URL path
-    const value = this.consumeIdentifier();
+    // v0.27.0: accept quoted string for URLs with $param.X patterns
+    let value: string;
+    if (this.check(TokenType.String)) {
+      value = this.advance().value;
+    } else {
+      value = this.consumeIdentifier();
+    }
     let body: Record<string, string> | undefined;
 
     // Parse body { } only for POST/PATCH/DELETE — not GET (GET uses { } for loading/error/empty states)
@@ -2067,25 +2007,10 @@ export class Parser {
       }
       value += (value ? ' ' : '') + tok.value;
       // Check for hyphenated continuation (e.g., text-align, border-radius)
-      // But NOT if the dash starts a new vendor-prefixed property on a new line (#124)
       if (this.peek()?.type === TokenType.Identifier && this.peek()?.value === '-') {
-        const dashTok = this.peek()!;
-        const afterDash = this.peekAt(1);
-        // #124: If the dash is on a LATER line, don't glue — it's a new property
-        if (dashTok.line > tok.line) {
-          // Don't consume — let the next iteration handle it as a new property
-        }
-        // #124: If what follows the dash is a vendor prefix, it's a new property
-        else if (afterDash?.type === TokenType.Identifier &&
-                 (afterDash.value.startsWith('webkit') || afterDash.value.startsWith('moz') ||
-                  afterDash.value.startsWith('ms') || afterDash.value.startsWith('o-'))) {
-          // Don't consume — new vendor-prefixed property
-        }
-        else {
-          value += this.advance().value; // consume -
-          if (this.peek()?.type === TokenType.Identifier) {
-            value += this.advance().value; // consume next part
-          }
+        value += this.advance().value; // consume -
+        if (this.peek()?.type === TokenType.Identifier) {
+          value += this.advance().value; // consume next part
         }
       }
     }
@@ -2394,6 +2319,17 @@ export class Parser {
         // After a comma, any identifier is a continuation (next font in stack, etc.)
         else if (parts[parts.length - 1].value === ',') { /* continue to push */ }
         // Same line as previous token — still part of this value
+        // #124: Vendor-prefixed props on same line should start new property.
+        // e.g. "-webkit-background-clip text -webkit-text-fill-color transparent"
+        // The "-" token followed by an identifier like "webkit" signals a new prop.
+        else if (next.line === lastLine && next.value === '-' && this.peekAt(1)?.type === TokenType.Identifier) {
+          // Check if this could be a vendor prefix like -webkit-, -moz-, etc.
+          const maybeVendor = this.peekAt(1)?.value;
+          if (maybeVendor === 'webkit' || maybeVendor === 'moz' || maybeVendor === 'ms' || maybeVendor === 'o') {
+            break; // new vendor-prefixed property — stop collecting
+          }
+          // Otherwise it's a negative value like "-1px" — continue
+        }
         else if (next.line === lastLine) { /* continue to push */ }
         // Otherwise new line + identifier = new property name — break
         else break;

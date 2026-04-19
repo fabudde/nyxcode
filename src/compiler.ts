@@ -89,6 +89,7 @@ export class Compiler {
   private globalHeadInjections: string[] = []; // From top-level `meta {}` or `head "..."` blocks — shared across all pages
   private themeVars: Map<string, string> = new Map();
   private themeDefaultElements: Set<string> = new Set();
+  private _hasVisibleDirective = false;
   private darkThemeVars: Map<string, string> = new Map(); // dark mode overrides
   // v0.23.0 — registry of named base themes: `@theme as "name" { ... }`
   private namedThemes: Map<string, any[]> = new Map();
@@ -277,6 +278,10 @@ export class Compiler {
       this.effects = [];
       this.hasReactivity = false;
       this.headInjections = [...layoutHeadInjections, ...this.globalHeadInjections]; // Start with layout + global (top-level meta/head) injections
+      // v0.27.0 — visible=auth/guest toggle script
+      if (this._hasVisibleDirective) {
+        this.headInjections.push('<script>(function(){var t=localStorage.getItem("token");document.querySelectorAll("[data-visible]").forEach(function(el){var v=el.getAttribute("data-visible");if(v==="auth"&&t)el.style.display="";if(v==="guest"&&t)el.style.display="none"})})();</script>');
+      }
       this.animations = [];
       this.scripts = []; // Reset scripts per page — prevent cross-page bleed
       this.usedInteractiveElements = new Set(layoutInteractiveElements); // Start with layout elements
@@ -428,6 +433,11 @@ export class Compiler {
   private compilePage(page: PageNode): string {
     let content = '';
 
+    // v0.27.0 — page auth: inject token check + redirect
+    if ((page as any).auth) {
+      this.headInjections.push('<script>if(!localStorage.getItem("token"))location.href="/login"</script>');
+    }
+
     // First style block in a page applies to body
     const pageStyle = page.body.find(s => s.type === 'Style') as StyleBlock | undefined;
     if (pageStyle) {
@@ -449,6 +459,11 @@ export class Compiler {
    */
   private compilePageStatic(page: PageNode): string {
     let content = '';
+
+    // v0.27.0 — page auth: inject token check + redirect
+    if ((page as any).auth) {
+      this.headInjections.push('<script>if(!localStorage.getItem("token"))location.href="/login"</script>');
+    }
 
     // First style block in a page applies to body
     const pageStyle = page.body.find(s => s.type === 'Style') as StyleBlock | undefined;
@@ -847,7 +862,16 @@ export class Compiler {
         presetClass = this.presets.get(presetName)!;
       }
     }
-    const nonPresetAttrs = filteredAttrs.filter(a => a.name !== 'preset');
+    let nonPresetAttrs = filteredAttrs.filter(a => a.name !== 'preset');
+
+    // v0.27.0 — visible=auth/guest: conditionally show/hide based on JWT token
+    const visibleAttr = nonPresetAttrs.find(a => a.name === 'visible');
+    let visibleMode: string | null = null;
+    if (visibleAttr) {
+      visibleMode = typeof visibleAttr.value === 'string' ? visibleAttr.value : '';
+      nonPresetAttrs = nonPresetAttrs.filter(a => a.name !== 'visible');
+      this._hasVisibleDirective = true;
+    }
 
     // Auto-inject loading="lazy" on img elements (unless explicitly set)
     if (tag === 'img' && !nonPresetAttrs.some(a => a.name === 'loading')) {
@@ -863,6 +887,13 @@ export class Compiler {
     // Filter out style blocks from children rendering
     const nonStyleChildren = el.children.filter(c => c.type !== 'Style');
     const children = nonStyleChildren.map(c => this.compileStatement(c)).join('');
+
+    // v0.27.0 — visible directive: add data-visible + initial display:none for auth elements
+    if (visibleMode === 'auth') {
+      attrs += ' data-visible="auth" style="display:none"';
+    } else if (visibleMode === 'guest') {
+      attrs += ' data-visible="guest"';
+    }
 
     // Handle reactive bindings: content starting with __NYX_BIND:
     if (content.startsWith('__NYX_BIND:')) {
@@ -1513,9 +1544,24 @@ export class Compiler {
     const emptyId = hasStates ? this.nextId('dm') : '';
 
     if (source.kind === 'get' || source.kind === 'query') {
-      const url = source.kind === 'query' ? `/api/__generated/${name}` : source.value;
+      let url = source.kind === 'query' ? `/api/__generated/${name}` : source.value;
+      // v0.27.0 — $param.X: replace with URL query parameter
+      const paramMatches = url.match(/\$param\.([\w]+)/g);
+      let paramGuardJs = '';
+      if (paramMatches) {
+        for (const match of paramMatches) {
+          const paramName = match.replace('$param.', '');
+          url = url.replace(match, `'+_p_${paramName}+'`);
+        }
+        // Build param extraction + guard
+        const paramNames = paramMatches.map((m: string) => m.replace('$param.', ''));
+        paramGuardJs = paramNames.map((p: string) =>
+          `var _p_${p}=new URLSearchParams(location.search).get('${p}');if(!_p_${p})location.href='/dashboard';`
+        ).join('');
+      }
       this.js.push(`
   // Data: ${name}
+  ${paramGuardJs}
   let ${name} = [];
   let ${name}__loading = true;
   let ${name}__error = null;

@@ -33,6 +33,7 @@ export interface PageNode extends BaseNode {
   type: 'Page';
   path: string;
   body: Statement[];
+  auth?: boolean;
 }
 
 /** `component Name { ... }` */
