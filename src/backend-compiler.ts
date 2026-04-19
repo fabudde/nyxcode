@@ -474,20 +474,19 @@ function compileApiRoute(api: ApiNode): string {
 
   // Generate query execution
   if (queries.length > 0) {
-    const q = queries[0];
-    const sql = q.sql;
-    // Extract $param references from SQL
-    const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
     const pathParams = [...api.path.matchAll(/:(\w+)/g)].map((m: any) => m[1]);
     const paramSrc = (p: string) => {
-      if (p.startsWith('req.')) return ''; // direct ref like req.user.id
+      if (p.startsWith('req.')) return '';
       return pathParams.includes(p) ? 'req.params' : (method === 'get' ? 'req.query' : 'req.body');
     };
-    const paramList = params.map(p => p.startsWith('req.') ? p : `${paramSrc(p)}.${p}`).join(', ');
-    const safeSql = sql.replace(/\$([\w.]+)/g, '?');
-    
+
     if (method === 'get') {
-      // SELECT → return all rows or single row
+      // GET: use first query only
+      const q = queries[0];
+      const sql = q.sql;
+      const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
+      const paramList = params.map(p => p.startsWith('req.') ? p : `${paramSrc(p)}.${p}`).join(', ');
+      const safeSql = sql.replace(/\$([\w.]+)/g, '?');
       const sqlLower = safeSql.toLowerCase();
       const isSingleRow = /\blimit\s+1\b/.test(sqlLower) || /\b(count|sum|avg|min|max)\s*\(/.test(sqlLower);
       if (isSingleRow) {
@@ -499,13 +498,26 @@ function compileApiRoute(api: ApiNode): string {
         handlerBody += `    res.json(rows);\n`;
       }
     } else {
-      // INSERT/UPDATE/DELETE → run and return result
-      if (safeSql.toLowerCase().startsWith('insert')) {
-        handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${paramList});\n`;
-        handlerBody += `    res.status(201).json({ id: info.lastInsertRowid, ...req.body });\n`;
-      } else {
-        handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${paramList});\n`;
-        handlerBody += `    res.json({ changes: info.changes });\n`;
+      // POST/PUT/DELETE: execute ALL queries sequentially, respond after last
+      for (let i = 0; i < queries.length; i++) {
+        const q = queries[i];
+        const sql = q.sql;
+        const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
+        const paramList = params.map(p => p.startsWith('req.') ? p : `${paramSrc(p)}.${p}`).join(', ');
+        const safeSql = sql.replace(/\$([\w.]+)/g, '?');
+        const isLast = i === queries.length - 1;
+        
+        if (isLast) {
+          if (safeSql.toLowerCase().startsWith('insert')) {
+            handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${paramList});\n`;
+            handlerBody += `    res.status(201).json({ id: info.lastInsertRowid, ...req.body });\n`;
+          } else {
+            handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${paramList});\n`;
+            handlerBody += `    res.json({ changes: info.changes });\n`;
+          }
+        } else {
+          handlerBody += `    db.prepare(\`${safeSql}\`).run(${paramList});\n`;
+        }
       }
     }
   } else if (responds.length > 0) {
