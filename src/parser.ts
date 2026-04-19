@@ -1543,6 +1543,11 @@ export class Parser {
           value = this.consume(TokenType.String).value;
         } else {
           value = this.advance().value;
+          // Consume dotted paths like spacing.md, colors.primary
+          while (this.check(TokenType.Dot)) {
+            this.advance(); // .
+            value += '.' + this.advance().value;
+          }
         }
         attributes.push({ name, value });
       } else if (this.check(TokenType.Identifier)) {
@@ -3069,6 +3074,11 @@ private parseElement(): ElementNode {
               val += this.advance().value; // .
               val += this.advance().value; // field
             }
+          }
+          // #139: Consume dotted paths after identifier (gap=spacing.md, color=colors.primary)
+          while (this.check(TokenType.Dot) && this.peekAt(1)?.type === TokenType.Identifier) {
+            val += this.advance().value; // .
+            val += this.advance().value; // field
           }
           // Responsive shorthand: value@mobileValue (e.g., grid=3@1)
           if (this.check(TokenType.At) && (this.peekAt(1)?.type === TokenType.Identifier || this.peekAt(1)?.type === TokenType.Number)) {

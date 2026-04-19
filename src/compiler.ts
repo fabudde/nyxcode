@@ -1725,7 +1725,41 @@ export class Compiler {
     const tag = this.mapTag(el.tag);
     let content = this.resolveTemplateContent(el.content, varName);
 
-    const attrs = this.resolveTemplateAttrs(el.attributes, varName);
+    // #139: Extract layout shorthand attributes and convert to inline styles
+    const layoutStyles: string[] = [];
+    const regularAttrs = el.attributes.filter(a => {
+      if (a.name === 'flex') {
+        layoutStyles.push('display:flex');
+        if (typeof a.value === 'string' && a.value !== 'true') layoutStyles.push(`flex-direction:${a.value}`);
+        return false;
+      }
+      if (a.name === 'between') { layoutStyles.push('justify-content:space-between'); return false; }
+      if (a.name === 'center') { layoutStyles.push('align-items:center'); return false; }
+      if (a.name === 'gap') {
+        const gapVal = typeof a.value === 'string' ? a.value : '';
+        // Resolve theme tokens like spacing.md → var(--spacing-md)
+        if (gapVal.includes('.')) {
+          layoutStyles.push(`gap:var(--${gapVal.replace(/\./g, '-')})`);
+        } else {
+          layoutStyles.push(`gap:${gapVal}`);
+        }
+        return false;
+      }
+      if (a.name === 'grid') {
+        // grid=3@1 → grid-template-columns (handled elsewhere normally)
+        return true;
+      }
+      return true;
+    });
+
+    let attrs = this.resolveTemplateAttrs(regularAttrs, varName);
+    if (layoutStyles.length > 0) {
+      // Merge with existing style attr if present
+      const existingStyle = attrs.match(/style="([^"]*)"/)?.[1] || '';
+      const merged = existingStyle ? `${layoutStyles.join('; ')}; ${existingStyle}` : layoutStyles.join('; ');
+      attrs = attrs.replace(/style="[^"]*"/, '').trim();
+      attrs = `style="${merged}"${attrs ? ' ' + attrs : ''}`;
+    }
     const attrStr = attrs ? ' ' + attrs : '';
 
     // Recurse into children
@@ -1870,15 +1904,19 @@ export class Compiler {
           return `style="${expanded}"`;
         }
         // Resolve .field references in ALL attributes
-        // Pure .field (whole value is a field ref) or mixed /path/.id
-        if (val.startsWith('.') && /^\.[a-zA-Z_][a-zA-Z0-9_.]*$/.test(val)) {
-          // Pure field: .name or .author.name
-          val = `\${${varName}${this.toOptionalChain(val)}}`;
-        } else if (/(?<![a-zA-Z0-9_])\.([a-zA-Z_])/.test(val)) {
-          // Mixed: /path/.id, some text .field more text
-          val = val.replace(/(?<![a-zA-Z0-9_])\.([a-zA-Z_][a-zA-Z0-9_]*)/g, (_: string, field: string) => {
-            return `\${${varName}.${field}}`;
-          });
+        // #139: Skip CSS/theme property values (gap=spacing.md is a theme token, not data binding)
+        const cssLayoutAttrs = ['gap', 'flex', 'grid', 'm', 'mx', 'my', 'p', 'px', 'py', 'w', 'h', 'mw', 'mh', 'r', 'fs', 'fw', 'lh', 'ls'];
+        if (!cssLayoutAttrs.includes(a.name)) {
+          // Pure .field (whole value is a field ref) or mixed /path/.id
+          if (val.startsWith('.') && /^\.[a-zA-Z_][a-zA-Z0-9_.]*$/.test(val)) {
+            // Pure field: .name or .author.name
+            val = `\${${varName}${this.toOptionalChain(val)}}`;
+          } else if (/(?<![a-zA-Z0-9_])\.([a-zA-Z_])/.test(val)) {
+            // Mixed: /path/.id, some text .field more text
+            val = val.replace(/(?<![a-zA-Z0-9_])\.([a-zA-Z_][a-zA-Z0-9_]*)/g, (_: string, field: string) => {
+              return `\${${varName}.${field}}`;
+            });
+          }
         }
         return `${a.name}="${val}"`;
       }
@@ -2461,44 +2499,58 @@ export class Compiler {
     let html = `${this.ind()}<form id="${formId}">\n`;
     this.indent++;
 
-    for (const stmt of form.body) {
-      if (stmt.type === 'Element') {
-        const el = stmt as ElementNode;
-        // Extract field name from content, add ID, suppress content rendering
-        if (el.tag === 'input' || el.tag === 'textarea' || el.tag === 'select') {
-          const nameAttr = el.attributes.find((a: any) => a.name === 'name');
-          let fieldName = '';
-          if (nameAttr) {
-            fieldName = typeof nameAttr.value === 'string' ? nameAttr.value : (nameAttr.value as any).value || '';
-          } else if (el.content) {
-            if (typeof el.content === 'string') fieldName = el.content;
-            else if ((el.content as any).type === 'Identifier') fieldName = (el.content as any).name;
-            else if ((el.content as any).type === 'StringLiteral') fieldName = (el.content as any).value;
+    // #138: Pre-process form inputs recursively — inputs may be nested inside grid/div wrappers
+    const processFormInputs = (elements: Statement[]) => {
+      for (const stmt of elements) {
+        if (stmt.type === 'Element') {
+          const el = stmt as ElementNode;
+          // Recurse into wrapper divs (grid, flex containers)
+          if (el.children && el.children.length > 0) {
+            processFormInputs(el.children);
           }
-          // Strip content so it doesn't render as value=""
-          if (el.content && (el.content as any).type === 'Identifier') {
-            (el as any)._fieldName = fieldName; // save for later
-            el.content = undefined as any;
-          }
-          if (fieldName && !el.attributes.find((a: any) => a.name === 'id')) {
-            el.attributes.push({ name: 'id', value: formId + '-' + fieldName });
-          }
-          if (fieldName && !el.attributes.find((a: any) => a.name === 'name')) {
-            el.attributes.push({ name: 'name', value: fieldName });
-          }
-          // Auto-detect input type from field name
-          if (el.tag === 'input' && !el.attributes.find((a: any) => a.name === 'type')) {
-            if (fieldName === 'password' || fieldName.endsWith('_password') || fieldName === 'confirm_password') {
-              el.attributes.push({ name: 'type', value: 'password' });
-            } else if (fieldName === 'email' || fieldName.endsWith('_email')) {
-              el.attributes.push({ name: 'type', value: 'email' });
-            } else if (fieldName === 'number' || fieldName === 'amount' || fieldName === 'price' || fieldName === 'quantity') {
-              el.attributes.push({ name: 'type', value: 'number' });
-            } else if (fieldName === 'url' || fieldName === 'website') {
-              el.attributes.push({ name: 'type', value: 'url' });
+          if (el.tag === 'input' || el.tag === 'textarea' || el.tag === 'select') {
+            const nameAttr = el.attributes.find((a: any) => a.name === 'name');
+            let fieldName = '';
+            if (nameAttr) {
+              fieldName = typeof nameAttr.value === 'string' ? nameAttr.value : (nameAttr.value as any).value || '';
+            } else if (el.content) {
+              if (typeof el.content === 'string') fieldName = el.content;
+              else if ((el.content as any).type === 'Identifier') fieldName = (el.content as any).name;
+              else if ((el.content as any).type === 'StringLiteral') fieldName = (el.content as any).value;
+            }
+            // Strip content so it doesn't render as value=""
+            if (el.content && (el.content as any).type === 'Identifier') {
+              (el as any)._fieldName = fieldName;
+              el.content = undefined as any;
+            }
+            if (fieldName && !el.attributes.find((a: any) => a.name === 'id')) {
+              el.attributes.push({ name: 'id', value: formId + '-' + fieldName });
+            }
+            if (fieldName && !el.attributes.find((a: any) => a.name === 'name')) {
+              el.attributes.push({ name: 'name', value: fieldName });
+            }
+            // Auto-detect input type from field name
+            if (el.tag === 'input' && !el.attributes.find((a: any) => a.name === 'type')) {
+              if (fieldName === 'password' || fieldName.endsWith('_password') || fieldName === 'confirm_password') {
+                el.attributes.push({ name: 'type', value: 'password' });
+              } else if (fieldName === 'email' || fieldName.endsWith('_email')) {
+                el.attributes.push({ name: 'type', value: 'email' });
+              } else if (fieldName === 'number' || fieldName === 'amount' || fieldName === 'price' || fieldName === 'quantity') {
+                el.attributes.push({ name: 'type', value: 'number' });
+              } else if (fieldName === 'url' || fieldName === 'website') {
+                el.attributes.push({ name: 'type', value: 'url' });
+              }
             }
           }
         }
+      }
+    };
+    processFormInputs(form.body);
+
+    // Render form body
+    for (const stmt of form.body) {
+      if (stmt.type === 'Element') {
+        const el = stmt as ElementNode;
         if (el.tag === 'submit') {
           const text = (el.content && typeof el.content !== 'string' && el.content.type === 'StringLiteral') ? (el.content as any).value : 'Submit';
           const presetAttr = el.attributes.find((a: any) => a.name === 'preset');
