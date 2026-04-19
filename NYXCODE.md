@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.27.3)
+# NYXCODE.md — AI Context File (v0.30.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -13,6 +13,7 @@ nyx build app.nyx -o public/   # custom directory
 nyx dev app.nyx                # Dev server + hot reload
 nyx parse app.nyx              # Debug AST output
 nyx flatten app.nyx > flat.nyx # Multi-file → single file
+nyx add stripe                 # Add package + npm install
 ```
 
 The CLI is available as `nyx` (preferred) or `nyxcode` (alias). Both work identically.
@@ -56,6 +57,87 @@ page /register {
 }
 ```
 This generates: `index.html`, `register/index.html`, AND `server.js` (10 CRUD endpoints + JWT auth + SQLite).
+
+## Backend Primitives (v0.30.0) — The Language Release
+
+NyxCode is now a full programming language. These primitives enable multi-step server logic.
+
+### `let` — Variable Bindings
+Use in `api` and `action` blocks for multi-step logic.
+```nyx
+api GET /api/stats auth {
+  let users = query "SELECT COUNT(*) as n FROM users"
+  let posts = query "SELECT COUNT(*) as n FROM posts"
+  respond 200 { status "ok" }
+}
+```
+**Smart detection:** `WHERE id = ?` or `LIMIT 1` → `.get()` (single row). Otherwise → `.all()` (array).
+
+**Built-in functions:** `sum(data, "field")`, `count(data)`, `avg(data, "field")`, `min`, `max`, `len`.
+
+**External calls:** `let session = stripe.checkout(amount)` → `await stripe.checkout(amount)`
+
+### `action` — Reusable Server Functions
+Define once, call from any `api` block or other `action`.
+```nyx
+action sendWelcome(email) {
+  email to=email subject="Welcome!" body="Thanks for joining."
+  on error {
+    respond 500 { error "Email failed" }
+  }
+}
+```
+Compiles to `async function` with try/catch. Params optionally typed: `action send(to: email)`.
+
+### `on` — Table Lifecycle Events
+React to data changes automatically.
+```nyx
+on users.created {
+  email to=row.email subject="Welcome!" body="You're in!"
+}
+on posts.deleted {
+  query "DELETE FROM comments WHERE post_id = $row.id"
+}
+```
+Events: `created`, `updated`, `deleted`. Hook functions auto-injected into CRUD routes.
+
+### `env` — Environment Variables
+Declare requirements. Fail fast at startup.
+```nyx
+env {
+  DATABASE_URL required
+  STRIPE_KEY required
+  DEBUG default="false"
+}
+```
+
+### `email` — First-Class Email
+Usable inside `action` and `api` blocks.
+```nyx
+email to=user.email subject="Order confirmed" body="Your order is ready."
+```
+
+### `use` — Package System (Three Tiers)
+```nyx
+use stripe           # Tier 1: built-in adapter (auto-init from env)
+use nodemailer       # Tier 1: SMTP transport + sendEmail() helper
+use uuid             # Tier 1: uuidv4() function
+use npm:"slugify"    # Tier 2: raw npm require (compiler warning)
+# use npm:"child_process"  → ❌ BLOCKED (security)
+```
+**Tier 1 packages (9):** stripe, nodemailer, redis, bcrypt, jsonwebtoken, better-sqlite3, sharp, resend, uuid
+
+**CLI:** `nyx add stripe` — adds `use` statement to .nyx file + runs `npm install`.
+
+### `respond` — Status Codes
+```nyx
+respond 201 { message "Created" }
+respond 404 { error "Not found" }
+```
+
+### Backend Auto-Detection
+No flags needed. If your file has `table`/`api`/`action`/`use`/`on`/`env`/`every` → backend generated.
+If only `page`/`theme`/`component` → HTML only.
 
 ## CSS Shorthands — ALWAYS USE THESE
 Property shorthands work in `style {}` blocks, `preset` definitions, inline styles, and CSS rules.
@@ -1950,4 +2032,7 @@ page / { footer { use social-links() } }
 ```
 
 ## Version
-v0.26.0 — 52 releases. Security-reviewed by Tyto 🦉 (9.5/10). QA by Kiro 🐺. 342 tests.
+v0.30.0 — The Language Release. DSL → Programming Language.
+Backend primitives: let, action, on, env, email, use, respond.
+Designed by the Rudel: Nyx 🧠, Tyto 🦉, Kiro 🐺, Fabian 🐻 (RFC #132).
+Security audit pending for release. Dogfooded on NyxStatus.com.
