@@ -1,3 +1,13 @@
+## v0.27.3 — "Background Workers" (2026-04-19)
+
+### Features
+
+- **`every` keyword for background workers (#128)** — New top-level block for recurring tasks. `every 30s 'health-check' { query "..." }` compiles to `setInterval()` in server.js. Supports interval formats (30s/5m/1h/1d), optional labels, error isolation (try/catch per tick), and graceful shutdown (clearInterval on SIGTERM/SIGINT). 5s minimum interval enforced at compile time.
+
+### Bug Fixes
+
+- **`flex center` no longer overrides `between`/`around`/`evenly` (#127)** — `flex=row between center` previously emitted two conflicting `justify-content` values. Now `center` only sets `align-items:center` when a justify-content keyword is also present.
+
 ## v0.27.1 — "Brand Identity" (2026-04-18)
 
 ### Features

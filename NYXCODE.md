@@ -1436,6 +1436,28 @@ config {
 - `cors "origin"` → auto-generates CORS middleware.
 - Generates startup validation + clear error messages.
 
+### Background Workers — `every` (v0.27.3+)
+
+Recurring background tasks. Compiles to `setInterval()` with error isolation and graceful shutdown.
+
+```nyx
+every 30s 'health-check' {
+  query "SELECT * FROM monitors WHERE status != 'paused'"
+}
+
+every 1h 'cleanup' {
+  query "DELETE FROM logs WHERE created_at < datetime('now', '-7 days')"
+}
+```
+
+- **Interval formats:** `30s`, `5m`, `1h`, `1d` (CSS-like durations)
+- **5s minimum** — compiler error below (prevents accidental server overload)
+- **Optional label** — `every 30s 'name' { }` for named workers
+- **Error isolation** — each tick wrapped in try/catch, failures logged but worker continues
+- **Graceful shutdown** — `clearInterval` on SIGTERM/SIGINT
+- **No request context** — `$req` not available (workers run independently)
+- **Zero dependencies** — pure `setInterval`, no Bull/Redis/cron
+
 ### Before/After Hooks (v0.15.0+)
 ```nyx
 before POST /api/posts {
