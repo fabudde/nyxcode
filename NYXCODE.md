@@ -1378,6 +1378,23 @@ table users {
 
 Auto-generates: CREATE TABLE + 5 CRUD endpoints per table (GET all, GET :id, POST, PUT, DELETE).
 
+### Pagination, Search & Filtering (v0.27.3+)
+
+All GET-all endpoints (`GET /api/tablename`) support:
+
+```
+GET /api/posts                        → plain array (backwards compatible)
+GET /api/posts?page=1&limit=20        → { data: [...], pagination: { page, limit, total, pages } }
+GET /api/posts?search=hello            → LIKE search across all text/email columns
+GET /api/posts?status=published        → WHERE status = 'published' (column-validated)
+GET /api/posts?search=foo&status=active&page=2  → all compose together
+```
+
+- **Pagination** is opt-in: without `?page` or `?limit`, returns plain array
+- **Limit** clamped between 1 and 100
+- **Filtering** only accepts valid column names (prevents SQL injection)
+- **Search** does case-insensitive LIKE across all `text` and `email` columns
+
 ### File Upload (v0.15.0+)
 ```nyx
 table posts {
@@ -1456,6 +1473,14 @@ every 1h 'cleanup' {
 - **Error isolation** — each tick wrapped in try/catch, failures logged but worker continues
 - **Graceful shutdown** — `clearInterval` on SIGTERM/SIGINT
 - **No request context** — `$req` not available (workers run independently)
+- **`$row` loops** — multi-statement blocks auto-loop when first query is SELECT:
+  ```nyx
+  every 60s 'check' {
+    query "SELECT id, url FROM monitors"
+    query "UPDATE monitors SET last_check = datetime('now') WHERE id = $row.id"
+  }
+  ```
+  `$row.field` compiles to parameterized `?` bindings (SQL injection safe)
 - **Zero dependencies** — pure `setInterval`, no Bull/Redis/cron
 
 ### Before/After Hooks (v0.15.0+)
