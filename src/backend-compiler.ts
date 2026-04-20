@@ -1031,7 +1031,7 @@ function broadcast(table, data) {
 ` : ''}
 const writeLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { error: 'Too many requests' } });
 
-const db = new Database(process.env.DB_PATH || 'app.db');
+const db = new Database(process.env.DATABASE_PATH || process.env.DB_PATH || 'app.db');
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
