@@ -3477,6 +3477,7 @@ private parseElement(): ElementNode {
       t.type === TokenType.Animate ||
       (t.type === TokenType.Identifier && t.value === 'footnotes' && this.peekAt(1)?.type === TokenType.LeftBrace) ||
       (t.type === TokenType.Identifier && t.value === 'meta' && this.peekAt(1)?.type === TokenType.LeftBrace) ||
+      (t.type === TokenType.Identifier && t.value === 'icon' && this.peekAt(1)?.type === TokenType.String) ||
       (t.type === TokenType.Identifier && ELEMENT_TAGS.has(t.value)) ||
       // Uppercase identifiers are component invocations (e.g., Card, Header)
       (t.type === TokenType.Identifier && t.value[0] >= 'A' && t.value[0] <= 'Z');
