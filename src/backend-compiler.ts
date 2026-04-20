@@ -1052,12 +1052,18 @@ function autoMigrate(tableName, expectedCols) {
   const existingNames = new Set(existing.map(c => c.name));
   for (const col of expectedCols) {
     if (!existingNames.has(col.name)) {
-      const sql = \`ALTER TABLE \${tableName} ADD COLUMN \${col.name} \${col.type}\${col.constraints || ''}\`;
+      // SQLite cannot ADD COLUMN with UNIQUE — strip it and create index instead
+      const hasUnique = col.constraints && col.constraints.includes('UNIQUE');
+      const safeConstraints = (col.constraints || '').replace(/ UNIQUE/g, '');
+      const sql = \`ALTER TABLE \${tableName} ADD COLUMN \${col.name} \${col.type}\${safeConstraints}\`;
       try {
         db.exec(sql);
+        if (hasUnique) {
+          db.exec(\`CREATE UNIQUE INDEX IF NOT EXISTS idx_\${tableName}_\${col.name} ON \${tableName}(\${col.name})\`);
+        }
         db.prepare('INSERT INTO _migrations (action, table_name, column_name, sql_executed) VALUES (?, ?, ?, ?)')
-          .run('add_column', tableName, col.name, sql);
-        console.log(\`[migration] Added column \${tableName}.\${col.name}\`);
+          .run('add_column', tableName, col.name, sql + (hasUnique ? ' + UNIQUE INDEX' : ''));
+        console.log(\`[migration] Added column \${tableName}.\${col.name}\${hasUnique ? ' (+ unique index)' : ''}\`);
       } catch(e) {
         console.error(\`[migration] Failed: \${sql} — \${e.message}\`);
       }
