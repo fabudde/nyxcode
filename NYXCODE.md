@@ -42,7 +42,7 @@ page / {
 table posts { title text required, body text, created auto }
 security { table users, login email password, token jwt, protect /api/posts write }
 theme { colors { primary #667eea, bg #0a0a12, card #1a1a2e } }
-preset card { bg card, r 12px, p 2rem }
+preset card { bg card; r 12px; p 2rem }
 
 page / {
   section style={ mw 800px, mx auto, p 2rem } {
@@ -229,8 +229,8 @@ div grid=3@1 gap=2rem { ... }            # 3 cols desktop, 1 col mobile! (v0.9.7
 
 ## Style Presets — Define Once, Use Everywhere
 ```nyx
-preset card { bg #1a1a2e, r 12px, p 2rem, shadow 0 4px 12px rgba(0,0,0,0.2) }
-preset label { fs 0.7rem, fw 700, tt uppercase, ls 0.05em, c #888 }
+preset card { bg #1a1a2e; r 12px; p 2rem; shadow 0 4px 12px rgba(0,0,0,0.2) }
+preset label { fs 0.7rem; fw 700; tt uppercase; ls 0.05em; c #888 }
 
 page / {
   div preset=card { h2 "Hello", span "Tag" preset=label }
