@@ -2391,6 +2391,12 @@ export class Parser {
         continue;
       }
       if (next.type === TokenType.Comma) {
+        // Outside parens: comma MAY be a property delimiter (like semicolon)
+        // Only break if next token after comma is a known CSS shorthand
+        const afterComma = this.peekAt(1);
+        if (afterComma && afterComma.type === TokenType.Identifier && CSS_SHORTHANDS.has(afterComma.value)) {
+          break; // Comma separates properties: bg red, p 1rem
+        }
         this.advance();
         parts.push({ kind: 'token', value: ',' });
         lastLine = next.line;
@@ -2545,8 +2551,8 @@ export class Parser {
       }
       const value = this.collectCSSValueUntilSemicolon();
       if (value) styles.push({ name: prop, value });
-      // Skip semicolons between properties (lexed as Identifier ";")
-      while (this.peek()?.type === TokenType.Identifier && this.peek()?.value === ';') {
+      // Skip semicolons and commas between properties
+      while ((this.peek()?.type === TokenType.Identifier && this.peek()?.value === ';') || this.peek()?.type === TokenType.Comma) {
         this.advance();
       }
     }
