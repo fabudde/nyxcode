@@ -3025,6 +3025,17 @@ private parseElement(): ElementNode {
     // For component invocations (uppercase tag), attributes take priority over statement detection
     const isComponentCall = tag[0] >= 'A' && tag[0] <= 'Z';
 
+    // For input/textarea/select: first bare identifier is the field name, NOT a new element
+    const FORM_FIELD_TAGS = new Set(['input', 'textarea', 'select']);
+    if (FORM_FIELD_TAGS.has(tag) && !content) {
+      const next = this.peek();
+      // Consume field name if: it's an identifier (or keyword token), NOT followed by = (attribute)
+      // and NOT followed by { (element children), and NOT a string (that's handled below)
+      if (next.type === TokenType.Identifier && this.peekAt(1)?.type !== TokenType.Equals && this.peekAt(1)?.type !== TokenType.LeftBrace) {
+        content = { type: 'Identifier', name: this.advance().value, line: next.line, col: next.col };
+      }
+    }
+
     // Parse content and attributes
     while (!this.isAtEnd() && !this.check(TokenType.RightBrace)) {
       // Check if next is a new statement — but key=value is an attribute, NOT a new statement
