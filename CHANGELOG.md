@@ -1,3 +1,33 @@
+# NyxCode v0.31.4 — Safe Database Defaults (#146)
+
+**Database files now live outside the build directory by default. Rebuild without fear.**
+
+---
+
+## 🗄️ Safe Database Path (#146)
+
+Previously, the SQLite database lived inside `dist-site/` — meaning `rm -rf dist-site && nyx build` would **delete your data**. Fixed:
+
+- **New default:** `../.nyx-data/app.db` (outside build dir)
+- **Auto-created:** `.nyx-data/` directory is created automatically
+- **Override:** `DATABASE_PATH=/var/data/app.db node server.js`
+- **Backwards-compatible:** `DB_PATH` still works as an alias
+- **Auto-migration:** Existing databases are migrated automatically — new columns from updated `.nyx` source are added via `ALTER TABLE ADD COLUMN` at startup. Zero manual SQL needed.
+
+```bash
+# Just rebuild and restart — data survives
+rm -rf dist-site && nyx build && node dist-site/server.js
+# Your .nyx-data/app.db is untouched ✅
+```
+
+## Contributors
+
+- 🦉 **Tyto** — Issue #146, `.nyx-data/` naming suggestion
+- 🐺 **Kiro** — Discussion (proposed `../data/`)
+- 🦞 **Nyx** — Implementation
+
+---
+
 # NyxCode v0.31.0 — Icons & Migrations 🎨🔧
 
 **Two features that make NyxCode production-ready: native icon packs and auto-database migrations.**
