@@ -970,6 +970,16 @@ export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config
   }
 
   const createStatements = tables.map(t => `db.exec(\`${createTableSQL(t)}\`);`).join('\n');
+
+  // Generate auto-migration calls
+  const migrateStatements = tables.map(t => {
+    const cols = t.columns.map(col => {
+      const type = sqlType(col);
+      const constraints = sqlConstraints(col).replace(/'/g, "\\'");
+      return `{ name: '${col.name}', type: '${type}', constraints: '${constraints}' }`;
+    });
+    return `autoMigrate('${t.name}', [${cols.join(', ')}]);`;
+  }).join('\n');
   const crudBlocks = tables.map(t => crudForTable(t, tables, onEvents)).join('\n');
   const hookBlocks = hooks.map(h => compileHook(h)).join('\n');
   const actionBlocks = actions.map(a => compileAction(a)).join('\n');
@@ -1024,6 +1034,38 @@ const writeLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { 
 const db = new Database(process.env.DB_PATH || 'app.db');
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+
+// ── Auto-Migration ─────────────────────────────────────────────
+
+db.exec(\`CREATE TABLE IF NOT EXISTS _migrations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  action TEXT NOT NULL,
+  table_name TEXT NOT NULL,
+  column_name TEXT,
+  sql_executed TEXT,
+  applied_at TEXT DEFAULT (datetime('now'))
+)\`);
+
+function autoMigrate(tableName, expectedCols) {
+  const existing = db.prepare(\`PRAGMA table_info(\${tableName})\`).all();
+  if (existing.length === 0) return; // Table doesn't exist yet, CREATE TABLE will handle it
+  const existingNames = new Set(existing.map(c => c.name));
+  for (const col of expectedCols) {
+    if (!existingNames.has(col.name)) {
+      const sql = \`ALTER TABLE \${tableName} ADD COLUMN \${col.name} \${col.type}\${col.constraints || ''}\`;
+      try {
+        db.exec(sql);
+        db.prepare('INSERT INTO _migrations (action, table_name, column_name, sql_executed) VALUES (?, ?, ?, ?)')
+          .run('add_column', tableName, col.name, sql);
+        console.log(\`[migration] Added column \${tableName}.\${col.name}\`);
+      } catch(e) {
+        console.error(\`[migration] Failed: \${sql} — \${e.message}\`);
+      }
+    }
+  }
+}
+
+${migrateStatements}
 
 // ── Create tables ──────────────────────────────────────────────
 
