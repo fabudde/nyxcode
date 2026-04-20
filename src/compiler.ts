@@ -774,6 +774,12 @@ export class Compiler {
       return this.compileComponentUsage(el);
     }
 
+    // ===== v0.31.1: submit → <button type="submit"> (#144) =====
+    // `submit` is not a valid HTML element. Always map to <button type="submit">.
+    if (el.tag === 'submit') {
+      el = { ...el, tag: 'button', attributes: [...el.attributes, { name: 'type', value: 'submit' }] };
+    }
+
     // ===== v0.24.0: nav burger =====
     // Intercept `<nav>` elements that carry a `burger` attribute and rewrite
     // them into a zero-JS <details>/<summary>/<nav> collapsible pattern.
