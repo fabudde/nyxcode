@@ -466,6 +466,11 @@ export class Parser {
           const refName = this.consumeIdentifier();
           this.consume(TokenType.RightBracket);
           colType = `[${refName}]`;
+        } else if (next.type === TokenType.Identifier && typeKeywords.has(next.value)) {
+          colType = this.advance().value;
+        } else if (next.type === TokenType.Email) {
+          // 'email' is lexed as TokenType.Email keyword, but valid as column type
+          colType = this.advance().value;
         } else if (next.type === TokenType.Identifier) {
           colType = this.advance().value;
         }
