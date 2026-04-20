@@ -13,6 +13,7 @@
  */
 
 import { Token, TokenType } from './tokens.js';
+import { COLUMN_TYPES, COLUMN_CONSTRAINTS } from './compiler-context.js';
 import {
   Program, TopLevelNode, PageNode, ComponentNode, ApiNode,
   TableNode, StoreNode, ThemeNode, Statement, DataStatement,
@@ -443,8 +444,8 @@ export class Parser {
     this.consume(TokenType.LeftBrace);
 
     const columns: ColumnDef[] = [];
-    const typeKeywords = new Set(['text', 'email', 'number', 'int', 'float', 'decimal', 'bool', 'auto']);
-    const constraintKeywords = new Set(['required', 'unique', 'default', 'ref', 'auto', 'min', 'max', 'format', 'pattern', 'realtime', 'enum']);
+    const typeKeywords = COLUMN_TYPES;
+    const constraintKeywords = COLUMN_CONSTRAINTS;
 
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       // Skip optional commas between columns (supports both inline and multi-line styles).
@@ -466,10 +467,7 @@ export class Parser {
           const refName = this.consumeIdentifier();
           this.consume(TokenType.RightBracket);
           colType = `[${refName}]`;
-        } else if (next.type === TokenType.Identifier && typeKeywords.has(next.value)) {
-          colType = this.advance().value;
-        } else if (next.type === TokenType.Email) {
-          // 'email' is lexed as TokenType.Email keyword, but valid as column type
+        } else if (this.isColumnType(next, typeKeywords)) {
           colType = this.advance().value;
         } else if (next.type === TokenType.Identifier) {
           colType = this.advance().value;
@@ -3459,6 +3457,20 @@ private parseElement(): ElementNode {
 
   private isAtEnd(): boolean {
     return this.peek().type === TokenType.EOF;
+  }
+
+  /**
+   * Checks if a token represents a valid column type in table definitions.
+   * Handles the case where type keywords (like 'email') are lexed as their
+   * own TokenType rather than Identifier. Prevents #143-class bugs for any
+   * keyword that doubles as a column type.
+   */
+  private isColumnType(token: Token, typeKeywords: Set<string>): boolean {
+    // Direct match: identifier whose value is a known type
+    if (token.type === TokenType.Identifier && typeKeywords.has(token.value)) return true;
+    // Keyword tokens that are also valid column types (e.g., TokenType.Email → 'email')
+    if (token.type !== TokenType.Identifier && typeKeywords.has(token.value)) return true;
+    return false;
   }
 
   private isBinaryOp(): boolean {

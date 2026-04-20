@@ -23,6 +23,7 @@ import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { nearestMatches, didYouMean } from './suggest.js';
+import { NODE_VISITORS } from './node-visitors.js';
 
 let NYXCODE_VERSION = '0.0.0';
 try {
@@ -696,7 +697,12 @@ export class Compiler {
       case 'Animate': this.animations.push(`@keyframes ${(stmt as AnimateStatement).name} { ${(stmt as AnimateStatement).content} }`); return '';
       case 'Footnotes': return this.compileFootnotes(stmt as any);
       case 'Icon': return this.compileIcon(stmt as any);
-      default: return '';
+      default: {
+        // Visitor pattern: check registry for node types added by sub-modules
+        const visitor = NODE_VISITORS.get(stmt.type);
+        if (visitor) return visitor(this, stmt);
+        return '';
+      }
     }
   }
 
