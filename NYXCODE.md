@@ -1517,6 +1517,29 @@ table users {
 
 Auto-generates: CREATE TABLE + 5 CRUD endpoints per table (GET all, GET :id, POST, PUT, DELETE).
 
+### Database Location (v0.31.4)
+
+By default, `app.db` lives **outside** the build directory so it survives rebuilds:
+
+```
+project/
+├── site.nyx
+├── .nyx-data/        ← auto-created, persistent
+│   └── app.db
+└── dist-site/        ← rebuilt freely, no data here
+    ├── index.html
+    └── server.js
+```
+
+**Override with env var:**
+```bash
+DATABASE_PATH=/var/data/myapp.db node server.js
+```
+
+Resolution order: `DATABASE_PATH` → `DB_PATH` → `../.nyx-data/app.db`
+
+**Docker:** Mount `.nyx-data/` as a volume. Build dir is disposable.
+
 ### Auto-Migrations (v0.31.0)
 
 When you add new columns to a table, the server automatically migrates the database at startup. No manual migration commands needed.

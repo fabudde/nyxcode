@@ -1031,7 +1031,9 @@ function broadcast(table, data) {
 ` : ''}
 const writeLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { error: 'Too many requests' } });
 
-const db = new Database(process.env.DATABASE_PATH || process.env.DB_PATH || 'app.db');
+const DB_PATH = process.env.DATABASE_PATH || process.env.DB_PATH || path.resolve(__dirname, '..', '.nyx-data', 'app.db');
+const fs = require('fs'); if (!fs.existsSync(path.dirname(DB_PATH))) fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
