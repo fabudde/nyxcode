@@ -41,7 +41,7 @@ nyx add stripe                    # Add package + npm install
 table posts { title text required, body text, created auto }
 security { table users, login email password, token jwt, protect /api/posts write }
 theme { colors { primary #667eea, bg #0a0a12, card #1a1a2e } }
-preset card { bg card; r 12px; p 2rem }
+preset card { bg card, r 12px, p 2rem }
 
 page / {
   section style={ mw 800px, mx auto, p 2rem } {
