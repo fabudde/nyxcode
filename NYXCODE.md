@@ -24,6 +24,28 @@ The CLI is available as `nyx` (preferred) or `nyxcode` (alias). Both work identi
 - No flag → defaults to `<input-file-dir>/dist-site/`, NOT the current working dir
 
 
+## Dev Server (`nyx dev`)
+
+```bash
+nyx dev app.nyx                # Starts on localhost:3000
+nyx dev app.nyx --port=8080    # Custom port
+```
+
+**What it does:**
+- Compiles `.nyx` → HTML and serves from memory (no disk I/O)
+- Watches all source files for changes, rebuilds with debounce
+- **Live Reload** via Server-Sent Events — browser refreshes automatically
+- **Full-stack mode:** If your `.nyx` has `table` or `security` blocks, the dev server embeds CRUD API routes + in-memory SQLite — no separate backend needed
+- All API endpoints (`GET/POST/PUT/DELETE`) work live during development
+- Auth (JWT login/register) works out of the box
+
+**Architecture:**
+```
+Your editor → save .nyx → file watcher detects → rebuild (50ms) → SSE "reload" → browser refreshes
+```
+
+No webpack. No vite config. No bundler. Just `nyx dev` and go.
+
 ## Comments
 
 ```nyx
