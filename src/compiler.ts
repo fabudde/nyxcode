@@ -2587,23 +2587,30 @@ export class Compiler {
         ? "var tk=localStorage.getItem('token');if(tk)h['Authorization']='Bearer '+tk;" 
         : '';
       
+      // #140: Collect fields recursively — inputs may be nested inside grid/div wrappers
       const fields: string[] = [];
-      for (const s of form.body) {
-        if (s.type !== 'Element') continue;
-        const el = s as ElementNode;
-        if (el.tag !== 'input' && el.tag !== 'textarea' && el.tag !== 'select') continue;
-        // Field name comes from name attr or _fieldName (set during form compilation)
-        const nameAttr = el.attributes.find((a: any) => a.name === 'name');
-        let fieldName = (el as any)._fieldName || '';
-        if (nameAttr) {
-          fieldName = typeof nameAttr.value === 'string' ? nameAttr.value : (nameAttr.value as any).value || '';
-        } else if (!fieldName && el.content) {
-          if (typeof el.content === 'string') fieldName = el.content;
-          else if ((el.content as any).type === 'Identifier') fieldName = (el.content as any).name;
-          else if ((el.content as any).type === 'StringLiteral') fieldName = (el.content as any).value;
+      const collectFields = (stmts: Statement[]) => {
+        for (const s of stmts) {
+          if (s.type !== 'Element') continue;
+          const el = s as ElementNode;
+          // Recurse into wrapper elements
+          if (el.children && el.children.length > 0) {
+            collectFields(el.children);
+          }
+          if (el.tag !== 'input' && el.tag !== 'textarea' && el.tag !== 'select') continue;
+          const nameAttr = el.attributes.find((a: any) => a.name === 'name');
+          let fieldName = (el as any)._fieldName || '';
+          if (nameAttr) {
+            fieldName = typeof nameAttr.value === 'string' ? nameAttr.value : (nameAttr.value as any).value || '';
+          } else if (!fieldName && el.content) {
+            if (typeof el.content === 'string') fieldName = el.content;
+            else if ((el.content as any).type === 'Identifier') fieldName = (el.content as any).name;
+            else if ((el.content as any).type === 'StringLiteral') fieldName = (el.content as any).value;
+          }
+          if (fieldName) fields.push(fieldName);
         }
-        if (fieldName) fields.push(fieldName);
-      }
+      };
+      collectFields(form.body);
 
       // Build body from input IDs  
       const bodyParts = fields.map((f: string) => "'" + f + "':document.getElementById('" + formId + "-" + f + "').value").join(',');
