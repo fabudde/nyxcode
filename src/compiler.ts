@@ -3520,6 +3520,16 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
   }
 
   private resolveThemeValue(cssProperty: string, value: string): string {
+    // #147: Strip outer quotes from multi-word values like "0.8rem 1.5rem".
+    // Quotes in .nyx group multi-token values for the parser, but must not appear in CSS output.
+    // Preserve quotes inside CSS functions like url("...") and font-family (handled separately).
+    if (value.startsWith('"') && value.endsWith('"') && value.length > 2) {
+      const inner = value.slice(1, -1);
+      // Only strip if it's NOT inside a function call context (no unbalanced parens)
+      if (!inner.includes('(') && !inner.includes(')')) {
+        value = inner;
+      }
+    }
     if (cssProperty === 'font-family') return this.processFontFamily(value);
 
     // Phase 1: Resolve dot-notation tokens (works for ALL properties)
