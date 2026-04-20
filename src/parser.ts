@@ -3054,7 +3054,12 @@ private parseElement(): ElementNode {
                 const tok = this.advance();
                 if (tok.type === TokenType.Comma) { propVal += ', '; }
                 else if ((tok.value === '-' || tok.value === '+') && propVal.length > 0 && !propVal.endsWith('(')) { propVal += ' ' + tok.value + ' '; }
-                else { propVal += tok.value; }
+                else {
+                  // #141: Add space between tokens inside parens
+                  // e.g. #1e6b8a 0% — without this, hex+percent merge
+                  const needsSpace = propVal.length > 0 && !propVal.endsWith('(') && !propVal.endsWith(', ');
+                  propVal += (needsSpace ? ' ' : '') + tok.value;
+                }
                 continue;
               }
               // Outside parens: comma or } ends the property
