@@ -37,6 +37,13 @@ try {
  * dangerous schemes (javascript:, vbscript:, data:text/html, …). See
  * `Compiler.sanitizeUrlAttr`.
  */
+/** Icon pack registry: pack name → CSS class prefix + CDN URL (#142) */
+const ICON_PACKS: Record<string, { pack: string; prefix: string; css: string; version: string }> = {
+  lucide:   { pack: 'lucide',   prefix: 'icon-',  css: 'https://unpkg.com/lucide-static@0.460.0/font/lucide.css', version: '0.460.0' },
+  phosphor: { pack: 'phosphor', prefix: 'ph ph-',  css: 'https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css', version: '2.1.1' },
+  tabler:   { pack: 'tabler',   prefix: 'ti ti-',  css: 'https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css', version: '3.31.0' },
+};
+
 const URL_ATTRS = new Set<string>([
   'src', 'srcset', 'href', 'action', 'formaction',
   'poster', 'data', 'cite', 'background', 'ping',
@@ -105,6 +112,7 @@ export class Compiler {
   // (NOT reset per-page) because the syntax is a program-level declaration.
   private topLevelKeyframes: Map<string, string> = new Map(); // name -> complete @keyframes CSS block
   private footnotesStyleInjected: boolean = false;
+  private iconPackConfig: { pack: string; prefix: string; css: string } | null = null; // v0.31.0 (#142)
   private svgDepth: number = 0;  // Tracks nesting inside <svg> so SVG-specific tags (text, title) aren't remapped to HTML (#62)
   private styleCache: Map<string, string> = new Map(); // hash -> className for dedup
   private staticMode: boolean = false; // When true, don't emit data-navigate on links
@@ -687,6 +695,7 @@ export class Compiler {
       case 'Head': this.headInjections.push((stmt as HeadStatement).content); return '';
       case 'Animate': this.animations.push(`@keyframes ${(stmt as AnimateStatement).name} { ${(stmt as AnimateStatement).content} }`); return '';
       case 'Footnotes': return this.compileFootnotes(stmt as any);
+      case 'Icon': return this.compileIcon(stmt as any);
       default: return '';
     }
   }
@@ -709,6 +718,30 @@ export class Compiler {
       return `<li id="fn-${e.id}">${content} <a href="#fnref-${e.id}" class="nyx-fnback" aria-label="Back to reference">↩</a></li>`;
     }).join('\n');
     return `<aside class="nyx-footnotes" role="doc-endnotes"><ol>${items}</ol></aside>`;
+  }
+
+  /** v0.31.0 — Compile `icon "name"` to `<i>` with icon-pack class (#142) */
+  private compileIcon(stmt: { name: string; size?: number; style?: Array<{ name: string; value: string }>; classes?: string[] }): string {
+    const prefix = this.iconPackConfig?.prefix || 'icon-';
+    const classes = [prefix + stmt.name, ...(stmt.classes || [])].join(' ');
+    const styles: string[] = [];
+    if (stmt.size) {
+      styles.push(`font-size:${stmt.size}px`, `width:${stmt.size}px`, `height:${stmt.size}px`);
+    }
+    if (stmt.style) {
+      for (const s of stmt.style) {
+        const prop = this.mapCSSProperty(s.name);
+        const value = this.resolveThemeValue(prop, s.value);
+        styles.push(`${prop}:${value}`);
+      }
+    }
+    const styleAttr = styles.length ? ` style="${styles.join(';')}"` : '';
+    return `<i class="${classes}"${styleAttr} aria-hidden="true"></i>`;
+  }
+
+  /** Get icon pack config (set by compileTheme) */
+  private getIconPack(): { pack: string; prefix: string; css: string } | null {
+    return this.iconPackConfig;
   }
 
   // --- Element compilation ---
@@ -2482,6 +2515,15 @@ export class Compiler {
       this.headInjections.push('<style>' + css + '</style>');
     }
 
+    // v0.31.0 (#142): Icon pack CSS injection
+    if (theme.icons) {
+      const packInfo = ICON_PACKS[theme.icons.pack];
+      if (packInfo) {
+        this.iconPackConfig = packInfo;
+        this.headInjections.push(`<link rel="stylesheet" href="${packInfo.css}" crossorigin="anonymous">`);
+      }
+    }
+
     // Google Fonts injection (guard against double-injection)
     if (this.googleFonts.length > 0 && !this.googleFontsInjected) {
       this.googleFontsInjected = true;
@@ -4057,6 +4099,13 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
     result = result.replace(/\[\^(\w+)\]/g, (_m, id) => {
       return `<sup class="nyx-fnref"><a href="#fn-${id}" id="fnref-${id}">[${id}]</a></sup>`;
     });
+    // v0.31.0 (#142): Inline icons: "icon:map-pin Address" → <i class="icon-map-pin"></i> Address
+    const iconPack = this.getIconPack();
+    if (iconPack) {
+      result = result.replace(/icon:([a-z0-9-]+)/gi, (_m, name) => {
+        return `<i class="${iconPack.prefix}${name}" aria-hidden="true"></i>`;
+      });
+    }
     return result;
   }
 

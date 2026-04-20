@@ -640,8 +640,26 @@ export class Parser {
     let bodyStyles: Array<{ name: string; value: string }> | undefined;
     let selectionStyles: Array<{ name: string; value: string }> | undefined;
     let defaultsList: Array<{ element: string; properties: Array<{ name: string; value: string }> }> | undefined;
+    let iconsConfig: { pack: string; mode: 'local' | 'cdn' } | undefined;
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       const sectionName = this.consumeIdentifier();
+
+      // v0.31.0 — `icons: lucide` or `icons: lucide cdn` (#142)
+      // Parsed as key-value, NOT a section with braces.
+      if (sectionName === 'icons') {
+        if (this.check(TokenType.Colon)) this.advance(); // skip optional colon
+        const pack = this.advance().value; // lucide, phosphor, tabler, etc.
+        let iconMode: 'local' | 'cdn' = 'local';
+        if (this.check(TokenType.Identifier) && this.peek().value === 'cdn') {
+          this.advance();
+          iconMode = 'cdn';
+        }
+        // Skip optional trailing semicolon
+        if (this.check(TokenType.Identifier) && this.peek().value === ';') this.advance();
+        iconsConfig = { pack, mode: iconMode };
+        continue;
+      }
+
       this.consume(TokenType.LeftBrace);
 
       // v0.25.0 — `defaults { a { c #9b8ec4; td none } pre { ... } }` (#112)
@@ -942,6 +960,7 @@ export class Parser {
     if (bodyStyles && bodyStyles.length > 0) node.body = bodyStyles;
     if (selectionStyles && selectionStyles.length > 0) node.selection = selectionStyles;
     if (defaultsList && defaultsList.length > 0) node.defaults = defaultsList;
+    if (iconsConfig) node.icons = iconsConfig;
     if (node.mode && (node.name || node.extends)) {
       throw this.error('`@theme dark` cannot be combined with `as` or `extends`. Dark mode is a per-theme variant; declare it separately.');
     }
@@ -1077,6 +1096,49 @@ export class Parser {
    * Use for fonts, meta tags, third-party CSS.
    * Example: head "<link href='https://fonts.googleapis.com/...' rel='stylesheet'>"
    */
+  private parseIcon(): import('./ast').IconStatement {
+    const start = this.advance(); // consume 'icon'
+    const name = this.consume(TokenType.String).value;
+    let size: number | undefined;
+    let style: Array<{ name: string; value: string }> | undefined;
+    let classes: string[] | undefined;
+    // Parse optional attributes: size=24, style={ c red; fs 2rem }, class="extra"
+    while ((this.check(TokenType.Identifier) && (this.peek().value === 'size' || this.peek().value === 'class')) || this.check(TokenType.Style)) {
+      const attr = this.advance().value; // 'size', 'style', or 'class'
+      if (this.check(TokenType.Equals)) this.advance(); // consume =
+      if (attr === 'size') {
+        size = parseInt(this.advance().value, 10);
+      } else if (attr === 'style' && this.check(TokenType.LeftBrace)) {
+        this.advance(); // consume {
+        style = [];
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          if (this.peek().type !== TokenType.Identifier) break;
+          const prop = this.advance().value;
+          if (this.check(TokenType.Colon)) this.advance();
+          // Collect value tokens until semicolon or right brace
+          let val = '';
+          while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            const t = this.peek();
+            // Semicolons separate properties
+            if (t.type === TokenType.Identifier && t.value === ';') { this.advance(); break; }
+            // Next identifier on same/new line that looks like a property name → stop
+            if (val && t.type === TokenType.Identifier && /^[a-z]/.test(t.value) && this.peekAt(1)?.type !== TokenType.RightBrace) {
+              // Peek: if followed by a value token or colon, this is a new property
+              const next = this.peekAt(1);
+              if (next && (next.type === TokenType.Colon || next.type === TokenType.Identifier || next.type === TokenType.Number || (next.value && next.value.startsWith('#')))) break;
+            }
+            val += (val ? ' ' : '') + this.advance().value;
+          }
+          if (val) style.push({ name: prop, value: val });
+        }
+        this.consume(TokenType.RightBrace); // consume style closing }
+      } else if (attr === 'class') {
+        classes = this.advance().value.split(/\s+/);
+      }
+    }
+    return { type: 'Icon', name, size, style, classes, line: start.line, col: start.col };
+  }
+
   private parseHead(): HeadStatement {
     const start = this.consume(TokenType.Head);
     const content = this.consume(TokenType.String).value;
@@ -1330,6 +1392,10 @@ export class Parser {
       case TokenType.Animate: return this.parseAnimate();
       case TokenType.Use: return this.parseUse() as any;
       case TokenType.Identifier:
+        // v0.31.0 — icon element: `icon "name"` with optional size= and style= (#142)
+        if (this.peek().value === 'icon' && this.peekAt(1)?.type === TokenType.String) {
+          return this.parseIcon();
+        }
         // Meta block: meta { title "..."; description "..."; og:image "..." }
         if (this.peek().value === 'meta' && this.peekAt(1)?.type === TokenType.LeftBrace) {
           return this.parseMeta();

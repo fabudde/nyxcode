@@ -90,6 +90,8 @@ export interface ThemeNode extends BaseNode {
   selection?: Array<{ name: string; value: string }>;
   /** v0.25.0 — `theme { defaults { a { c #9b8ec4 } pre { font-family ... } } }` — element default styles wrapped in :where() for zero specificity (#112) */
   defaults?: Array<{ element: string; properties: Array<{ name: string; value: string }> }>;
+  /** v0.31.0 — `theme { icons: lucide }` or `theme { icons: lucide cdn }` — icon pack support (#142) */
+  icons?: { pack: string; mode: 'local' | 'cdn' };
 }
 
 /** `security { ... }` */
@@ -139,7 +141,17 @@ export type Statement =
   | FootnotesStatement
   | LetStatement
   | EmailStatement
-  | ActionCallStatement;
+  | ActionCallStatement
+  | IconStatement;
+
+/** `icon "name"` — renders an icon from the configured icon pack (#142) */
+export interface IconStatement extends BaseNode {
+  type: 'Icon';
+  name: string;
+  size?: number;
+  style?: Array<{ name: string; value: string }>;
+  classes?: string[];
+}
 
 /** `head { ... }` — inject into <head>: fonts, meta, raw CSS */
 export interface HeadStatement extends BaseNode {
