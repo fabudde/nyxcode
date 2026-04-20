@@ -229,15 +229,25 @@ data posts = get /api/posts auth {
 each posts -> div { h3 .title, img src=.image alt=.title }
 ```
 
-### 🗃️ Database
+### 🗃️ Database + Auto-Migrations
 ```nyx
 table posts {
   title text required
   body text
   author [users]         # Foreign key → auto JOIN
   created auto
+  category text default="general"   # Add columns anytime — auto-migrated!
 }
 # Auto-generates: GET/POST/PUT/DELETE endpoints + pagination + search + filtering
+# Auto-migrates: New columns applied at startup, zero data loss
+```
+
+### 🎯 Native Icons (v0.31.0)
+```nyx
+theme { icons: lucide }                           # Lucide, Phosphor, or Tabler
+icon "heart" size=24                               # Standalone icon
+icon "stethoscope" size=32 style={ c #2a7d5f }    # With style
+h1 "icon:map-pin Our Location"                     # Inline in text
 ```
 
 ## CSS Shorthands

@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.30.0)
+# NYXCODE.md — AI Context File (v0.31.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -1397,12 +1397,47 @@ page / {
 ```
 Raw JavaScript captured at lexer level. Use sparingly — NyxCode native features preferred.
 
-## Icons
-4 methods — no native `icon` element:
-1. **Emoji:** `span "🦞"`
-2. **Lucide CSS:** Add CDN in `head`, use `<i data-lucide="heart"></i>` via script
-3. **Font Awesome:** Add CDN in `head`, `span class="fa-solid fa-heart"`
-4. **Material Icons:** Add CDN in `head`, `span "heart" class="material-icons"`
+## Icons (v0.31.0)
+
+Native icon pack support. Declare once in theme, use everywhere.
+
+### Theme Declaration
+```nyx
+theme {
+  icons: lucide           # Lucide Icons (default, 1400+ icons)
+  # icons: phosphor       # Phosphor Icons
+  # icons: tabler         # Tabler Icons
+  # icons: lucide cdn     # CDN mode (default is local/pinned)
+}
+```
+
+Supported packs:
+| Pack | Prefix | Version |
+|------|--------|---------|
+| `lucide` | `icon-` | 0.460.0 |
+| `phosphor` | `ph ph-` | 2.1.1 |
+| `tabler` | `ti ti-` | 3.31.0 |
+
+All versions pinned for supply-chain safety.
+
+### Standalone Icon Element
+```nyx
+icon "heart"                              # basic
+icon "stethoscope" size=32                # with size (px)
+icon "map-pin" size=24 style={ c red }    # with inline styles
+icon "settings" style={ c #2a7d5f; fs 2rem }
+```
+Compiles to: `<i class="icon-heart" aria-hidden="true"></i>`
+
+### Inline Icons in Text
+```nyx
+h1 "icon:heart Welcome"
+p "Visit us at icon:map-pin our location"
+p "icon:star Rated icon:thumbs-up Approved"   # multiple per line
+```
+Compiles to: `<h1><i class="icon-heart" aria-hidden="true"></i> Welcome</h1>`
+
+**Note:** Inline `icon:name` syntax requires `theme { icons: ... }`. Without it, standalone `icon` elements still work with default `icon-` prefix.
 
 ## Head Injection
 
@@ -1459,6 +1494,31 @@ table users {
 **Constraints:** `required` → NOT NULL | `unique` → UNIQUE | `default="value"` → DEFAULT 'value'
 
 Auto-generates: CREATE TABLE + 5 CRUD endpoints per table (GET all, GET :id, POST, PUT, DELETE).
+
+### Auto-Migrations (v0.31.0)
+
+When you add new columns to a table, the server automatically migrates the database at startup. No manual migration commands needed.
+
+```nyx
+# v1: original schema
+table posts { title text required, body text }
+
+# v2: add two columns — just edit and rebuild!
+table posts { title text required, body text, category text default="general", views number }
+```
+
+**How it works:**
+1. At startup, compares `.nyx` schema with existing DB via `PRAGMA table_info()`
+2. New columns → `ALTER TABLE ADD COLUMN` with correct type + defaults
+3. UNIQUE columns → adds a separate `CREATE UNIQUE INDEX` (SQLite limitation)
+4. All changes logged in `_migrations` table with timestamps
+5. Existing data is preserved — zero data loss
+6. Idempotent — multiple restarts only apply changes once
+
+**Limitations (SQLite):**
+- Cannot drop columns (data safety)
+- Cannot change column types
+- Cannot add `NOT NULL` without a `DEFAULT` to tables with existing data
 
 ### Pagination, Search & Filtering (v0.27.3+)
 
