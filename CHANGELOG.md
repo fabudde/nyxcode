@@ -1,3 +1,16 @@
+# NyxCode v0.33.1 — Pipe Source Integration Fix (#151)
+
+**Fixes pipe keyword not being recognized when building from TypeScript source.**
+
+## 🐛 Bug Fix
+
+- **Pipe code ported to TypeScript source** — v0.32.0 pipe feature was only in compiled dist/ files, not in .ts source. Building from source removed pipes. (#151)
+- `compilePipeBlocks()` now correctly called in backend compiler output
+- Pipe test file added to src/tests/ (was only in dist/)
+- 452 tests passing (387 existing + 65 pipe tests), 0 failures
+
+---
+
 # NyxCode v0.33.0 — let & const: Page-Local Variables (#150)
 
 **Reactive variables meet compile-time constants. Write less, build more.**

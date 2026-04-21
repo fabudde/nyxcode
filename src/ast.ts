@@ -19,7 +19,7 @@ export interface Program extends BaseNode {
 }
 
 export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode | ConfigNode | HookNode | MiddlewareNode | FootnotesStatement
-  | PresetNode | HeadStatement | KeyframesNode | EveryNode | ActionNode | OnEventNode | EnvNode;
+  | PresetNode | HeadStatement | KeyframesNode | EveryNode | ActionNode | OnEventNode | EnvNode | PipeNode;
 
 /** `keyframes name { 0% { ... } 50% { ... } 100% { ... } }` — top-level @keyframes definition (v0.25.0 #110) */
 export interface KeyframesNode extends BaseNode {
@@ -564,4 +564,197 @@ export interface ActionCallStatement extends BaseNode {
   type: 'ActionCall';
   name: string;
   args: string[];
+}
+
+// ── Pipe blocks (v0.32.0 — declarative logic chains) ──────────────────
+
+/** `pipe 'name' { ... }` — declarative logic chain */
+export interface PipeNode extends BaseNode {
+  type: 'Pipe';
+  name: string;
+  trigger: PipeTrigger | null;
+  steps: PipeStep[];
+}
+
+export type PipeTrigger =
+  | PipeTriggerApi
+  | PipeTriggerEvery
+  | PipeTriggerWebhook
+  | PipeTriggerEvent;
+
+export interface PipeTriggerApi {
+  type: 'PipeTrigger';
+  kind: 'api';
+  method: string;
+  path: string;
+  auth: boolean;
+  middleware?: string[];
+}
+
+export interface PipeTriggerEvery {
+  type: 'PipeTrigger';
+  kind: 'every';
+  interval: string;
+  intervalMs: number;
+}
+
+export interface PipeTriggerWebhook {
+  type: 'PipeTrigger';
+  kind: 'webhook';
+  method: string;
+  path: string;
+  secret?: string;
+}
+
+export interface PipeTriggerEvent {
+  type: 'PipeTrigger';
+  kind: 'event';
+  table: string;
+  event: string;
+}
+
+export type PipeStep =
+  | PipeValidateStep
+  | PipeQueryStep
+  | PipeFetchStep
+  | PipeSetStep
+  | PipeTransformStep
+  | PipeEachStep
+  | PipeWhenStep
+  | PipeOnChangeStep
+  | PipeNotifyStep
+  | PipeLogStep
+  | PipeRespondStep
+  | PipeAbortStep
+  | PipeWebhookStep
+  | PipeRunStep;
+
+export interface PipeValidateCheck {
+  kind: string;
+  value?: string;
+}
+
+export interface PipeValidateField {
+  field: string;
+  checks: PipeValidateCheck[];
+}
+
+export interface PipeValidateStep {
+  type: 'PipeValidate';
+  fields: PipeValidateField[];
+  line: number;
+  col: number;
+}
+
+export interface PipeQueryStep {
+  type: 'PipeQuery';
+  sql: string;
+  as?: string;
+  line: number;
+  col: number;
+}
+
+export interface PipeFetchStep {
+  type: 'PipeFetch';
+  url: string;
+  options: Record<string, string>;
+  line: number;
+  col: number;
+}
+
+export interface PipeSetStep {
+  type: 'PipeSet';
+  name: string;
+  expression: string;
+  line: number;
+  col: number;
+}
+
+export interface PipeTransformField {
+  key: string;
+  expr: string;
+}
+
+export interface PipeTransformStep {
+  type: 'PipeTransform';
+  fields: PipeTransformField[];
+  line: number;
+  col: number;
+}
+
+export interface PipeEachStep {
+  type: 'PipeEach';
+  collection: string;
+  itemName: string;
+  body: PipeStep[];
+  line: number;
+  col: number;
+}
+
+export interface PipeWhenStep {
+  type: 'PipeWhen';
+  condition: string;
+  body: PipeStep[];
+  elseBody?: PipeStep[];
+  line: number;
+  col: number;
+}
+
+export interface PipeOnChangeTransition {
+  from: string;
+  to: string;
+  body: PipeStep[];
+}
+
+export interface PipeOnChangeStep {
+  type: 'PipeOnChange';
+  field: string;
+  transitions: PipeOnChangeTransition[];
+}
+
+export interface PipeNotifyStep {
+  type: 'PipeNotify';
+  channel: string;
+  params: Record<string, string>;
+  line: number;
+  col: number;
+}
+
+export interface PipeLogStep {
+  type: 'PipeLog';
+  message: string;
+  line: number;
+  col: number;
+}
+
+export interface PipeRespondStep {
+  type: 'PipeRespond';
+  status: number;
+  body?: Record<string, string>;
+  line: number;
+  col: number;
+}
+
+export interface PipeAbortStep {
+  type: 'PipeAbort';
+  status: number;
+  message: string;
+  line: number;
+  col: number;
+}
+
+export interface PipeWebhookStep {
+  type: 'PipeWebhook';
+  url: string;
+  body?: Record<string, string>;
+  line: number;
+  col: number;
+}
+
+export interface PipeRunStep {
+  type: 'PipeRun';
+  pipeName: string;
+  withParams?: Record<string, string>;
+  line: number;
+  col: number;
 }

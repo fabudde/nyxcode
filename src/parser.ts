@@ -26,6 +26,7 @@ import {
   StateStatement, EffectStatement, ComputedStatement, UseStatement,
   HeadStatement, AnimateStatement, PseudoElementBlock, LayoutNode, KeyframesNode,
   ScriptStatement, FormAction, ConfigNode, EnvVar, HookNode, MiddlewareNode,
+  PipeNode, PipeStep, PipeTrigger, PipeValidateCheck, PipeValidateField,
 } from './ast.js';
 
 /** Set of tags that are recognized as built-in elements */
@@ -145,6 +146,7 @@ export class Parser {
       case TokenType.Env: return this.parseEnv();
       case TokenType.On: return this.parseOnEvent();
       case TokenType.Every: return this.parseEvery() as any;
+      case TokenType.PipeBlock: return this.parsePipeBlock();
       case TokenType.Identifier:
         if (token.value === 'middleware') return this.parseMiddleware();
         if (token.value === 'meta') return this.parseMeta() as any;
@@ -195,6 +197,539 @@ export class Parser {
     const body = this.parseBody();
     this.consume(TokenType.RightBrace);
     return { type: 'Every', interval, intervalMs, label, body, line: start.line, col: start.col };
+  }
+
+  // v0.32.0 — `pipe 'name' { ... }` declarative logic chains
+  private parsePipeBlock(): PipeNode {
+    const start = this.consume(TokenType.PipeBlock);
+    // Parse pipe name (required string)
+    const name = this.consume(TokenType.String).value;
+    this.consume(TokenType.LeftBrace);
+    // Parse pipe steps
+    let trigger: PipeTrigger | null = null;
+    const steps: PipeStep[] = [];
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      // Skip newlines
+      while (this.check(TokenType.Newline)) this.advance();
+      if (this.check(TokenType.RightBrace)) break;
+      const step = this.parsePipeStep();
+      if (step) {
+        if (step.type === 'PipeTrigger') {
+          trigger = step as any as PipeTrigger;
+        } else {
+          steps.push(step as PipeStep);
+        }
+      }
+    }
+    this.consume(TokenType.RightBrace);
+    return { type: 'Pipe', name, trigger, steps, line: start.line, col: start.col };
+  }
+
+  private parsePipeStep(): PipeStep | { type: 'PipeTrigger'; [key: string]: any } | { type: 'PipeOnChange'; [key: string]: any } | null {
+    const token = this.peek();
+    // on — trigger definitions
+    if (token.type === TokenType.On) {
+      return this.parsePipeTrigger();
+    }
+    // validate
+    if (token.type === TokenType.Validate) {
+      return this.parsePipeValidate();
+    }
+    // query
+    if (token.type === TokenType.Query) {
+      return this.parsePipeQuery();
+    }
+    // respond
+    if (token.type === TokenType.Respond) {
+      return this.parsePipeRespond();
+    }
+    // each
+    if (token.type === TokenType.Each) {
+      return this.parsePipeEach();
+    }
+    // when
+    if (token.type === TokenType.When) {
+      return this.parsePipeWhen();
+    }
+    // Identifier-based steps: set, transform, fetch, log, notify, abort, webhook, run
+    if (token.type === TokenType.Identifier) {
+      switch (token.value) {
+        case 'set': return this.parsePipeSet();
+        case 'transform': return this.parsePipeTransform();
+        case 'fetch': return this.parsePipeFetch();
+        case 'log': return this.parsePipeLog();
+        case 'notify': return this.parsePipeNotify();
+        case 'abort': return this.parsePipeAbort();
+        case 'webhook': return this.parsePipeWebhook();
+        case 'run': return this.parsePipeRun();
+      }
+    }
+    // Skip unknown tokens
+    this.advance();
+    return null;
+  }
+
+  // Parse trigger: on api POST /path [auth] | on every 30s | on webhook POST /path [secret=$KEY] | on event table.created
+  private parsePipeTrigger(): { type: 'PipeTrigger'; [key: string]: any } | { type: 'PipeOnChange'; [key: string]: any } {
+    this.consume(TokenType.On);
+    const kindToken = this.peek();
+    // on api METHOD /path [auth]
+    if (kindToken.type === TokenType.Api) {
+      this.advance(); // consume 'api'
+      const method = this.consumeIdentifier().toUpperCase();
+      const path = this.consumeIdentifier();
+      let auth = false;
+      if (this.check(TokenType.Auth)) {
+        this.advance();
+        auth = true;
+      }
+      // Optional [middleware] bracket
+      const middlewareNames: string[] = [];
+      if (this.check(TokenType.LeftBracket)) {
+        this.advance();
+        while (!this.check(TokenType.RightBracket) && !this.isAtEnd()) {
+          middlewareNames.push(this.consumeIdentifier());
+          if (this.check(TokenType.Comma)) this.advance();
+        }
+        this.consume(TokenType.RightBracket);
+      }
+      return { type: 'PipeTrigger', kind: 'api', method, path, auth, middleware: middlewareNames.length > 0 ? middlewareNames : undefined };
+    }
+    // on every Xs
+    if (kindToken.type === TokenType.Every) {
+      this.advance(); // consume 'every'
+      const intervalToken = this.advance();
+      const interval = intervalToken.value;
+      const match = interval.match(/^(\d+)(s|m|h)$/);
+      if (!match) throw this.error(`Invalid interval '${interval}'. Use format: 30s, 5m, 1h`);
+      const num = parseInt(match[1]);
+      const unit = match[2];
+      const multiplier = unit === 's' ? 1000 : unit === 'm' ? 60000 : 3600000;
+      const intervalMs = num * multiplier;
+      return { type: 'PipeTrigger', kind: 'every', interval, intervalMs };
+    }
+    // on webhook POST /path [secret=$KEY]
+    if (kindToken.type === TokenType.Identifier && kindToken.value === 'webhook') {
+      this.advance(); // consume 'webhook'
+      const method = this.consumeIdentifier().toUpperCase();
+      const path = this.consumeIdentifier();
+      let secret: string | undefined;
+      if (this.check(TokenType.LeftBracket)) {
+        this.advance();
+        while (!this.check(TokenType.RightBracket) && !this.isAtEnd()) {
+          const key = this.consumeIdentifier();
+          if (key === 'secret' && this.check(TokenType.Equals)) {
+            this.advance(); // =
+            // Handle $VARNAME (Dollar + Identifier)
+            if (this.check(TokenType.Dollar)) {
+              let val = this.advance().value;
+              if (this.check(TokenType.Identifier)) {
+                val += this.advance().value;
+              }
+              secret = val;
+            } else {
+              secret = this.advance().value;
+            }
+          }
+          if (this.check(TokenType.Comma)) this.advance();
+        }
+        this.consume(TokenType.RightBracket);
+      }
+      return { type: 'PipeTrigger', kind: 'webhook', method, path, secret };
+    }
+    // on event table.eventname
+    if (kindToken.type === TokenType.Identifier && kindToken.value === 'event') {
+      this.advance(); // consume 'event'
+      const tableName = this.consumeIdentifier();
+      this.consume(TokenType.Dot);
+      const event = this.consumeIdentifier();
+      return { type: 'PipeTrigger', kind: 'event', table: tableName, event };
+    }
+    // on change $field { ... }
+    if (kindToken.type === TokenType.Identifier && kindToken.value === 'change') {
+      this.advance(); // consume 'change'
+      // Handle $field (Dollar + Identifier)
+      let field = this.advance().value;
+      if (field === '$' && this.check(TokenType.Identifier)) field += this.advance().value;
+      this.consume(TokenType.LeftBrace);
+      const transitions: Array<{ from: string; to: string; body: PipeStep[] }> = [];
+      // Parse: old -> new { steps }
+      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+        while (this.check(TokenType.Newline)) this.advance();
+        if (this.check(TokenType.RightBrace)) break;
+        const from = this.advance().value;
+        this.consume(TokenType.Arrow); // ->
+        const to = this.advance().value;
+        this.consume(TokenType.LeftBrace);
+        const body: PipeStep[] = [];
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          const s = this.parsePipeStep();
+          if (s && s.type !== 'PipeTrigger') body.push(s as PipeStep);
+        }
+        this.consume(TokenType.RightBrace);
+        transitions.push({ from, to, body });
+      }
+      this.consume(TokenType.RightBrace);
+      return { type: 'PipeOnChange', field, transitions };
+    }
+    throw this.error(`Unknown pipe trigger kind '${kindToken.value}'`);
+  }
+
+  // validate $body.field is email|url|number|string [min=X] [max=X]
+  private parsePipeValidate(): PipeStep {
+    this.consume(TokenType.Validate);
+    const fields: PipeValidateField[] = [];
+    // Parse multiple field validations until we hit a non-validate statement
+    while (this.check(TokenType.Dollar)) {
+      let fieldName = this.advance().value; // '$'
+      // Consume the identifier part after $
+      if (!this.isAtEnd() && !this.check(TokenType.Newline)) {
+        fieldName += this.advance().value; // e.g. 'body'
+      }
+      // Handle $body.field with dot notation
+      while (this.check(TokenType.Dot)) {
+        this.advance();
+        fieldName += '.' + this.advance().value;
+      }
+      const checks: PipeValidateCheck[] = [];
+      // 'is' keyword
+      if (this.check(TokenType.Identifier) && this.peek().value === 'is') {
+        this.advance(); // consume 'is'
+        // Parse check types separated by |
+        const checkType = this.consumeIdentifier();
+        checks.push({ kind: checkType });
+        while (this.check(TokenType.Pipe)) {
+          this.advance(); // |
+          checks.push({ kind: this.consumeIdentifier() });
+        }
+      }
+      // Optional [min=X] [max=X] constraints
+      if (this.check(TokenType.LeftBracket)) {
+        this.advance();
+        while (!this.check(TokenType.RightBracket) && !this.isAtEnd()) {
+          const key = this.consumeIdentifier();
+          if (this.check(TokenType.Equals)) {
+            this.advance();
+            const val = this.advance().value;
+            checks.push({ kind: key, value: val });
+          }
+          if (this.check(TokenType.Comma)) this.advance();
+        }
+        this.consume(TokenType.RightBracket);
+      }
+      fields.push({ field: fieldName, checks });
+    }
+    return { type: 'PipeValidate', fields, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // query "SQL with $var interpolation"
+  private parsePipeQuery(): PipeStep {
+    this.consume(TokenType.Query);
+    const sql = this.consume(TokenType.String).value;
+    // Optional 'as varname'
+    let asVar: string | undefined;
+    if (this.check(TokenType.Identifier) && this.peek().value === 'as') {
+      this.advance();
+      asVar = this.consumeIdentifier();
+    }
+    return { type: 'PipeQuery', sql, as: asVar, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // fetch $url [timeout=Xs] [method=GET] [body={...}] [as varname]
+  private parsePipeFetch(): PipeStep {
+    this.advance(); // consume 'fetch'
+    // Handle $variable (Dollar + Identifier) or string URL
+    let url = this.advance().value;
+    if (url === '$' && this.check(TokenType.Identifier)) {
+      url += this.advance().value;
+      // Handle $body.url
+      while (this.check(TokenType.Dot)) {
+        this.advance();
+        url += '.' + this.advance().value;
+      }
+    }
+    const options: Record<string, string> = {};
+    // Parse optional bracketed options
+    if (this.check(TokenType.LeftBracket)) {
+      this.advance();
+      while (!this.check(TokenType.RightBracket) && !this.isAtEnd()) {
+        const key = this.consumeIdentifier();
+        if (this.check(TokenType.Equals)) {
+          this.advance();
+          options[key] = this.advance().value;
+        }
+        if (this.check(TokenType.Comma)) this.advance();
+      }
+      this.consume(TokenType.RightBracket);
+    }
+    // Optional 'as varname'
+    if (this.check(TokenType.Identifier) && this.peek().value === 'as') {
+      this.advance();
+      options.as = this.consumeIdentifier();
+    }
+    return { type: 'PipeFetch', url, options, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // Helper: collect expression tokens, merging $ with following identifier
+  private collectPipeExpr(stopAtBrace: boolean = true, stopAtNewline: boolean = true): string {
+    let expr = '';
+    while (!this.isAtEnd()) {
+      if (stopAtBrace && this.check(TokenType.RightBrace)) break;
+      if (stopAtNewline && this.check(TokenType.Newline)) break;
+      const t = this.peek();
+      // Stop at keywords that start new pipe steps
+      if (t.type === TokenType.On || t.type === TokenType.Validate || t.type === TokenType.Query ||
+          t.type === TokenType.Respond || t.type === TokenType.Each || t.type === TokenType.When ||
+          (t.type === TokenType.Identifier && ['set', 'transform', 'fetch', 'log', 'notify', 'abort', 'webhook', 'run'].includes(t.value))) {
+        break;
+      }
+      if (t.type === TokenType.Dollar) {
+        expr += t.value;
+        this.advance();
+      } else if (t.type === TokenType.String) {
+        expr += '"' + t.value + '" ';
+        this.advance();
+      } else {
+        expr += t.value + ' ';
+        this.advance();
+      }
+    }
+    return expr.trim();
+  }
+
+  // set varname = expression
+  private parsePipeSet(): PipeStep {
+    this.advance(); // consume 'set'
+    const name = this.consumeIdentifier();
+    this.consume(TokenType.Equals);
+    const expression = this.collectPipeExpr();
+    return { type: 'PipeSet', name, expression, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // transform { key: $var, key2: $var * 1.19 }
+  private parsePipeTransform(): PipeStep {
+    this.advance(); // consume 'transform'
+    this.consume(TokenType.LeftBrace);
+    const fields: Array<{ key: string; expr: string }> = [];
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      while (this.check(TokenType.Newline) || this.check(TokenType.Comma)) this.advance();
+      if (this.check(TokenType.RightBrace)) break;
+      const key = this.consumeIdentifier();
+      this.consume(TokenType.Colon);
+      // Collect value expression tokens (merge $ with identifier)
+      let expr = '';
+      while (!this.check(TokenType.RightBrace) && !this.check(TokenType.Comma) && !this.check(TokenType.Newline) && !this.isAtEnd()) {
+        const t = this.peek();
+        if (t.type === TokenType.Dollar) {
+          expr += t.value;
+          this.advance();
+        } else if (t.type === TokenType.String) {
+          expr += '"' + t.value + '" ';
+          this.advance();
+        } else {
+          expr += t.value + ' ';
+          this.advance();
+        }
+      }
+      fields.push({ key, expr: expr.trim() });
+    }
+    this.consume(TokenType.RightBrace);
+    return { type: 'PipeTransform', fields, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // each $collection as item { steps }
+  private parsePipeEach(): PipeStep {
+    this.consume(TokenType.Each);
+    // Handle $collection (Dollar + Identifier)
+    let collection = this.advance().value;
+    if (collection === '$' && this.check(TokenType.Identifier)) {
+      collection += this.advance().value;
+    }
+    let itemName = 'item';
+    if (this.check(TokenType.Identifier) && this.peek().value === 'as') {
+      this.advance(); // consume 'as'
+      itemName = this.consumeIdentifier();
+    }
+    this.consume(TokenType.LeftBrace);
+    const body: PipeStep[] = [];
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      const step = this.parsePipeStep();
+      if (step && step.type !== 'PipeTrigger') body.push(step as PipeStep);
+    }
+    this.consume(TokenType.RightBrace);
+    return { type: 'PipeEach', collection, itemName, body, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // when $condition { steps } [else { steps }]
+  private parsePipeWhen(): PipeStep {
+    this.consume(TokenType.When);
+    // Collect condition tokens until {
+    let condition = '';
+    while (!this.check(TokenType.LeftBrace) && !this.isAtEnd()) {
+      const t = this.peek();
+      if (t.type === TokenType.Dollar) {
+        // Merge $ with following identifier
+        condition += t.value;
+        this.advance();
+      } else if (t.type === TokenType.String) {
+        condition += '"' + t.value + '" ';
+        this.advance();
+      } else {
+        condition += t.value + ' ';
+        this.advance();
+      }
+    }
+    this.consume(TokenType.LeftBrace);
+    const body: PipeStep[] = [];
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      const step = this.parsePipeStep();
+      if (step && step.type !== 'PipeTrigger') body.push(step as PipeStep);
+    }
+    this.consume(TokenType.RightBrace);
+    let elseBody: PipeStep[] | undefined;
+    if (this.check(TokenType.Else)) {
+      this.advance(); // consume 'else'
+      this.consume(TokenType.LeftBrace);
+      elseBody = [];
+      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+        const step = this.parsePipeStep();
+        if (step && step.type !== 'PipeTrigger') elseBody.push(step as PipeStep);
+      }
+      this.consume(TokenType.RightBrace);
+    }
+    return { type: 'PipeWhen', condition: condition.trim(), body, elseBody, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // notify email to=$var subject="..." body="..."
+  // notify sms to=$var message="..."
+  // notify webhook to=$url body={...}
+  private parsePipeNotify(): PipeStep {
+    this.advance(); // consume 'notify'
+    const channel = this.consumeIdentifier(); // email | sms | webhook
+    const params: Record<string, string> = {};
+    // Parse key=value pairs
+    while (this.check(TokenType.Identifier) || this.check(TokenType.Dollar)) {
+      const key = this.consumeIdentifier();
+      if (this.check(TokenType.Equals)) {
+        this.advance();
+        if (this.check(TokenType.String)) {
+          params[key] = this.advance().value;
+        } else if (this.check(TokenType.LeftBrace)) {
+          // Inline object
+          params[key] = JSON.stringify(this.consumePipeInlineObject());
+        } else if (this.check(TokenType.Dollar)) {
+          // Handle $variable
+          let val = this.advance().value;
+          if (this.check(TokenType.Identifier)) val += this.advance().value;
+          while (this.check(TokenType.Dot)) { this.advance(); val += '.' + this.advance().value; }
+          params[key] = val;
+        } else {
+          params[key] = this.advance().value;
+        }
+      }
+    }
+    return { type: 'PipeNotify', channel, params, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // log "message with $var interpolation"
+  private parsePipeLog(): PipeStep {
+    this.advance(); // consume 'log'
+    const message = this.consume(TokenType.String).value;
+    return { type: 'PipeLog', message, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // respond 201 { key: $var }
+  private parsePipeRespond(): PipeStep {
+    this.consume(TokenType.Respond);
+    let status = 200;
+    if (this.check(TokenType.Number)) {
+      status = parseInt(this.advance().value);
+    }
+    let body: Record<string, string> | undefined;
+    if (this.check(TokenType.LeftBrace)) {
+      body = this.consumePipeInlineObject();
+    }
+    return { type: 'PipeRespond', status, body, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // abort 400 "error message"
+  private parsePipeAbort(): PipeStep {
+    this.advance(); // consume 'abort'
+    let status = 400;
+    if (this.check(TokenType.Number)) {
+      status = parseInt(this.advance().value);
+    }
+    let message = 'Error';
+    if (this.check(TokenType.String)) {
+      message = this.advance().value;
+    }
+    return { type: 'PipeAbort', status, message, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // webhook "url" [body={...}]
+  private parsePipeWebhook(): PipeStep {
+    this.advance(); // consume 'webhook'
+    const url = this.consume(TokenType.String).value;
+    let body: Record<string, string> | undefined;
+    if (this.check(TokenType.LeftBracket)) {
+      this.advance();
+      while (!this.check(TokenType.RightBracket) && !this.isAtEnd()) {
+        const key = this.consumeIdentifier();
+        if (key === 'body' && this.check(TokenType.Equals)) {
+          this.advance();
+          body = this.consumePipeInlineObject();
+        }
+        if (this.check(TokenType.Comma)) this.advance();
+      }
+      this.consume(TokenType.RightBracket);
+    }
+    return { type: 'PipeWebhook', url, body, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // run pipe 'other-pipe' [with { key: $var }]
+  private parsePipeRun(): PipeStep {
+    this.advance(); // consume 'run'
+    // Expect 'pipe' keyword
+    if (this.check(TokenType.PipeBlock)) {
+      this.advance();
+    }
+    const pipeName = this.consume(TokenType.String).value;
+    let withParams: Record<string, string> | undefined;
+    if (this.check(TokenType.Identifier) && this.peek().value === 'with') {
+      this.advance();
+      withParams = this.consumePipeInlineObject();
+    }
+    return { type: 'PipeRun', pipeName, withParams, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  // Helper: consume { key: value, key2: value2 } as a raw key-value map
+  private consumePipeInlineObject(): Record<string, string> {
+    this.consume(TokenType.LeftBrace);
+    const obj: Record<string, string> = {};
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      while (this.check(TokenType.Newline) || this.check(TokenType.Comma)) this.advance();
+      if (this.check(TokenType.RightBrace)) break;
+      const key = this.consumeIdentifier();
+      this.consume(TokenType.Colon);
+      // Collect value expression (merge $ with following identifier)
+      let val = '';
+      while (!this.check(TokenType.RightBrace) && !this.check(TokenType.Comma) && !this.check(TokenType.Newline) && !this.isAtEnd()) {
+        const t = this.peek();
+        if (t.type === TokenType.Dollar) {
+          val += t.value;
+          this.advance();
+        } else if (t.type === TokenType.String) {
+          val += '"' + t.value + '" ';
+          this.advance();
+        } else {
+          val += t.value + ' ';
+          this.advance();
+        }
+      }
+      obj[key] = val.trim();
+    }
+    this.consume(TokenType.RightBrace);
+    return obj;
   }
 
   private parseOnEvent(): any {

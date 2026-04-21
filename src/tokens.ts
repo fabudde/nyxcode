@@ -52,6 +52,7 @@ export enum TokenType {
   Const = 'Const',
   Env = 'Env',
   Email = 'Email',
+  PipeBlock = 'PipeBlock',
 
   // Operators & Punctuation
   LeftBrace = 'LeftBrace',       // {
@@ -127,6 +128,7 @@ export const KEYWORDS: Record<string, TokenType> = {
   const: TokenType.Const,
   env: TokenType.Env,
   email: TokenType.Email,
+  pipe: TokenType.PipeBlock,
 };
 
 export interface Token {
