@@ -249,6 +249,66 @@ export class Validator {
       }
     }
 
+    // v0.32.0 — Pipe-specific validation
+    const usePackages = program.body.filter((n: any) => n.type === 'Use' && n.packageMode).map((n: any) => n.path);
+    for (const node of program.body) {
+      if ((node as any).type === 'Pipe') {
+        const pipe = node as any;
+        // Pipe without trigger
+        if (!pipe.trigger) {
+          errors.push({
+            message: 'Pipe "' + pipe.name + '" has no trigger (add an "on api", "on every", "on webhook", or "on event" step)',
+            line: pipe.line, col: pipe.col, severity: 'warning',
+          });
+        }
+        // Check for notify sms without use twilio
+        const hasSmsPipe = pipe.steps.some((s: any) => s.type === 'PipeNotify' && s.channel === 'sms');
+        if (hasSmsPipe && !usePackages.includes('twilio')) {
+          errors.push({
+            message: 'Pipe "' + pipe.name + '" uses notify sms but no "use twilio" declared',
+            line: pipe.line, col: pipe.col, severity: 'warning',
+          });
+        }
+        // Check for notify email without use nodemailer
+        const hasEmailPipe = pipe.steps.some((s: any) => s.type === 'PipeNotify' && s.channel === 'email');
+        if (hasEmailPipe && !usePackages.includes('nodemailer')) {
+          errors.push({
+            message: 'Pipe "' + pipe.name + '" uses notify email but no "use nodemailer" declared',
+            line: pipe.line, col: pipe.col, severity: 'warning',
+          });
+        }
+        // Check for respond without API trigger
+        const hasRespond = pipe.steps.some((s: any) => s.type === 'PipeRespond');
+        if (hasRespond && pipe.trigger && pipe.trigger.kind !== 'api' && pipe.trigger.kind !== 'webhook') {
+          errors.push({
+            message: 'Pipe "' + pipe.name + '" uses respond but trigger is "' + pipe.trigger.kind + '" (respond only works with api/webhook triggers)',
+            line: pipe.line, col: pipe.col, severity: 'warning',
+          });
+        }
+        // Check for query using $body without prior validate (SECURITY)
+        let hasValidate = false;
+        for (const step of pipe.steps) {
+          if (step.type === 'PipeValidate') hasValidate = true;
+          if (step.type === 'PipeQuery' && !hasValidate) {
+            if (step.sql && (step.sql.includes('$body') || step.sql.includes('$req.body'))) {
+              errors.push({
+                message: 'Pipe "' + pipe.name + '" has query using user input ($body) without prior validate step (security risk)',
+                line: pipe.line, col: pipe.col, severity: 'warning',
+              });
+            }
+          }
+        }
+        // Check for fetch to $variable without validation (SSRF risk)
+        const hasFetchToVar = pipe.steps.some((s: any) => s.type === 'PipeFetch' && s.url && s.url.startsWith('$'));
+        if (hasFetchToVar) {
+          errors.push({
+            message: 'Pipe "' + pipe.name + '" fetches a user-provided URL ($variable) — potential SSRF risk, validate the URL first',
+            line: pipe.line, col: pipe.col, severity: 'warning',
+          });
+        }
+      }
+    }
+
     errors.sort((a, b) => {
       if (a.severity !== b.severity) { return a.severity === 'error' ? -1 : 1; }
       return a.line - b.line || a.col - b.col;
