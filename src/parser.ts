@@ -3294,6 +3294,11 @@ export class Parser {
   private parseLet(): any {
     const start = this.consume(TokenType.Let);
     const name = this.consumeIdentifier();
+    // Reserved name protection (v0.33.2)
+    const RESERVED_LET = ['__nyx', 'window', 'document', 'globalThis', 'eval', 'Function', 'constructor', 'prototype', '__proto__'];
+    if (name.startsWith('__nyx') || name.startsWith('__') || RESERVED_LET.includes(name)) {
+      throw this.error(`Reserved variable name '${name}' — names starting with '__' and JavaScript builtins are not allowed.`);
+    }
     this.consume(TokenType.Equals);
 
     // --- Frontend reactive let (simple values) → emits State node ---
@@ -3375,6 +3380,11 @@ export class Parser {
   private parseConst(): any {
     const start = this.consume(TokenType.Const);
     const name = this.consumeIdentifier();
+    // Reserved name protection (v0.33.2)
+    const RESERVED_CONST = ['__nyx', 'window', 'document', 'globalThis', 'eval', 'Function', 'constructor', 'prototype', '__proto__'];
+    if (name.startsWith('__nyx') || name.startsWith('__') || RESERVED_CONST.includes(name)) {
+      throw this.error(`Reserved variable name '${name}' — names starting with '__' and JavaScript builtins are not allowed.`);
+    }
     this.consume(TokenType.Equals);
 
     let value: any;
@@ -3659,6 +3669,11 @@ private parseElement(): ElementNode {
                 const t = this.advance();
                 if (t.type === TokenType.LeftBrace) depth++;
                 else if (t.type === TokenType.RightBrace) { depth--; if (depth === 0) { action += ' }'; break; } }
+                // Merge compound operators: + = → +=, - = → -=, * = → *=, / = → /=
+                else if (t.value === '=' && /[+\-*/]$/.test(action.trimEnd())) {
+                  action = action.trimEnd() + '=';
+                  continue;
+                }
                 action += ' ' + t.value;
               }
             } else {

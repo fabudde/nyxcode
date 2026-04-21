@@ -3964,6 +3964,11 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
   }
 
   private actionToJS(action: string): string {
+    // Strip wrapping braces: "{ count += 1 }" -> "count += 1"
+    action = action.trim();
+    if (action.startsWith('{') && action.endsWith('}')) {
+      action = action.slice(1, -1).trim();
+    }
     if (action.startsWith('navigate')) {
       const path = action.replace('navigate ', '');
       return `window.location.href='${path}'`;
@@ -3973,37 +3978,66 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
     }
     // Normalize spaces around dots: "user . name" -> "user.name"
     action = action.replace(/\s*\.\s*/g, '.');
-    // State mutations: count + 1, count - 1, name = "new"
-    // Check if action references a store field
+    // State mutations: count += 1, count -= 1, count++, count--, name = "new"
+    // Handle compound operators: +=, -=, *=, /=, ++, --
+    const compoundMatch = action.match(/^(\w[\w.]*)\s*(\+\+|--|\+=|-=|\*=|\/=)\s*(.*)?$/);
+    if (compoundMatch) {
+      const varName = compoundMatch[1];
+      const op = compoundMatch[2];
+      const rhs = (compoundMatch[3] || '').trim();
+      const stateRef = this.resolveVarToState(varName);
+      if (stateRef) {
+        if (op === '++') return `${stateRef} = ${stateRef} + 1`;
+        if (op === '--') return `${stateRef} = ${stateRef} - 1`;
+        const rhsResolved = this.resolveStateRefs(rhs).replace(/"/g, "'");
+        return `${stateRef} ${op} ${rhsResolved}`;
+      }
+    }
+    // Simple assignment: name = "new"
+    const assignMatch = action.match(/^(\w[\w.]*)\s*=\s*(.+)$/);
+    if (assignMatch) {
+      const varName = assignMatch[1];
+      const rhs = assignMatch[2].trim();
+      const stateRef = this.resolveVarToState(varName);
+      if (stateRef) {
+        const rhsResolved = this.resolveStateRefs(rhs).replace(/"/g, "'");
+        return `${stateRef} = ${rhsResolved}`;
+      }
+    }
+    // Check if action references a store field or state var for non-assignment
     for (const [storeName, store] of this.stores) {
       for (const field of store.fields) {
         if (!field.isAction && action.includes(`${storeName}.${field.name}`)) {
-          if (action.includes('=')) {
-            const [lhs, ...rhsParts] = action.split('=');
-            const rhs = rhsParts.join('=').trim();
-            const rhsResolved = this.resolveStateRefs(rhs);
-            const rhsFinal = rhsResolved.replace(/"/g, "'");
-            return `__nyx.state['${lhs.trim()}'] = ${rhsFinal}`;
-          }
+          return this.resolveStateRefs(action);
         }
       }
     }
-    // Check if action references a state var
     for (const [name] of this.stateVars) {
       if (action.includes(name)) {
-        if (action.includes('=')) {
-          const [lhs, ...rhsParts] = action.split('=');
-          const rhs = rhsParts.join('=').trim();
-          const rhsResolved = this.resolveStateRefs(rhs);
-          const rhsFinal = rhsResolved.replace(/"/g, "'");
-          return `__nyx.state.${lhs.trim()} = ${rhsFinal}`;
-        } else {
-          const resolved = this.resolveStateRefs(action);
-          return `__nyx.state.${name} = ${resolved}`;
-        }
+        const resolved = this.resolveStateRefs(action);
+        return `__nyx.state.${name} = ${resolved}`;
       }
     }
     return action;
+  }
+
+  /** Resolve a variable name to its __nyx.state reference, or null if not a state/store var */
+  private resolveVarToState(varName: string): string | null {
+    // Check store fields
+    for (const [storeName, store] of this.stores) {
+      for (const field of store.fields) {
+        if (!field.isAction && `${storeName}.${field.name}` === varName) {
+          return `__nyx.state['${storeName}.${field.name}']`;
+        }
+      }
+    }
+    // Check state vars (including let vars)
+    for (const [name] of this.stateVars) {
+      if (name === varName) {
+        return `__nyx.state.${name}`;
+      }
+    }
+    return null;
   }
 
   /** Replace state var names in an expression with __nyx.state.name */

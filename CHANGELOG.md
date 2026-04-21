@@ -1,3 +1,19 @@
+# NyxCode v0.33.2 — Event Handler Fixes (Tyto Review)
+
+**Three findings from Tyto’s security review, all fixed.**
+
+## 🐛 Bug Fixes
+
+- **CRITICAL: `+=` operator fixed** — `count += 1` was compiled as `count + = 1` (with space). Parser now correctly merges compound operators (`+=`, `-=`, `*=`, `/=`).
+- **MEDIUM: Reserved name protection** — `let __nyx = ...` or `const __proto__ = ...` now throws a parse error. Names starting with `__` and JavaScript builtins (`window`, `document`, `eval`, etc.) are blocked.
+- **Note:** Inline `onclick` → `addEventListener` migration tracked for v0.34 (CSP improvement).
+
+## Stats
+- 452 tests, 0 failures
+- Thanks to Tyto 🦉 for the thorough security review!
+
+---
+
 # NyxCode v0.33.1 — Pipe Source Integration Fix (#151)
 
 **Fixes pipe keyword not being recognized when building from TypeScript source.**
