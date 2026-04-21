@@ -84,6 +84,7 @@ export class Compiler {
   private indent: number = 0;
   private pageClass: string = '';
   private stateVars: Map<string, string> = new Map(); // name -> initial value
+  private constVars: Map<string, string> = new Map(); // name -> value (non-reactive)
   // v0.24.0 nav-burger: one CSS block per breakpoint, emitted once per build.
   private burgerBreakpointsEmitted: Set<string> = new Set();
   private computedVars: Map<string, string> = new Map(); // name -> expression
@@ -283,6 +284,7 @@ export class Compiler {
       this.indent = 0;
       this.pageClass = '';
       this.stateVars = new Map();
+      this.constVars = new Map();
       this.computedVars = new Map();
       this.effects = [];
       this.hasReactivity = false;
@@ -691,6 +693,7 @@ export class Compiler {
       case 'Auth': return ''; // Auth is handled at build level
       case 'On': return ''; // Events compiled with their parent element
       case 'State': return this.compileState(stmt as StateStatement);
+      case 'Const': return this.compileConst(stmt as any);
       case 'Effect': return this.compileEffect(stmt as EffectStatement);
       case 'Computed': return this.compileComputed(stmt as ComputedStatement);
       case 'Head': this.headInjections.push((stmt as HeadStatement).content); return '';
@@ -1321,13 +1324,28 @@ export class Compiler {
 
     switch (content.type) {
       case 'StringLiteral': {
-        // Check for {varName} interpolation patterns referencing state/computed/store vars
-        const interpolationPattern = /\{(\w+(?:\.\w+)?)\}/g;
+        // Check for {varName} and ${varName} interpolation patterns referencing state/computed/store vars
+        const interpolationPattern = /\$?\{(\w+(?:\.\w+)?)\}/g;
         let match: RegExpExecArray | null;
         const bindings: Array<{full: string, expr: string}> = [];
+        let resolvedValue = content.value;
+        // First pass: inline const vars (compile-time substitution)
         while ((match = interpolationPattern.exec(content.value)) !== null) {
           const varRef = match[1];
+          if (this.constVars.has(varRef)) {
+            // Const: inline the value at compile time (strip quotes for strings)
+            let constVal = this.constVars.get(varRef)!;
+            if (constVal.startsWith('"') && constVal.endsWith('"')) constVal = constVal.slice(1, -1);
+            resolvedValue = resolvedValue.replace(match[0], constVal);
+          }
+        }
+        // Second pass: find reactive bindings in the resolved value
+        interpolationPattern.lastIndex = 0;
+        const reactivePattern = /\$?\{(\w+(?:\.\w+)?)\}/g;
+        while ((match = reactivePattern.exec(resolvedValue)) !== null) {
+          const varRef = match[1];
           const dotParts = varRef.split('.');
+          if (this.constVars.has(varRef)) continue; // already inlined
           if (dotParts.length === 2 && this.stores.has(dotParts[0])) {
             bindings.push({ full: match[0], expr: `state.${dotParts[0]}.${dotParts[1]}` });
           } else if (this.stateVars.has(varRef)) {
@@ -1338,14 +1356,14 @@ export class Compiler {
         }
         if (bindings.length > 0) {
           this.hasReactivity = true;
-          // Build template: "Count: {count}" -> __NYX_TPL:Count: {{state.count}}
-          let tpl = this.escapeContent(content.value);
+          // Build template: "Count: ${count}" -> __NYX_TPL:Count: {{state.count}}
+          let tpl = this.escapeContent(resolvedValue);
           for (const b of bindings) {
             tpl = tpl.replace(b.full, `{{${b.expr}}}`);
           }
           return `__NYX_TPL:${tpl}`;
         }
-        return this.escapeContent(content.value);
+        return this.escapeContent(resolvedValue);
       }
       case 'PropertyAccess':
         return `\${${this.propertyToJS(content.path)}}`;
@@ -1365,6 +1383,12 @@ export class Compiler {
         }
         if (this.computedVars.has(content.name)) {
           return `__NYX_BIND:computed.${content.name}`;
+        }
+        // Const var — inline at compile time (no reactivity)
+        if (this.constVars.has(content.name)) {
+          let val = this.constVars.get(content.name)!;
+          if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+          return this.escapeContent(val);
         }
         return `\${${content.name}}`;
       default:
@@ -2122,10 +2146,11 @@ export class Compiler {
       const name = expr.name as string;
       // Defensive: compile-time idents shouldn't get here, but skip anyway.
       if (/^__\w+__$/.test(name)) return undefined;
-      // Declared state or store → safe, real reactive reference.
+      // Declared state, store, computed, or const → safe, real reactive reference.
       if (this.stateVars.has(name)) return undefined;
       if (this.stores.has(name)) return undefined;
       if (this.computedVars.has(name)) return undefined;
+      if (this.constVars.has(name)) return undefined;
       // Bare, undeclared → potential secret leak.
       return name;
     }
@@ -3013,6 +3038,27 @@ export class Compiler {
     }
 
     this.stateVars.set(state.name, initVal);
+    return '';
+  }
+
+  /**
+   * Compile a `const` declaration — non-reactive, zero overhead.
+   * Just a plain JS const. No signal, no subscriber, no re-render.
+   */
+  private compileConst(node: any): string {
+    let val: string;
+    if (typeof node.value === 'string') {
+      val = node.value;
+    } else if (node.value?.type === 'StringLiteral') {
+      val = JSON.stringify(node.value.value);
+    } else if (node.value?.type === 'NumberLiteral') {
+      val = String(node.value.value);
+    } else if (typeof node.value === 'object' && node.value?.type === 'ArrayLiteral') {
+      val = JSON.stringify(node.value.elements?.map((e: any) => e.value ?? e) ?? []);
+    } else {
+      val = String(node.value);
+    }
+    this.constVars.set(node.name, val);
     return '';
   }
 

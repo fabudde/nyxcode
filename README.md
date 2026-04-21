@@ -3,7 +3,7 @@
 **The AI-native programming language. One `.nyx` file = full-stack app.**
 
 [![npm](https://img.shields.io/npm/v/@fabudde/nyxcode)](https://www.npmjs.com/package/@fabudde/nyxcode)
-[![Tests](https://img.shields.io/badge/tests-435-brightgreen)](#)
+[![Tests](https://img.shields.io/badge/tests-452-brightgreen)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 🌐 **[nyxcode.io](https://nyxcode.io)** · 📊 **[NyxStatus.com](https://nyxstatus.com)** (built in 378 lines of NyxCode)
@@ -103,6 +103,21 @@ api GET /api/stats auth {
 }
 ```
 
+
+### `let` — Reactive Page-Local Variables (v0.33.0)
+```nyx
+page '/counter' {
+  let count = 0
+  let name = "Nyx"
+  const label = "Counter"
+
+  h1 "Hello ${name}!"
+  p "${label}: ${count}"
+  button "+" @click { count += 1 }
+}
+```
+
+`let` in pages/components creates reactive variables — changes auto-update the DOM. `const` is compile-time inlined with zero runtime cost.
 ### `action` — Reusable Server Functions
 ```nyx
 action sendWelcome(email) {

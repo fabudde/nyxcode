@@ -1382,6 +1382,7 @@ export class Parser {
       case TokenType.Limit: return this.parseLimitStmt();
       case TokenType.Query: return this.parseQuery();
       case TokenType.Let: return this.parseLet();
+      case TokenType.Const: return this.parseConst();
       // Email only as a statement when followed by to= (not inside elements like `input email`)
       case TokenType.Email:
         if (this.peekAt(1)?.type === TokenType.Identifier && this.peekAt(1)?.value === 'to') {
@@ -2759,7 +2760,36 @@ export class Parser {
     const start = this.consume(TokenType.Let);
     const name = this.consumeIdentifier();
     this.consume(TokenType.Equals);
-    // let x = query "..." | sum(data, "field") | expression
+
+    // --- Frontend reactive let (simple values) → emits State node ---
+    // String literal: let greeting = "Hello"
+    if (this.check(TokenType.String)) {
+      const val = this.advance();
+      return { type: 'State', name, initialValue: { type: 'StringLiteral', value: val.value, line: val.line, col: val.col }, line: start.line, col: start.col };
+    }
+    // Number literal: let count = 0
+    if (this.check(TokenType.Number)) {
+      const val = this.advance();
+      return { type: 'State', name, initialValue: { type: 'NumberLiteral', value: parseFloat(val.value), line: val.line, col: val.col }, line: start.line, col: start.col };
+    }
+    // Boolean: let active = true / false
+    if (this.check(TokenType.Identifier) && (this.peek().value === 'true' || this.peek().value === 'false')) {
+      const val = this.advance();
+      return { type: 'State', name, initialValue: val.value, line: start.line, col: start.col };
+    }
+    // Array literal: let items = ["a", "b"]
+    if (this.check(TokenType.LeftBracket)) {
+      const arr = this.consumeArrayLiteral();
+      return { type: 'State', name, initialValue: arr, line: start.line, col: start.col };
+    }
+    // Object literal: let config = { key: "value" }
+    if (this.check(TokenType.LeftBrace)) {
+      const obj = this.consumeObjectLiteral();
+      return { type: 'State', name, initialValue: obj, line: start.line, col: start.col };
+    }
+
+    // --- Backend let (query, builtins, method calls) → emits Let node ---
+    // let x = query "..."
     if (this.check(TokenType.Query)) {
       this.advance(); // consume 'query'
       const sql = this.consume(TokenType.String).value;
@@ -2795,12 +2825,39 @@ export class Parser {
         }
         return { type: 'Let', name, value: { kind: 'call', target, method, args }, line: start.line, col: start.col };
       }
-      // Simple identifier assignment
-      return { type: 'Let', name, value: { kind: 'arithmetic', expr: target }, line: start.line, col: start.col };
+      // Simple identifier → treat as State (reactive)
+      return { type: 'State', name, initialValue: target, line: start.line, col: start.col };
     }
-    // Fallback: arithmetic/string expression
+    // Fallback: treat as reactive state with raw value
     const expr = this.advance().value;
-    return { type: 'Let', name, value: { kind: 'arithmetic', expr }, line: start.line, col: start.col };
+    return { type: 'State', name, initialValue: expr, line: start.line, col: start.col };
+  }
+
+  /**
+   * Parse: `const name = value`
+   * Non-reactive constant. Compiled to a plain JS const with no reactivity overhead.
+   */
+  private parseConst(): any {
+    const start = this.consume(TokenType.Const);
+    const name = this.consumeIdentifier();
+    this.consume(TokenType.Equals);
+
+    let value: any;
+    if (this.check(TokenType.String)) {
+      value = { type: 'StringLiteral', value: this.advance().value };
+    } else if (this.check(TokenType.Number)) {
+      value = { type: 'NumberLiteral', value: parseFloat(this.advance().value) };
+    } else if (this.check(TokenType.Identifier) && (this.peek().value === 'true' || this.peek().value === 'false')) {
+      value = this.advance().value;
+    } else if (this.check(TokenType.LeftBracket)) {
+      value = this.consumeArrayLiteral();
+    } else if (this.check(TokenType.LeftBrace)) {
+      value = this.consumeObjectLiteral();
+    } else {
+      value = this.advance().value;
+    }
+
+    return { type: 'Const', name, value, line: start.line, col: start.col };
   }
 
   private parseEmailStatement(): any {
@@ -3090,7 +3147,7 @@ private parseElement(): ElementNode {
         content = { type: 'StringLiteral', value: this.advance().value, line: next.line, col: next.col };
       }
       // v0.30: keyword tokens used as element content (input email, input action, etc.)
-      else if ((next.type === TokenType.Email || next.type === TokenType.Action || next.type === TokenType.Let || next.type === TokenType.Env) && this.peekAt(1)?.type !== TokenType.LeftBrace && this.peekAt(1)?.type !== TokenType.LeftParen) {
+      else if ((next.type === TokenType.Email || next.type === TokenType.Action || next.type === TokenType.Let || next.type === TokenType.Const || next.type === TokenType.Env) && this.peekAt(1)?.type !== TokenType.LeftBrace && this.peekAt(1)?.type !== TokenType.LeftParen) {
         content = { type: 'Identifier', name: this.advance().value, line: next.line, col: next.col };
       }
       // Property access: .name or .author.name (nested)
@@ -3113,7 +3170,7 @@ private parseElement(): ElementNode {
       }
       // Attribute: key=value or key="complex value" (including keyword tokens like style=)
       // Attribute: key=value — handle keywords that can also be attribute names
-      else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form || next.type === TokenType.Data || next.type === TokenType.State || next.type === TokenType.Preset || next.type === TokenType.Email || next.type === TokenType.Action || next.type === TokenType.Let || next.type === TokenType.Env) && this.peekAt(1)?.type === TokenType.Equals) {
+      else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form || next.type === TokenType.Data || next.type === TokenType.State || next.type === TokenType.Preset || next.type === TokenType.Email || next.type === TokenType.Action || next.type === TokenType.Let || next.type === TokenType.Const || next.type === TokenType.Env) && this.peekAt(1)?.type === TokenType.Equals) {
         const name = this.advance().value;
         this.advance(); // =
         const valToken = this.peek();
@@ -3394,6 +3451,7 @@ private parseElement(): ElementNode {
       TokenType.Query, TokenType.Head, TokenType.Style, TokenType.Store,
       TokenType.Raw, TokenType.Limit, TokenType.Animate, TokenType.Effect,
       TokenType.Computed, TokenType.Config, TokenType.Before, TokenType.After,
+      TokenType.Let, TokenType.Const, TokenType.Env, TokenType.Email,
     ]);
     return keywordTypes.has(token.type);
   }

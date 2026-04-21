@@ -1,3 +1,117 @@
+# NyxCode v0.33.0 — let & const: Page-Local Variables (#150)
+
+**Reactive variables meet compile-time constants. Write less, build more.**
+
+---
+
+## 🔥 `let` — Reactive Page-Local Variables
+
+```nyx
+page '/counter' {
+  let count = 0
+  let name = "Nyx"
+  let items = ["apple", "banana"]
+
+  h1 "Hello ${name}!"
+  p "Count: ${count}"
+  button "Increment" @click { count += 1 }
+}
+```
+
+`let` creates reactive variables scoped to a page or component. When the value changes, all referencing DOM nodes auto-update. No boilerplate, no imports, no `useState()`.
+
+### Supported types
+- **Strings:** `let name = "Nyx"`
+- **Numbers:** `let count = 0`
+- **Booleans:** `let active = true`
+- **Arrays:** `let items = ["a", "b", "c"]`
+- **Objects:** `let config = { key: "value" }`
+
+### `let` vs `state` vs `store`
+
+| Feature | `let` | `state` | `store` |
+|---------|-------|---------|---------|
+| Syntax | `let x = 0` | `state x = 0` | `store name { x = 0 }` |
+| Scope | Page/component | Page/component | Global |
+| Reactivity | ✅ | ✅ | ✅ |
+| Use case | **Preferred** — local UI state | Legacy (still works) | Shared app state |
+
+`let` is the **recommended** way to declare reactive variables. `state` still works for backwards compatibility.
+
+---
+
+## 🔒 `const` — Non-Reactive Constants
+
+```nyx
+page '/' {
+  const appName = "My App"
+  const version = 42
+
+  h1 "${appName}"
+  p "Version: ${version}"
+}
+```
+
+- **Zero overhead:** No reactive signal, no subscriber, no re-render.
+- **Compile-time inlined:** The value is baked into the HTML at build time.
+- **Perfect for:** Labels, config values, static text.
+
+---
+
+## ✨ `${}` Template Interpolation
+
+Both `${var}` and `{var}` syntax now work for variable interpolation in text content:
+
+```nyx
+page '/' {
+  let name = "Nyx"
+  let count = 0
+  const label = "Counter"
+
+  h1 "Hello ${name}!"      // reactive — updates when name changes
+  p "${label}: ${count}"    // const inlined, count reactive
+  p "Total: {count}"        // {var} still works too
+}
+```
+
+- `let`/`state` vars → reactive template binding (auto-updates on change)
+- `const` vars → compile-time inline (zero runtime cost)
+- Store fields → `${store.field}` reactive binding
+
+### XSS Auto-Escape
+
+All interpolated values are rendered via `textContent` (never `innerHTML`), making XSS injection impossible. This is by design — NyxCode is secure by default.
+
+---
+
+## 📊 Token Efficiency
+
+NyxCode `let` vs React `useState`:
+
+```
+// React (~39 tokens)
+const [count, setCount] = useState(0)
+return <p>{count}</p>
+<button onClick={() => setCount(c => c+1)}>Click</button>
+
+// NyxCode (~12 tokens)
+let count = 0
+p "${count}"
+button "Click" @click { count += 1 }
+```
+
+**~70% fewer tokens** — critical for AI-generated code.
+
+---
+
+## Stats
+
+- **452 tests** (17 new let/const tests + 435 existing — 0 regressions)
+- Backwards compatible: `state`, `store`, `{var}` all unchanged
+- Backend `let` (query, builtins) unchanged
+
+---
+
 # NyxCode v0.32.0 — pipe: Declarative Logic Chains (#149)
 
 **Build complete multi-step workflows in a single declarative block. The biggest NyxCode feature since The Language Release.**

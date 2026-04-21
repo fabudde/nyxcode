@@ -49,6 +49,7 @@ export enum TokenType {
   Every = 'Every',
   Action = 'Action',
   Let = 'Let',
+  Const = 'Const',
   Env = 'Env',
   Email = 'Email',
 
@@ -123,6 +124,7 @@ export const KEYWORDS: Record<string, TokenType> = {
   every: TokenType.Every,
   action: TokenType.Action,
   let: TokenType.Let,
+  const: TokenType.Const,
   env: TokenType.Env,
   email: TokenType.Email,
 };

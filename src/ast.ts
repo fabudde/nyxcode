@@ -140,6 +140,7 @@ export type Statement =
   | ScriptStatement
   | FootnotesStatement
   | LetStatement
+  | ConstStatement
   | EmailStatement
   | ActionCallStatement
   | IconStatement;
@@ -514,6 +515,13 @@ export interface LetStatement extends BaseNode {
   type: 'Let';
   name: string;
   value: LetExpression;
+}
+
+/** `const name = value` — non-reactive compile-time constant */
+export interface ConstStatement extends BaseNode {
+  type: 'Const';
+  name: string;
+  value: any;
 }
 
 export type LetExpression = 
