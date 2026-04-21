@@ -1,3 +1,27 @@
+# NyxCode v0.33.3 — @event Shorthand Syntax (#152)
+
+**`@click`, `@submit`, `@keydown` etc. now work as documented.**
+
+## ✨ New
+
+- **`@event` shorthand** — `@click { count += 1 }` now compiles correctly
+- Supports modifiers: `@click.prevent`, `@keydown.ctrl.z`
+- Works alongside existing `on:click` and `on click` syntax
+
+## Example
+
+```nyx
+page '/' {
+  let count = 0
+  button "+" @click { count += 1 }
+  button "-" @click { count -= 1 }
+}
+```
+
+452 tests, 0 failures.
+
+---
+
 # NyxCode v0.33.2 — Event Handler Fixes (Tyto Review)
 
 **Three findings from Tyto’s security review, all fixed.**

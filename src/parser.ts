@@ -3690,6 +3690,48 @@ private parseElement(): ElementNode {
           break;
         }
       }
+      // v0.33.3: @event shorthand — @click, @submit, @keydown etc.
+      if (this.check(TokenType.At) && this.peekAt(1)?.type === TokenType.Identifier) {
+        this.advance(); // consume '@'
+        const eventName = this.consumeIdentifier();
+        // Parse modifiers: @click.prevent, @keydown.ctrl.z
+        const modifiers: string[] = [];
+        while (this.check(TokenType.Dot) && this.peekAt(1)?.type === TokenType.Identifier) {
+          this.advance(); // .
+          modifiers.push(this.consumeIdentifier());
+        }
+        if (this.check(TokenType.Arrow)) this.advance(); // -> (optional)
+        let action = '';
+        while (!this.isAtEnd() && !this.isStatementStart()) {
+          const cur = this.peek();
+          if (cur.type === TokenType.RightBrace) break;
+          if (cur.type === TokenType.At) break; // next @event
+          if (cur.type === TokenType.LeftBrace) {
+            if (action.trim().length > 0) break;
+            action += ' {';
+            this.advance();
+            let depth = 1;
+            while (depth > 0 && !this.isAtEnd()) {
+              const t = this.advance();
+              if (t.type === TokenType.LeftBrace) depth++;
+              else if (t.type === TokenType.RightBrace) { depth--; if (depth === 0) { action += ' }'; break; } }
+              else if (t.value === '=' && /[+\-*/]$/.test(action.trimEnd())) {
+                action = action.trimEnd() + '=';
+                continue;
+              }
+              action += ' ' + t.value;
+            }
+          } else {
+            const tok = this.advance();
+            if (tok.type === TokenType.String) action += (action ? ' ' : '') + '"' + tok.value + '"';
+            else action += (action ? ' ' : '') + tok.value;
+          }
+        }
+        const attrName = 'on' + eventName.charAt(0).toUpperCase() + eventName.slice(1);
+        const attrValue = modifiers.length > 0 ? '__mods:' + modifiers.join(',') + ':' + action.trim() : action.trim();
+        attributes.push({ name: attrName, value: attrValue });
+        continue;
+      }
       const next = this.peek();
 
       // String content: h1 "Hello"
