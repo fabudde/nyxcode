@@ -48,6 +48,7 @@ export var TokenType;
     TokenType["Every"] = "Every";
     TokenType["Action"] = "Action";
     TokenType["Let"] = "Let";
+    TokenType["Const"] = "Const";
     TokenType["Env"] = "Env";
     TokenType["Email"] = "Email";
     TokenType["PipeBlock"] = "PipeBlock";
@@ -120,6 +121,7 @@ export const KEYWORDS = {
     every: TokenType.Every,
     action: TokenType.Action,
     let: TokenType.Let,
+    const: TokenType.Const,
     env: TokenType.Env,
     email: TokenType.Email,
     pipe: TokenType.PipeBlock,

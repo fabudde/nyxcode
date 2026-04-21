@@ -998,13 +998,8 @@ else {
                     deps.push('multer');
                 if (tables.some((t) => t.columns.some((c) => c.constraints.includes('realtime'))))
                     deps.push('ws');
-                if (pipes.some(p => p.steps.some(s => s.type === 'PipeNotify' && s.channel === 'email')))
-                    deps.push('nodemailer');
-                if (pipes.some(p => p.steps.some(s => s.type === 'PipeNotify' && s.channel === 'sms')))
-                    deps.push('twilio');
-                const pipeInfo = pipes.length > 0 ? ` + ${pipes.length} pipe${pipes.length !== 1 ? 's' : ''}` : '';
                 console.log(`   📦 deps: ${deps.join(' ')}`);
-                console.log(`   🖥️  server.js generated (${tables.length} table${tables.length !== 1 ? 's' : ''}${security ? ' + auth' : ''}${pipeInfo})`);
+                console.log(`   🖥️  server.js generated (${tables.length} table${tables.length !== 1 ? 's' : ''}${security ? ' + auth' : ''})`);
             }
         }
         else if (command === 'watch') {

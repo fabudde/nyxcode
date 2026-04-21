@@ -489,8 +489,17 @@ export class Parser {
       } else if (t.type === TokenType.String) {
         expr += '"' + t.value + '" ';
         this.advance();
+      } else if (t.type === TokenType.Dot) {
+        // No spaces around dots for clean property access (ctx.result.lastInsertRowid)
+        expr = expr.trimEnd() + t.value;
+        this.advance();
       } else {
-        expr += t.value + ' ';
+        // No leading space if previous char is a dot
+        if (expr.endsWith('.')) {
+          expr += t.value + ' ';
+        } else {
+          expr += t.value + ' ';
+        }
         this.advance();
       }
     }
@@ -638,7 +647,7 @@ export class Parser {
     return { type: 'PipeLog', message, line: this.peek().line, col: this.peek().col } as any;
   }
 
-  // respond 201 { key: $var }
+  // respond 201 { key: $var } OR respond 200 $variable OR respond 200 $var[0]
   private parsePipeRespond(): PipeStep {
     this.consume(TokenType.Respond);
     let status = 200;
@@ -646,10 +655,27 @@ export class Parser {
       status = parseInt(this.advance().value);
     }
     let body: Record<string, string> | undefined;
+    let varRef: string | undefined;
     if (this.check(TokenType.LeftBrace)) {
       body = this.consumePipeInlineObject();
+    } else if (this.check(TokenType.Dollar)) {
+      // respond 200 $variable or $variable[0] or $variable.field
+      this.advance(); // consume $
+      let ref = '$' + this.advance().value; // $varname
+      // Handle dot access: $var.field
+      while (this.check(TokenType.Dot)) {
+        this.advance(); // consume .
+        ref += '.' + this.advance().value;
+      }
+      // Handle array access: $var[0]
+      if (this.check(TokenType.LeftBracket)) {
+        this.advance(); // consume [
+        ref += '[' + this.advance().value + ']';
+        if (this.check(TokenType.RightBracket)) this.advance(); // consume ]
+      }
+      varRef = ref;
     }
-    return { type: 'PipeRespond', status, body, line: this.peek().line, col: this.peek().col } as any;
+    return { type: 'PipeRespond', status, body, varRef, line: this.peek().line, col: this.peek().col } as any;
   }
 
   // abort 400 "error message"

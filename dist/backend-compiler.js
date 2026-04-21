@@ -906,33 +906,27 @@ db.exec(\`CREATE TABLE IF NOT EXISTS _pipe_state (
   PRIMARY KEY (pipe_name, row_key, field_name)
 )\`);`;
 }
-
 function compilePipeExpr(expr) {
-    // Convert $variable references to ctx.variable
-    // $body.field → ctx.req.body.field
-    // $req.params.id → ctx.req.params.id  
-    // $result → ctx.result
-    // $row.field → ctx.row.field
     return expr
         .replace(/\$body\.(\w+)/g, 'ctx.req.body.$1')
         .replace(/\$req\.(\w[\w.]*)/g, 'ctx.req.$1')
         .replace(/\$row\.(\w+)/g, 'ctx.row.$1')
         .replace(/\$(\w+)/g, 'ctx.$1');
 }
-
 function compilePipeSql(sql) {
-    // Extract $var references and convert to parameterized queries
     const params = [...sql.matchAll(/\$(\w[\w.]*)/g)].map(m => m[1]);
-    const safeSql = sql.replace(/\$([\w.]+)/g, '?');
+    const safeSql = sql.replace(/\$[\w.]+/g, '?');
     const paramList = params.map(p => {
-        if (p.startsWith('body.')) return `ctx.req.body.${p.slice(5)}`;
-        if (p.startsWith('req.')) return `ctx.req.${p.slice(4)}`;
-        if (p.startsWith('row.')) return `ctx.row.${p.slice(4)}`;
+        if (p.startsWith('body.'))
+            return `ctx.req.body.${p.slice(5)}`;
+        if (p.startsWith('req.'))
+            return `ctx.req.${p.slice(4)}`;
+        if (p.startsWith('row.'))
+            return `ctx.row.${p.slice(4)}`;
         return `ctx.${p}`;
     });
     return { safeSql, paramList };
 }
-
 function compilePipeStep(step, pipeName, indent = '    ') {
     switch (step.type) {
         case 'PipeValidate': {
@@ -943,19 +937,25 @@ function compilePipeStep(step, pipeName, indent = '    ') {
                     fieldPath.startsWith('req.') ? `ctx.${fieldPath}` : `ctx.req.body.${fieldPath}`;
                 for (const check of f.checks) {
                     if (check.kind === 'email') {
-                        lines.push(`${indent}if (${accessor} && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(${accessor})) return ctx.res?.status(400).json({ error: '${fieldPath} must be a valid email' });`);
-                    } else if (check.kind === 'url') {
-                        lines.push(`${indent}if (${accessor} && !/^https?:\\/\\//.test(${accessor})) return ctx.res?.status(400).json({ error: '${fieldPath} must be a valid URL' });`);
-                    } else if (check.kind === 'number') {
-                        lines.push(`${indent}if (${accessor} !== undefined && isNaN(Number(${accessor}))) return ctx.res?.status(400).json({ error: '${fieldPath} must be a number' });`);
-                    } else if (check.kind === 'string') {
-                        lines.push(`${indent}if (${accessor} !== undefined && typeof ${accessor} !== 'string') return ctx.res?.status(400).json({ error: '${fieldPath} must be a string' });`);
-                    } else if (check.kind === 'required') {
+                        lines.push(`${indent}if (${accessor} && !/^[^\\\\s@]+@[^\\\\s@]+\\\\.[^\\\\s@]+$/.test(${accessor})) return ctx.res?.status(400).json({ error: '${fieldPath} must be a valid email' });`);
+                    }
+                    else if (check.kind === 'url') {
+                        lines.push(`${indent}if (${accessor} && !/^https?:\\\\/\\\\//.test(${accessor})) return ctx.res?.status(400).json({ error: '${fieldPath} must be a valid URL' });`);
+                    }
+                    else if (check.kind === 'number') {
+                        lines.push(`${indent}if (${accessor} == null || isNaN(Number(${accessor}))) return ctx.res?.status(400).json({ error: '${fieldPath} is required and must be a number' });`);
+                    }
+                    else if (check.kind === 'string') {
+                        lines.push(`${indent}if (${accessor} == null || typeof ${accessor} !== 'string') return ctx.res?.status(400).json({ error: '${fieldPath} is required and must be a string' });`);
+                    }
+                    else if (check.kind === 'required') {
                         lines.push(`${indent}if (!${accessor} && ${accessor} !== 0) return ctx.res?.status(400).json({ error: '${fieldPath} is required' });`);
-                    } else if (check.kind === 'min') {
-                        lines.push(`${indent}if (${accessor} !== undefined && ${accessor}.length < ${check.value}) return ctx.res?.status(400).json({ error: '${fieldPath} must be at least ${check.value} characters' });`);
-                    } else if (check.kind === 'max') {
-                        lines.push(`${indent}if (${accessor} !== undefined && ${accessor}.length > ${check.value}) return ctx.res?.status(400).json({ error: '${fieldPath} must be at most ${check.value} characters' });`);
+                    }
+                    else if (check.kind === 'min') {
+                        lines.push(`${indent}if (${accessor} != null && ${accessor}.length < ${check.value}) return ctx.res?.status(400).json({ error: '${fieldPath} must be at least ${check.value} characters' });`);
+                    }
+                    else if (check.kind === 'max') {
+                        lines.push(`${indent}if (${accessor} != null && ${accessor}.length > ${check.value}) return ctx.res?.status(400).json({ error: '${fieldPath} must be at most ${check.value} characters' });`);
                     }
                 }
             }
@@ -967,7 +967,8 @@ function compilePipeStep(step, pipeName, indent = '    ') {
             const varName = step.as || (isSelect ? 'rows' : 'queryResult');
             if (isSelect) {
                 return `${indent}ctx.${varName} = db.prepare(${JSON.stringify(safeSql)}).all(${paramList.join(', ')}); // pipe: ${pipeName}`;
-            } else {
+            }
+            else {
                 return `${indent}ctx.${varName} = db.prepare(${JSON.stringify(safeSql)}).run(${paramList.join(', ')}); // pipe: ${pipeName}`;
             }
         }
@@ -991,7 +992,7 @@ function compilePipeStep(step, pipeName, indent = '    ') {
             return `${indent}ctx.${step.name} = ${expr}; // pipe: ${pipeName}`;
         }
         case 'PipeTransform': {
-            const entries = step.fields.map(f => `${f.key}: ${compilePipeExpr(f.expr)}`).join(', ');
+            const entries = step.fields.map((f) => `${f.key}: ${compilePipeExpr(f.expr)}`).join(', ');
             return `${indent}ctx.result = { ${entries} }; // pipe: ${pipeName}`;
         }
         case 'PipeEach': {
@@ -1036,7 +1037,8 @@ function compilePipeStep(step, pipeName, indent = '    ') {
                     for (const s of t.body) {
                         lines.push(compilePipeStep(s, pipeName, indent + '    '));
                     }
-                } else {
+                }
+                else {
                     const fromCond = t.from === '*' ? 'true' : `__prev_val === '${t.from}'`;
                     const toCond = t.to === '*' ? 'true' : `__current_val === '${t.to}'`;
                     lines.push(`${indent}    if (${fromCond} && ${toCond}) {`);
@@ -1057,11 +1059,13 @@ function compilePipeStep(step, pipeName, indent = '    ') {
                 const subject = step.params.subject || '';
                 const body = step.params.body || '';
                 return `${indent}await sendEmail({ to: ${to}, subject: ${JSON.stringify(subject)}, body: ${JSON.stringify(body)} }); // pipe: ${pipeName}`;
-            } else if (step.channel === 'sms') {
+            }
+            else if (step.channel === 'sms') {
                 const to = compilePipeExpr(step.params.to || '');
                 const msg = step.params.message || '';
                 return `${indent}await sendSms(${to}, ${JSON.stringify(msg)}); // pipe: ${pipeName}`;
-            } else if (step.channel === 'webhook') {
+            }
+            else if (step.channel === 'webhook') {
                 const url = compilePipeExpr(step.params.to || '');
                 const body = step.params.body ? compilePipeExpr(JSON.stringify(step.params.body)) : '{}';
                 return `${indent}await fetch(${url}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${body}) }); // pipe: ${pipeName}`;
@@ -1069,11 +1073,14 @@ function compilePipeStep(step, pipeName, indent = '    ') {
             return `${indent}// unsupported notify channel: ${step.channel}`;
         }
         case 'PipeLog': {
-            // Interpolate $vars in message
             const msg = step.message.replace(/\$(\w[\w.]*)/g, (_, v) => `\${${compilePipeExpr('$' + v)}}`);
             return `${indent}console.log('[pipe:${pipeName}]', \`${msg}\`); // pipe: ${pipeName}`;
         }
         case 'PipeRespond': {
+            if (step.varRef) {
+                const compiled = compilePipeExpr(step.varRef);
+                return `${indent}return ctx.res?.status(${step.status}).json(${compiled}); // pipe: ${pipeName}`;
+            }
             const bodyEntries = step.body ? Object.entries(step.body).map(([k, v]) => {
                 const compiled = compilePipeExpr(v);
                 return `${JSON.stringify(k)}: ${compiled}`;
@@ -1090,7 +1097,6 @@ function compilePipeStep(step, pipeName, indent = '    ') {
         }
         case 'PipeRun': {
             const safeName = step.pipeName.replace(/[^a-zA-Z0-9_]/g, '_');
-            const withStr = step.withParams ? `, ${JSON.stringify(step.withParams)}` : '';
             if (step.withParams) {
                 return `${indent}await pipe_${safeName}({ ...ctx, ...${JSON.stringify(step.withParams)} }); // pipe: ${pipeName}`;
             }
@@ -1100,29 +1106,23 @@ function compilePipeStep(step, pipeName, indent = '    ') {
             return `${indent}// unknown pipe step: ${step.type}`;
     }
 }
-
 function compilePipeBlocks(pipes) {
-    if (!pipes || pipes.length === 0) return '';
-
-    const hasOnChange = pipes.some(p => p.steps.some(s => s.type === 'PipeOnChange'));
+    if (!pipes || pipes.length === 0)
+        return '';
+    const hasOnChange = pipes.some(p => p.steps.some((s) => s.type === 'PipeOnChange'));
     const blocks = [];
     const routes = [];
     const intervals = [];
-    const cleanups = [];
-
     if (hasOnChange) {
         blocks.push(compilePipeStateTable());
     }
-
     for (const pipe of pipes) {
         const safeName = pipe.name.replace(/[^a-zA-Z0-9_]/g, '_');
-        
         // Generate async function
         let body = '';
         for (const step of pipe.steps) {
             body += compilePipeStep(step, pipe.name) + '\n';
         }
-
         blocks.push(`
 // pipe: ${pipe.name}
 async function pipe_${safeName}(ctx) {
@@ -1132,27 +1132,27 @@ ${body}  } catch(e) {
     if (ctx.res && !ctx.res.headersSent) ctx.res.status(500).json({ error: 'Internal pipe error' });
   }
 }`);
-
         // Register trigger
         if (pipe.trigger) {
             const t = pipe.trigger;
             if (t.kind === 'api') {
                 const method = t.method.toLowerCase();
                 const middleware = t.auth ? 'authMiddleware, ' : '';
-                const mwNames = (t.middleware || []).map(m => 'mw_' + m + ', ').join('');
+                const mwNames = (t.middleware || []).map((m) => 'mw_' + m + ', ').join('');
                 routes.push(`
 // pipe: ${pipe.name} — trigger: api ${t.method} ${t.path}
 app.${method}('${t.path}', ${middleware}${mwNames}async (req, res) => {
   await pipe_${safeName}({ req, res, db, result: null });
 });`);
-            } else if (t.kind === 'every') {
+            }
+            else if (t.kind === 'every') {
                 intervals.push(`
 // pipe: ${pipe.name} — trigger: every ${t.interval}
 const interval_pipe_${safeName} = setInterval(async () => {
   await pipe_${safeName}({ db, result: null });
 }, ${t.intervalMs});`);
-                cleanups.push(`clearInterval(interval_pipe_${safeName});`);
-            } else if (t.kind === 'webhook') {
+            }
+            else if (t.kind === 'webhook') {
                 const method = t.method.toLowerCase();
                 let verifyBlock = '';
                 if (t.secret) {
@@ -1169,15 +1169,11 @@ const interval_pipe_${safeName} = setInterval(async () => {
 app.${method}('${t.path}', webhookLimiter, async (req, res) => {${verifyBlock}
   await pipe_${safeName}({ req, res, db, result: null });
 });`);
-            } else if (t.kind === 'event') {
-                // Event-triggered pipes are called from the CRUD hooks
-                // The onEvent compilation handles this
             }
         }
     }
-
     let output = `
-// ── Pipe Blocks (v0.32.0) ─────────────────────────────────────────────
+// ── Pipe Blocks (v0.32.0) ─────────────────────────────────────────────────────
 ${blocks.join('\n')}
 
 // ── Pipe Webhook Rate Limiter ──
@@ -1185,19 +1181,16 @@ const webhookLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, message: { erro
 
 ${routes.join('\n')}
 `;
-
     if (intervals.length > 0) {
         output += `
 // ── Pipe Background Workers ──
 ${intervals.join('\n')}
 `;
     }
-
     return output;
 }
-
 // ── Main export ────────────────────────────────────────────────────────
-export function compileBackend(tables, apis = [], config, hooks = [], pagePaths = [], middlewares = [], everys = [], actions = [], envNode, onEvents = [], useStatements = [], pipes = []) {
+export function compileBackend(tables, apis = [], config = undefined, hooks = [], pagePaths = [], middlewares = [], everys = [], actions = [], envNode, onEvents = [], useStatements = [], pipes = []) {
     const hasUploads = tables.some(t => t.columns.some(c => c.type === 'upload'));
     const realtimeTables = tables.filter(t => t.columns.some(c => c.constraints.includes('realtime')));
     const hasRealtime = realtimeTables.length > 0;
@@ -1340,6 +1333,7 @@ ${envValidation}
 ${apiBlocks}
 ${crudBlocks}
 ${hookBlocks}
+${compilePipeBlocks(pipes)}
 
 // ── Role guard middleware ────────────────────────────────────
 function roleGuard(role) {
@@ -1367,7 +1361,6 @@ app.use((err, req, res, next) => {
 const distDir = path.join(__dirname, '.');
 app.use(express.static(distDir));
 
-${compilePipeBlocks(pipes)}
 // ── Start ──────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || ${defaultPort};

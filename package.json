@@ -1,9 +1,58 @@
 {
-  "dependencies": {
-    "better-sqlite3": "^12.9.0"
+  "name": "@fabudde/nyxcode",
+  "version": "0.33.7",
+  "description": "NyxCode \u2014 The AI-native programming language. One .nyx file = full-stack app. 3.5x fewer tokens than Next.js.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "nyxcode": "dist/cli.js",
+    "nyx": "dist/cli.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "NYXCODE.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "parse": "node dist/cli.js",
+    "test": "node --test 'dist/tests/*.test.js'",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "nyxcode",
+    "compiler",
+    "programming-language",
+    "web",
+    "ai-native",
+    "html",
+    "css",
+    "reactive",
+    "components",
+    "zero-config",
+    "token-efficient"
+  ],
+  "homepage": "https://nyxcode.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fabudde/nyxcode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fabudde/nyxcode/issues"
+  },
+  "author": "Fabian Budde & Nyx",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13"
+    "@types/better-sqlite3": "^7.6.13",
+    "typescript": "^5.9.3"
   },
-  "version": "0.22.0"
+  "dependencies": {
+    "better-sqlite3": "^12.9.0"
+  }
 }

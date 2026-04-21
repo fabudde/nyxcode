@@ -986,15 +986,15 @@ function compilePipeStep(step: any, pipeName: string, indent: string = '    '): 
           } else if (check.kind === 'url') {
             lines.push(`${indent}if (${accessor} && !/^https?:\\\\/\\\\//.test(${accessor})) return ctx.res?.status(400).json({ error: '${fieldPath} must be a valid URL' });`);
           } else if (check.kind === 'number') {
-            lines.push(`${indent}if (${accessor} !== undefined && isNaN(Number(${accessor}))) return ctx.res?.status(400).json({ error: '${fieldPath} must be a number' });`);
+            lines.push(`${indent}if (${accessor} == null || isNaN(Number(${accessor}))) return ctx.res?.status(400).json({ error: '${fieldPath} is required and must be a number' });`);
           } else if (check.kind === 'string') {
-            lines.push(`${indent}if (${accessor} !== undefined && typeof ${accessor} !== 'string') return ctx.res?.status(400).json({ error: '${fieldPath} must be a string' });`);
+            lines.push(`${indent}if (${accessor} == null || typeof ${accessor} !== 'string') return ctx.res?.status(400).json({ error: '${fieldPath} is required and must be a string' });`);
           } else if (check.kind === 'required') {
             lines.push(`${indent}if (!${accessor} && ${accessor} !== 0) return ctx.res?.status(400).json({ error: '${fieldPath} is required' });`);
           } else if (check.kind === 'min') {
-            lines.push(`${indent}if (${accessor} !== undefined && ${accessor}.length < ${check.value}) return ctx.res?.status(400).json({ error: '${fieldPath} must be at least ${check.value} characters' });`);
+            lines.push(`${indent}if (${accessor} != null && ${accessor}.length < ${check.value}) return ctx.res?.status(400).json({ error: '${fieldPath} must be at least ${check.value} characters' });`);
           } else if (check.kind === 'max') {
-            lines.push(`${indent}if (${accessor} !== undefined && ${accessor}.length > ${check.value}) return ctx.res?.status(400).json({ error: '${fieldPath} must be at most ${check.value} characters' });`);
+            lines.push(`${indent}if (${accessor} != null && ${accessor}.length > ${check.value}) return ctx.res?.status(400).json({ error: '${fieldPath} must be at most ${check.value} characters' });`);
           }
         }
       }
@@ -1112,6 +1112,10 @@ function compilePipeStep(step: any, pipeName: string, indent: string = '    '): 
       return `${indent}console.log('[pipe:${pipeName}]', \`${msg}\`); // pipe: ${pipeName}`;
     }
     case 'PipeRespond': {
+      if (step.varRef) {
+        const compiled = compilePipeExpr(step.varRef);
+        return `${indent}return ctx.res?.status(${step.status}).json(${compiled}); // pipe: ${pipeName}`;
+      }
       const bodyEntries = step.body ? Object.entries(step.body).map(([k, v]: [string, any]) => {
         const compiled = compilePipeExpr(v);
         return `${JSON.stringify(k)}: ${compiled}`;

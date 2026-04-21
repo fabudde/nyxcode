@@ -259,7 +259,7 @@ export class Parser {
                 auth = true;
             }
             // Optional [middleware] bracket
-            let middlewareNames = [];
+            const middlewareNames = [];
             if (this.check(TokenType.LeftBracket)) {
                 this.advance();
                 while (!this.check(TokenType.RightBracket) && !this.isAtEnd()) {
@@ -304,7 +304,8 @@ export class Parser {
                                 val += this.advance().value;
                             }
                             secret = val;
-                        } else {
+                        }
+                        else {
                             secret = this.advance().value;
                         }
                     }
@@ -328,7 +329,8 @@ export class Parser {
             this.advance(); // consume 'change'
             // Handle $field (Dollar + Identifier)
             let field = this.advance().value;
-            if (field === String.fromCharCode(36) && this.check(TokenType.Identifier)) field += this.advance().value;
+            if (field === '$' && this.check(TokenType.Identifier))
+                field += this.advance().value;
             this.consume(TokenType.LeftBrace);
             const transitions = [];
             // Parse: old -> new { steps }
@@ -344,7 +346,7 @@ export class Parser {
                 const body = [];
                 while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
                     const s = this.parsePipeStep();
-                    if (s)
+                    if (s && s.type !== 'PipeTrigger')
                         body.push(s);
                 }
                 this.consume(TokenType.RightBrace);
@@ -369,7 +371,7 @@ export class Parser {
             // Handle $body.field with dot notation
             while (this.check(TokenType.Dot)) {
                 this.advance();
-                fieldName += '.' + this.advance().value; // works even if next is Email keyword
+                fieldName += '.' + this.advance().value;
             }
             const checks = [];
             // 'is' keyword
@@ -449,13 +451,14 @@ export class Parser {
         }
         return { type: 'PipeFetch', url, options, line: this.peek().line, col: this.peek().col };
     }
-    // set varname = expression
     // Helper: collect expression tokens, merging $ with following identifier
     collectPipeExpr(stopAtBrace = true, stopAtNewline = true) {
         let expr = '';
         while (!this.isAtEnd()) {
-            if (stopAtBrace && this.check(TokenType.RightBrace)) break;
-            if (stopAtNewline && this.check(TokenType.Newline)) break;
+            if (stopAtBrace && this.check(TokenType.RightBrace))
+                break;
+            if (stopAtNewline && this.check(TokenType.Newline))
+                break;
             const t = this.peek();
             // Stop at keywords that start new pipe steps
             if (t.type === TokenType.On || t.type === TokenType.Validate || t.type === TokenType.Query ||
@@ -466,16 +469,30 @@ export class Parser {
             if (t.type === TokenType.Dollar) {
                 expr += t.value;
                 this.advance();
-            } else if (t.type === TokenType.String) {
+            }
+            else if (t.type === TokenType.String) {
                 expr += '"' + t.value + '" ';
                 this.advance();
-            } else {
-                expr += t.value + ' ';
+            }
+            else if (t.type === TokenType.Dot) {
+                // No spaces around dots for clean property access (ctx.result.lastInsertRowid)
+                expr = expr.trimEnd() + t.value;
+                this.advance();
+            }
+            else {
+                // No leading space if previous char is a dot
+                if (expr.endsWith('.')) {
+                    expr += t.value + ' ';
+                }
+                else {
+                    expr += t.value + ' ';
+                }
                 this.advance();
             }
         }
         return expr.trim();
     }
+    // set varname = expression
     parsePipeSet() {
         this.advance(); // consume 'set'
         const name = this.consumeIdentifier();
@@ -502,10 +519,12 @@ export class Parser {
                 if (t.type === TokenType.Dollar) {
                     expr += t.value;
                     this.advance();
-                } else if (t.type === TokenType.String) {
+                }
+                else if (t.type === TokenType.String) {
                     expr += '"' + t.value + '" ';
                     this.advance();
-                } else {
+                }
+                else {
                     expr += t.value + ' ';
                     this.advance();
                 }
@@ -532,7 +551,7 @@ export class Parser {
         const body = [];
         while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
             const step = this.parsePipeStep();
-            if (step)
+            if (step && step.type !== 'PipeTrigger')
                 body.push(step);
         }
         this.consume(TokenType.RightBrace);
@@ -549,10 +568,12 @@ export class Parser {
                 // Merge $ with following identifier
                 condition += t.value;
                 this.advance();
-            } else if (t.type === TokenType.String) {
+            }
+            else if (t.type === TokenType.String) {
                 condition += '"' + t.value + '" ';
                 this.advance();
-            } else {
+            }
+            else {
                 condition += t.value + ' ';
                 this.advance();
             }
@@ -561,7 +582,7 @@ export class Parser {
         const body = [];
         while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
             const step = this.parsePipeStep();
-            if (step)
+            if (step && step.type !== 'PipeTrigger')
                 body.push(step);
         }
         this.consume(TokenType.RightBrace);
@@ -572,7 +593,7 @@ export class Parser {
             elseBody = [];
             while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
                 const step = this.parsePipeStep();
-                if (step)
+                if (step && step.type !== 'PipeTrigger')
                     elseBody.push(step);
             }
             this.consume(TokenType.RightBrace);
@@ -593,16 +614,23 @@ export class Parser {
                 this.advance();
                 if (this.check(TokenType.String)) {
                     params[key] = this.advance().value;
-                } else if (this.check(TokenType.LeftBrace)) {
+                }
+                else if (this.check(TokenType.LeftBrace)) {
                     // Inline object
-                    params[key] = this.consumePipeInlineObject();
-                } else if (this.check(TokenType.Dollar)) {
+                    params[key] = JSON.stringify(this.consumePipeInlineObject());
+                }
+                else if (this.check(TokenType.Dollar)) {
                     // Handle $variable
                     let val = this.advance().value;
-                    if (this.check(TokenType.Identifier)) val += this.advance().value;
-                    while (this.check(TokenType.Dot)) { this.advance(); val += '.' + this.advance().value; }
+                    if (this.check(TokenType.Identifier))
+                        val += this.advance().value;
+                    while (this.check(TokenType.Dot)) {
+                        this.advance();
+                        val += '.' + this.advance().value;
+                    }
                     params[key] = val;
-                } else {
+                }
+                else {
                     params[key] = this.advance().value;
                 }
             }
@@ -615,7 +643,7 @@ export class Parser {
         const message = this.consume(TokenType.String).value;
         return { type: 'PipeLog', message, line: this.peek().line, col: this.peek().col };
     }
-    // respond 201 { key: $var }
+    // respond 201 { key: $var } OR respond 200 $variable OR respond 200 $var[0]
     parsePipeRespond() {
         this.consume(TokenType.Respond);
         let status = 200;
@@ -623,10 +651,29 @@ export class Parser {
             status = parseInt(this.advance().value);
         }
         let body;
+        let varRef;
         if (this.check(TokenType.LeftBrace)) {
             body = this.consumePipeInlineObject();
         }
-        return { type: 'PipeRespond', status, body, line: this.peek().line, col: this.peek().col };
+        else if (this.check(TokenType.Dollar)) {
+            // respond 200 $variable or $variable[0] or $variable.field
+            this.advance(); // consume $
+            let ref = '$' + this.advance().value; // $varname
+            // Handle dot access: $var.field
+            while (this.check(TokenType.Dot)) {
+                this.advance(); // consume .
+                ref += '.' + this.advance().value;
+            }
+            // Handle array access: $var[0]
+            if (this.check(TokenType.LeftBracket)) {
+                this.advance(); // consume [
+                ref += '[' + this.advance().value + ']';
+                if (this.check(TokenType.RightBracket))
+                    this.advance(); // consume ]
+            }
+            varRef = ref;
+        }
+        return { type: 'PipeRespond', status, body, varRef, line: this.peek().line, col: this.peek().col };
     }
     // abort 400 "error message"
     parsePipeAbort() {
@@ -694,10 +741,12 @@ export class Parser {
                 if (t.type === TokenType.Dollar) {
                     val += t.value;
                     this.advance();
-                } else if (t.type === TokenType.String) {
+                }
+                else if (t.type === TokenType.String) {
                     val += '"' + t.value + '" ';
                     this.advance();
-                } else {
+                }
+                else {
                     val += t.value + ' ';
                     this.advance();
                 }
@@ -1968,6 +2017,7 @@ export class Parser {
             case TokenType.Limit: return this.parseLimitStmt();
             case TokenType.Query: return this.parseQuery();
             case TokenType.Let: return this.parseLet();
+            case TokenType.Const: return this.parseConst();
             // Email only as a statement when followed by to= (not inside elements like `input email`)
             case TokenType.Email:
                 if (this.peekAt(1)?.type === TokenType.Identifier && this.peekAt(1)?.value === 'to') {
@@ -3433,8 +3483,40 @@ export class Parser {
     parseLet() {
         const start = this.consume(TokenType.Let);
         const name = this.consumeIdentifier();
+        // Reserved name protection (v0.33.2)
+        const RESERVED_LET = ['__nyx', 'window', 'document', 'globalThis', 'eval', 'Function', 'constructor', 'prototype', '__proto__'];
+        if (name.startsWith('__nyx') || name.startsWith('__') || RESERVED_LET.includes(name)) {
+            throw this.error(`Reserved variable name '${name}' — names starting with '__' and JavaScript builtins are not allowed.`);
+        }
         this.consume(TokenType.Equals);
-        // let x = query "..." | sum(data, "field") | expression
+        // --- Frontend reactive let (simple values) → emits State node ---
+        // String literal: let greeting = "Hello"
+        if (this.check(TokenType.String)) {
+            const val = this.advance();
+            return { type: 'State', name, initialValue: { type: 'StringLiteral', value: val.value, line: val.line, col: val.col }, line: start.line, col: start.col };
+        }
+        // Number literal: let count = 0
+        if (this.check(TokenType.Number)) {
+            const val = this.advance();
+            return { type: 'State', name, initialValue: { type: 'NumberLiteral', value: parseFloat(val.value), line: val.line, col: val.col }, line: start.line, col: start.col };
+        }
+        // Boolean: let active = true / false
+        if (this.check(TokenType.Identifier) && (this.peek().value === 'true' || this.peek().value === 'false')) {
+            const val = this.advance();
+            return { type: 'State', name, initialValue: val.value, line: start.line, col: start.col };
+        }
+        // Array literal: let items = ["a", "b"]
+        if (this.check(TokenType.LeftBracket)) {
+            const arr = this.consumeArrayLiteral();
+            return { type: 'State', name, initialValue: arr, line: start.line, col: start.col };
+        }
+        // Object literal: let config = { key: "value" }
+        if (this.check(TokenType.LeftBrace)) {
+            const obj = this.consumeObjectLiteral();
+            return { type: 'State', name, initialValue: obj, line: start.line, col: start.col };
+        }
+        // --- Backend let (query, builtins, method calls) → emits Let node ---
+        // let x = query "..."
         if (this.check(TokenType.Query)) {
             this.advance(); // consume 'query'
             const sql = this.consume(TokenType.String).value;
@@ -3472,12 +3554,46 @@ export class Parser {
                 }
                 return { type: 'Let', name, value: { kind: 'call', target, method, args }, line: start.line, col: start.col };
             }
-            // Simple identifier assignment
-            return { type: 'Let', name, value: { kind: 'arithmetic', expr: target }, line: start.line, col: start.col };
+            // Simple identifier → treat as State (reactive)
+            return { type: 'State', name, initialValue: target, line: start.line, col: start.col };
         }
-        // Fallback: arithmetic/string expression
+        // Fallback: treat as reactive state with raw value
         const expr = this.advance().value;
-        return { type: 'Let', name, value: { kind: 'arithmetic', expr }, line: start.line, col: start.col };
+        return { type: 'State', name, initialValue: expr, line: start.line, col: start.col };
+    }
+    /**
+     * Parse: `const name = value`
+     * Non-reactive constant. Compiled to a plain JS const with no reactivity overhead.
+     */
+    parseConst() {
+        const start = this.consume(TokenType.Const);
+        const name = this.consumeIdentifier();
+        // Reserved name protection (v0.33.2)
+        const RESERVED_CONST = ['__nyx', 'window', 'document', 'globalThis', 'eval', 'Function', 'constructor', 'prototype', '__proto__'];
+        if (name.startsWith('__nyx') || name.startsWith('__') || RESERVED_CONST.includes(name)) {
+            throw this.error(`Reserved variable name '${name}' — names starting with '__' and JavaScript builtins are not allowed.`);
+        }
+        this.consume(TokenType.Equals);
+        let value;
+        if (this.check(TokenType.String)) {
+            value = { type: 'StringLiteral', value: this.advance().value };
+        }
+        else if (this.check(TokenType.Number)) {
+            value = { type: 'NumberLiteral', value: parseFloat(this.advance().value) };
+        }
+        else if (this.check(TokenType.Identifier) && (this.peek().value === 'true' || this.peek().value === 'false')) {
+            value = this.advance().value;
+        }
+        else if (this.check(TokenType.LeftBracket)) {
+            value = this.consumeArrayLiteral();
+        }
+        else if (this.check(TokenType.LeftBrace)) {
+            value = this.consumeObjectLiteral();
+        }
+        else {
+            value = this.advance().value;
+        }
+        return { type: 'Const', name, value, line: start.line, col: start.col };
     }
     parseEmailStatement() {
         const start = this.consume(TokenType.Email);
@@ -3763,7 +3879,16 @@ export class Parser {
                                         break;
                                     }
                                 }
-                                action += ' ' + t.value;
+                                // Merge compound operators: + = → +=, - = → -=, * = → *=, / = → /=
+                                else if (t.value === '=' && /[+\-*/]$/.test(action.trimEnd())) {
+                                    action = action.trimEnd() + '=';
+                                    continue;
+                                }
+                                // Preserve string quotes inside brace blocks
+                                if (t.type === TokenType.String)
+                                    action += ' "' + t.value + '"';
+                                else
+                                    action += ' ' + t.value;
                             }
                         }
                         else {
@@ -3783,13 +3908,73 @@ export class Parser {
                     break;
                 }
             }
+            // v0.33.3: @event shorthand — @click, @submit, @keydown etc.
+            if (this.check(TokenType.At) && this.peekAt(1)?.type === TokenType.Identifier) {
+                this.advance(); // consume '@'
+                const eventName = this.consumeIdentifier();
+                // Parse modifiers: @click.prevent, @keydown.ctrl.z
+                const modifiers = [];
+                while (this.check(TokenType.Dot) && this.peekAt(1)?.type === TokenType.Identifier) {
+                    this.advance(); // .
+                    modifiers.push(this.consumeIdentifier());
+                }
+                if (this.check(TokenType.Arrow))
+                    this.advance(); // -> (optional)
+                let action = '';
+                while (!this.isAtEnd() && !this.isStatementStart()) {
+                    const cur = this.peek();
+                    if (cur.type === TokenType.RightBrace)
+                        break;
+                    if (cur.type === TokenType.At)
+                        break; // next @event
+                    if (cur.type === TokenType.LeftBrace) {
+                        if (action.trim().length > 0)
+                            break;
+                        action += ' {';
+                        this.advance();
+                        let depth = 1;
+                        while (depth > 0 && !this.isAtEnd()) {
+                            const t = this.advance();
+                            if (t.type === TokenType.LeftBrace)
+                                depth++;
+                            else if (t.type === TokenType.RightBrace) {
+                                depth--;
+                                if (depth === 0) {
+                                    action += ' }';
+                                    break;
+                                }
+                            }
+                            else if (t.value === '=' && /[+\-*/]$/.test(action.trimEnd())) {
+                                action = action.trimEnd() + '=';
+                                continue;
+                            }
+                            // Preserve string quotes inside brace blocks
+                            if (t.type === TokenType.String)
+                                action += ' "' + t.value + '"';
+                            else
+                                action += ' ' + t.value;
+                        }
+                    }
+                    else {
+                        const tok = this.advance();
+                        if (tok.type === TokenType.String)
+                            action += (action ? ' ' : '') + '"' + tok.value + '"';
+                        else
+                            action += (action ? ' ' : '') + tok.value;
+                    }
+                }
+                const attrName = 'on' + eventName.charAt(0).toUpperCase() + eventName.slice(1);
+                const attrValue = modifiers.length > 0 ? '__mods:' + modifiers.join(',') + ':' + action.trim() : action.trim();
+                attributes.push({ name: attrName, value: attrValue });
+                continue;
+            }
             const next = this.peek();
             // String content: h1 "Hello"
             if (next.type === TokenType.String) {
                 content = { type: 'StringLiteral', value: this.advance().value, line: next.line, col: next.col };
             }
             // v0.30: keyword tokens used as element content (input email, input action, etc.)
-            else if ((next.type === TokenType.Email || next.type === TokenType.Action || next.type === TokenType.Let || next.type === TokenType.Env) && this.peekAt(1)?.type !== TokenType.LeftBrace && this.peekAt(1)?.type !== TokenType.LeftParen) {
+            else if ((next.type === TokenType.Email || next.type === TokenType.Action || next.type === TokenType.Let || next.type === TokenType.Const || next.type === TokenType.Env) && this.peekAt(1)?.type !== TokenType.LeftBrace && this.peekAt(1)?.type !== TokenType.LeftParen) {
                 content = { type: 'Identifier', name: this.advance().value, line: next.line, col: next.col };
             }
             // Property access: .name or .author.name (nested)
@@ -3813,7 +3998,7 @@ export class Parser {
             }
             // Attribute: key=value or key="complex value" (including keyword tokens like style=)
             // Attribute: key=value — handle keywords that can also be attribute names
-            else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form || next.type === TokenType.Data || next.type === TokenType.State || next.type === TokenType.Preset || next.type === TokenType.Email || next.type === TokenType.Action || next.type === TokenType.Let || next.type === TokenType.Env) && this.peekAt(1)?.type === TokenType.Equals) {
+            else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form || next.type === TokenType.Data || next.type === TokenType.State || next.type === TokenType.Preset || next.type === TokenType.Email || next.type === TokenType.Action || next.type === TokenType.Let || next.type === TokenType.Const || next.type === TokenType.Env) && this.peekAt(1)?.type === TokenType.Equals) {
                 const name = this.advance().value;
                 this.advance(); // =
                 const valToken = this.peek();
@@ -4115,6 +4300,7 @@ export class Parser {
             TokenType.Query, TokenType.Head, TokenType.Style, TokenType.Store,
             TokenType.Raw, TokenType.Limit, TokenType.Animate, TokenType.Effect,
             TokenType.Computed, TokenType.Config, TokenType.Before, TokenType.After,
+            TokenType.Let, TokenType.Const, TokenType.Env, TokenType.Email,
         ]);
         return keywordTypes.has(token.type);
     }
