@@ -161,6 +161,125 @@ respond 404 { error "Not found" }
 No flags needed. If your file has `table`/`api`/`action`/`use`/`on`/`env`/`every` → backend generated.
 If only `page`/`theme`/`component` → HTML only.
 
+
+## Pipe — Declarative Logic Chains (v0.32.0)
+
+The `pipe` keyword lets you build multi-step workflows in a single, readable block. Think Zapier/n8n — but in 10 lines of `.nyx` instead of 100 clicks.
+
+### Basic Example
+```nyx
+pipe 'new-order' {
+  on api POST /api/orders auth
+  validate $body.email is email
+  validate $body.total is number min=1
+  query "INSERT INTO orders (user_id, total) VALUES ($req.user.id, $body.total)" as result
+  set order_id = $result.lastInsertRowid
+  notify email to=$body.email subject="Order #$order_id" body="Thanks!"
+  log "Order $order_id created"
+  respond 201 { id: $order_id, status: created }
+}
+```
+
+### Triggers (`on`)
+Every pipe starts with a trigger:
+```nyx
+on api POST /api/path [auth]    // HTTP request
+on every 30s                     // Scheduled interval (5s minimum)
+on webhook POST /hooks/name [secret=$WEBHOOK_SECRET]  // Incoming webhook
+on event orders.created          // Table lifecycle event
+```
+
+### Steps Reference
+
+| Step | Purpose | Example |
+|------|---------|---------|
+| `validate` | Input validation, aborts 400 on fail | `validate $body.email is email` |
+| `query` | Parameterized SQL | `query "SELECT * FROM users WHERE id = $id" as rows` |
+| `fetch` | HTTP request | `fetch $url timeout=5s method=POST as response` |
+| `set` | Variable assignment | `set total = $body.price * $body.qty` |
+| `transform` | Shape output data | `transform { id: $x, total: $y }` |
+| `each` | Loop over rows/arrays | `each $items as item { ... }` |
+| `when` | Conditional branch | `when $total > 100 { ... }` |
+| `on change` | State transition detection | `on change $row.status { up -> down { ... } }` |
+| `notify email` | Send email | `notify email to=$email subject="..." body="..."` |
+| `notify sms` | Send SMS | `notify sms to="+49..." message="..."` |
+| `notify webhook` | Outgoing webhook | `notify webhook to=$url body={ key: $val }` |
+| `webhook` | Shorthand outgoing webhook | `webhook "https://..." body={ ... }` |
+| `log` | Structured logging | `log "Order $id created"` |
+| `respond` | HTTP response | `respond 201 { status: ok }` |
+| `abort` | Stop with error | `abort 400 "Invalid input"` |
+| `run pipe` | Call another pipe | `run pipe 'send-invoice' with { id: $order_id }` |
+
+### Validation Types
+```nyx
+validate $body.email is email          // Email format
+validate $body.url is url              // URL format
+validate $body.age is number           // Must be numeric
+validate $body.age is number min=18    // Minimum value
+validate $body.name is string min=2    // Minimum length
+validate $body.name is string max=100  // Maximum length
+validate $body.items is array          // Must be array
+validate $body.items is array min=1    // Non-empty array
+```
+
+### State Change Detection
+```nyx
+pipe 'uptime-monitor' {
+  on every 30s
+  query "SELECT id, url, name, status FROM monitors" as rows
+  each $rows as row {
+    fetch $row.url timeout=10s as check
+    on change $row.status {
+      up -> down {
+        notify sms to="+49..." message="🚨 DOWN: $row.name"
+      }
+      down -> up {
+        notify sms to="+49..." message="✅ UP: $row.name"
+      }
+    }
+  }
+}
+```
+
+State is tracked in `_pipe_state` table (auto-created). Only fires when value actually changes.
+
+### Security
+- All SQL queries use parameterized binding (`?` placeholders) — never string concatenation
+- Webhook endpoints are rate-limited (60 req/min default)
+- `secret=` on webhooks enables HMAC-SHA256 signature verification
+- Compile-time warnings for: unvalidated user input in queries, missing `use nodemailer`/`use twilio`, SSRF risk on fetch with user-provided URLs
+
+### Pipe-to-Pipe Calls
+```nyx
+pipe 'process-order' {
+  on api POST /api/orders auth
+  query "INSERT INTO orders ..." as result
+  run pipe 'send-invoice' with { order_id: $result.lastInsertRowid }
+  run pipe 'notify-warehouse' with { order_id: $result.lastInsertRowid }
+  respond 201 { status: ok }
+}
+
+pipe 'send-invoice' {
+  log "Sending invoice for order $order_id"
+  notify email to="billing@shop.com" subject="Invoice" body="Order $order_id"
+}
+```
+
+### Required Adapters
+```nyx
+use nodemailer    // Required for notify email
+  SMTP_HOST default="smtp.gmail.com"
+  SMTP_PORT default="587"
+  SMTP_USER required
+  SMTP_PASS required
+
+use twilio        // Required for notify sms
+  TWILIO_ACCOUNT_SID required
+  TWILIO_AUTH_TOKEN required
+  TWILIO_FROM required
+```
+
+
 ## CSS Shorthands — ALWAYS USE THESE
 Property shorthands work in `style {}` blocks, `preset` definitions, inline styles, and CSS rules.
 

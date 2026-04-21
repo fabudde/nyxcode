@@ -1,4 +1,88 @@
-# NyxCode v0.31.4 — Safe Database Defaults (#146)
+# NyxCode v0.32.0 — pipe: Declarative Logic Chains (#149)
+
+**Build complete multi-step workflows in a single declarative block. The biggest NyxCode feature since The Language Release.**
+
+---
+
+## 🔥 `pipe` — Universal Logic Chains
+
+16 step types, parameterized SQL, webhook security, state change detection, pipe-to-pipe calls.
+
+```nyx
+pipe 'new-order' {
+  on api POST /api/orders auth
+  validate $body.email is email
+  validate $body.total is number min=1
+  query "INSERT INTO orders (email, total) VALUES ($body.email, $body.total)" as result
+  set order_id = $result.lastInsertRowid
+  notify email to=$body.email subject="Order #$order_id"
+  log "Order $order_id created"
+  respond 201 { id: $order_id, status: created }
+}
+```
+
+### Pipe Steps
+| Step | Purpose |
+|------|---------|
+| `on api/every/webhook/event` | Trigger |
+| `validate` | Input validation (email, url, number, string, array + min/max) |
+| `query` | Parameterized SQL execution |
+| `fetch` | HTTP requests with timeout |
+| `set` | Variable assignment |
+| `transform` | Shape output data |
+| `each` | Loop over collections |
+| `when` | Conditional branches |
+| `on change` | State transition detection |
+| `notify email/sms/webhook` | Send notifications |
+| `log` | Structured logging |
+| `respond` | HTTP response |
+| `abort` | Stop with error |
+| `run pipe` | Call another pipe |
+
+### Security
+- Parameterized SQL everywhere (no string interpolation)
+- Webhook rate limiting (60 req/min)
+- HMAC-SHA256 signature verification
+- 7 compile-time security warnings
+
+### Stats
+- 435 tests (65 new, 370 existing — 0 failures)
+- ~810 lines of new code (parser + compiler + validator)
+
+---
+
+# Changelog
+
+## v0.32.0 — pipe: Declarative Logic Chains (#149)
+
+### 🔥 New: `pipe` keyword — multi-step declarative workflows
+
+Build complete business logic in a single block:
+
+```nyx
+pipe 'new-order' {
+  on api POST /api/orders auth
+  validate $body.email is email
+  query "INSERT INTO orders ..." as result
+  notify email to=$body.email subject="Confirmation"
+  respond 201 { id: $result.lastInsertRowid }
+}
+```
+
+**16 pipe steps:** `on` (api/every/webhook/event triggers), `validate`, `query`, `fetch`, `set`, `transform`, `each`, `when`, `on change`, `notify` (email/sms/webhook), `webhook`, `log`, `respond`, `abort`, `run pipe`
+
+**Security hardened:**
+- All SQL uses parameterized queries (never string interpolation)
+- Webhook endpoints rate-limited (60 req/min)
+- HMAC-SHA256 signature verification for incoming webhooks
+- 7 compile-time security warnings (unvalidated input, missing adapters, SSRF risk)
+
+**State change detection:** `on change $field { old -> new { ... } }` with automatic `_pipe_state` table
+
+**Pipe-to-pipe:** `run pipe 'other' with { key: $val }` for composable workflows
+
+**Tests:** 435 total (65 new pipe tests + 370 existing, 0 failures)
+
 
 **Database files now live outside the build directory by default. Rebuild without fear.**
 

@@ -3,7 +3,7 @@
 **The AI-native programming language. One `.nyx` file = full-stack app.**
 
 [![npm](https://img.shields.io/npm/v/@fabudde/nyxcode)](https://www.npmjs.com/package/@fabudde/nyxcode)
-[![Tests](https://img.shields.io/badge/tests-365-brightgreen)](#)
+[![Tests](https://img.shields.io/badge/tests-435-brightgreen)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 🌐 **[nyxcode.io](https://nyxcode.io)** · 📊 **[NyxStatus.com](https://nyxstatus.com)** (built in 378 lines of NyxCode)
@@ -147,6 +147,22 @@ every 60s 'health-check' {
 }
 ```
 
+### `pipe` — Declarative Logic Chains (v0.32.0)
+```nyx
+pipe 'new-order' {
+  on api POST /api/orders auth
+  validate $body.email is email
+  validate $body.total is number min=1
+  query "INSERT INTO orders (email, total) VALUES ($body.email, $body.total)" as result
+  set order_id = $result.lastInsertRowid
+  notify email to=$body.email subject="Order #$order_id"
+  log "Order $order_id created"
+  respond 201 { id: $order_id, status: created }
+}
+```
+
+16 steps: `validate`, `query`, `fetch`, `set`, `transform`, `each`, `when`, `on change`, `notify` (email/sms/webhook), `log`, `respond`, `abort`, `run pipe`. Parameterized SQL, webhook security, state detection. See [NYXCODE.md](NYXCODE.md#pipe--declarative-logic-chains-v0320).
+
 ### Multi-Query API Blocks
 ```nyx
 api POST /api/monitors/delete auth {
@@ -168,7 +184,7 @@ each alerts -> alert {
 ```
 
 ### Backend Auto-Detection
-No flags. If your `.nyx` has `table`/`api`/`action`/`security`/`use`/`on`/`env`/`every` → `server.js` generated. Otherwise → HTML only.
+No flags. If your `.nyx` has `table`/`api`/`action`/`security`/`use`/`on`/`env`/`every`/`pipe` → `server.js` generated. Otherwise → HTML only.
 
 ## Features
 
@@ -299,6 +315,7 @@ h1 "icon:map-pin Our Location"                     # Inline in text
 
 | Version | Highlights |
 |---------|------------|
+| **v0.32.0** | **`pipe` — Declarative Logic Chains** — 16 step types, parameterized SQL, webhook security, state detection, pipe-to-pipe |
 | **v0.30.0** | **The Language Release** — `let`, `action`, `on`, `env`, `email`, `use`, `respond`, forms in each, multi-query API |
 | v0.27.x | `page auth`, `visible=auth/guest`, `$param.id`, `every`, pagination, search |
 | v0.26.x | mask-* auto-prefix, compile-time `when`, `picture`/`source`, security hardening |

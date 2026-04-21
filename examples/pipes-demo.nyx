@@ -1,0 +1,161 @@
+// NyxCode v0.32.0 — Pipe Blocks Demo
+// Demonstrates all pipe features: triggers, steps, validation, and more
+
+config {
+  name "Pipes Demo"
+  port 4000
+}
+
+table orders {
+  email email required
+  total number
+  status text default "pending"
+  created_at text default now
+}
+
+table notifications {
+  order_id number
+  channel text
+  message text
+  sent_at text default now
+}
+
+// ── 1. API-triggered pipe with validation and query ───────────────
+
+pipe 'create-order' {
+  on api POST /api/orders auth
+
+  validate $body.email is email
+  validate $body.total is number [min=1]
+
+  set tax = $body.total * 0.19
+  set grandTotal = $body.total + $tax
+
+  query "INSERT INTO orders (email, total, status) VALUES ($body.email, $grandTotal, 'pending')" as result
+
+  transform {
+    id: $result.lastInsertRowid,
+    email: $body.email,
+    total: $grandTotal,
+    tax: $tax,
+    status: pending
+  }
+
+  log "New order #$result.lastInsertRowid from $body.email — total: $grandTotal"
+
+  when $grandTotal > 100 {
+    log "Premium order detected! Notifying Slack..."
+    webhook "https://hooks.slack.com/services/EXAMPLE"
+  }
+
+  respond 201 { id: $result.lastInsertRowid, total: $grandTotal, status: created }
+}
+
+// ── 2. Scheduled pipe (cron-style) ───────────────────────────────
+
+pipe 'cleanup-expired' {
+  on every 1h
+
+  query "DELETE FROM orders WHERE status = 'expired' AND created_at < datetime('now', '-7 days')" as deleted
+  log "Cleanup: removed $deleted.changes expired orders"
+}
+
+// ── 3. Webhook-triggered pipe with signature verification ────────
+
+pipe 'stripe-webhook' {
+  on webhook POST /hooks/stripe [secret=$STRIPE_WEBHOOK_SECRET]
+
+  log "Stripe webhook received"
+
+  query "UPDATE orders SET status = 'paid' WHERE id = $body.order_id" as updated
+
+  when $updated.changes > 0 {
+    log "Order $body.order_id marked as paid"
+  }
+
+  respond 200 { received: true }
+}
+
+// ── 4. Pipe with each loop ───────────────────────────────────────
+
+pipe 'send-daily-report' {
+  on every 24h
+
+  query "SELECT * FROM orders WHERE status = 'pending' AND created_at > datetime('now', '-1 day')" as pendingOrders
+
+  set count = 0
+
+  each $pendingOrders as order {
+    log "Pending: order from $order.email — $order.total"
+    set count = $count + 1
+  }
+
+  log "Daily report: $count pending orders"
+}
+
+// ── 5. State change detection ────────────────────────────────────
+
+pipe 'order-status-change' {
+  on api PUT /api/orders
+
+  on change $status {
+    pending -> shipped {
+      log "Order shipped! Notifying customer..."
+      query "INSERT INTO notifications (order_id, channel, message) VALUES ($req.params.id, 'email', 'Your order has been shipped!')"
+    }
+    shipped -> delivered {
+      log "Order delivered!"
+    }
+    * -> cancelled {
+      log "Order cancelled from previous status"
+    }
+  }
+
+  respond 200 { updated: true }
+}
+
+// ── 6. Pipe-to-pipe composition ──────────────────────────────────
+
+pipe 'validate-and-enrich' {
+  on api POST /api/enrich
+
+  validate $body.email is email
+  validate $body.name is string [min=2, max=100]
+
+  set enriched = true
+
+  run pipe 'create-order'
+}
+
+// ── 7. Conditional branching with else ───────────────────────────
+
+pipe 'check-order-limit' {
+  on api POST /api/check-limit
+
+  query "SELECT COUNT(*) as cnt FROM orders WHERE email = $body.email AND created_at > datetime('now', '-1 day')" as check
+
+  when $check.cnt > 10 {
+    abort 429 "Too many orders today. Please try again tomorrow."
+  } else {
+    log "Order limit OK for $body.email ($check.cnt/10 today)"
+    respond 200 { allowed: true, used: $check.cnt }
+  }
+}
+
+// ── 8. Fetch third-party API ────────────────────────────────────────
+
+pipe 'geocode-order' {
+  on api POST /api/geocode
+
+  validate $body.address is string
+
+  fetch "https://nominatim.openstreetmap.org/search" [timeout=5, method=GET] as geo
+
+  transform {
+    address: $body.address,
+    lat: $geo.lat,
+    lon: $geo.lon
+  }
+
+  respond 200 { location: $result }
+}
