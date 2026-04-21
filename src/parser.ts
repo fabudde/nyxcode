@@ -3674,7 +3674,9 @@ private parseElement(): ElementNode {
                   action = action.trimEnd() + '=';
                   continue;
                 }
-                action += ' ' + t.value;
+                // Preserve string quotes inside brace blocks
+                if (t.type === TokenType.String) action += ' "' + t.value + '"';
+                else action += ' ' + t.value;
               }
             } else {
               const tok = this.advance();
@@ -3719,7 +3721,9 @@ private parseElement(): ElementNode {
                 action = action.trimEnd() + '=';
                 continue;
               }
-              action += ' ' + t.value;
+              // Preserve string quotes inside brace blocks
+              if (t.type === TokenType.String) action += ' "' + t.value + '"';
+              else action += ' ' + t.value;
             }
           } else {
             const tok = this.advance();

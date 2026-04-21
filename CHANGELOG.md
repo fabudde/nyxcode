@@ -1,3 +1,17 @@
+# NyxCode v0.33.4 — String Quote Preservation in @click (#153)
+
+**String literals in event handlers now keep their quotes. XSS fix.**
+
+## 🐛 Bug Fix
+
+- `@click { msg = "hello" }` now compiles to `onclick="__nyx.state.msg = 'hello'"` (was: `msg = hello` — unquoted!)
+- Fixed in both `@event` and `on:click` parsers
+- String tokens inside `{ }` brace blocks now preserve quotes
+
+452 tests, 0 failures.
+
+---
+
 # NyxCode v0.33.3 — @event Shorthand Syntax (#152)
 
 **`@click`, `@submit`, `@keydown` etc. now work as documented.**
