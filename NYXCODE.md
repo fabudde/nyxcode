@@ -1293,12 +1293,45 @@ page / {
 - Works in any nested element depth — compiles to reactive template bindings
 - State changes auto-trigger re-render
 
-### Events (v0.12.0+)
+### Events (v0.12.0+, @event shorthand v0.33.3)
+
+**Recommended: `@event` shorthand (v0.33.3+):**
+```nyx
+button "+" @click { count += 1 }
+button "-" @click { count -= 1 }
+button "Set" @click { msg = "hello" }
+```
+
+**Legacy syntax (still works):**
 ```nyx
 button "Click" on:click -> count = count + 1
 button "Reset" on:click -> count = 0
 ```
-Both `on:click` and `on click` syntax work (colon optional).
+
+**Three equivalent syntaxes:**
+| Syntax | Example |
+|---|---|
+| `@event { }` | `@click { count += 1 }` ✅ recommended |
+| `on:event ->` | `on:click -> count = count + 1` |
+| `on event ->` | `on click -> count = count + 1` |
+
+**Modifiers:**
+```nyx
+button "Submit" @click.prevent { save() }
+input @keydown.enter { submit() }
+input @keydown.ctrl.s { save() }
+button @click.stop { handle() }
+```
+
+| Modifier | Effect |
+|---|---|
+| `.prevent` | `event.preventDefault()` |
+| `.stop` | `event.stopPropagation()` |
+| `.enter` | Only on Enter key |
+| `.escape` | Only on Escape key |
+| `.ctrl`, `.alt`, `.shift`, `.meta` | Modifier keys |
+| `.ctrl.z` | Combo: Ctrl+Z |
+
 Events work inline on elements AND inside when/else blocks.
 
 ### Store — Global State (v0.16.0+)
