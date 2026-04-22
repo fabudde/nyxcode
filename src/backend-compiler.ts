@@ -589,7 +589,7 @@ function compileApiRoute(api: ApiNode): string {
       handlerBody += `    const __sse = await fetch(${url}, ${opts});\n`;
       handlerBody += `    const __reader = __sse.body.getReader();\n`;
       handlerBody += `    const __dec = new TextDecoder();\n`;
-      handlerBody += `    try { while (true) { const {done, value} = await __reader.read(); if (done) break; res.write('data: ' + JSON.stringify(__dec.decode(value, {stream:true})) + '\\n\\n'); } }\n`;
+      handlerBody += `    try { while (true) { const {done, value} = await __reader.read(); if (done) break; res.write(__dec.decode(value, {stream:true})); } }\n`;
       handlerBody += `    finally { res.write('data: [DONE]\\n\\n'); res.end(); }\n`;
       handlerBody += `    return;\n`;
     }
