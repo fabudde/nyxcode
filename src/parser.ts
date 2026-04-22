@@ -3412,26 +3412,40 @@ export class Parser {
     const status = parseInt(this.consume(TokenType.Number).value);
 
     let body: Record<string, string | { value: string; isRef: boolean }> | string | undefined;
-    if (this.check(TokenType.LeftBrace)) {
-      this.advance();
-      body = {};
-      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
-        const key = this.consumeIdentifier();
-        if (this.check(TokenType.String)) {
-          // String literal: respond 200 { status "ok" }
-          body[key] = this.consume(TokenType.String).value;
-        } else {
-          // Variable reference: respond 200 { count userCount.count }
-          let ref = this.consumeIdentifier();
-          while (this.check(TokenType.Dot)) {
-            this.advance();
-            ref += '.' + this.consumeIdentifier();
-          }
-          body[key] = { value: ref, isRef: true };
-        }
-        if (this.check(TokenType.Comma)) this.advance();
-      }
-      this.consume(TokenType.RightBrace);
+     if (this.check(TokenType.LeftBrace)) {
+       this.advance();
+       body = {};
+       while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+         while (this.check(TokenType.Newline)) this.advance();
+         if (this.check(TokenType.RightBrace)) break;
+         const key = this.consumeIdentifier();
+         // v0.36: Support key: value syntax (colon optional)
+         if (this.check(TokenType.Colon)) this.advance();
+         if (this.check(TokenType.String)) {
+           body[key] = this.consume(TokenType.String).value;
+         } else if (this.check(TokenType.Number)) {
+           body[key] = this.advance().value;
+         } else if (this.check(TokenType.Identifier) && (this.peek().value === 'true' || this.peek().value === 'false' || this.peek().value === 'null')) {
+           body[key] = this.advance().value;
+         } else if (this.check(TokenType.Dollar)) {
+           let ref = this.advance().value;
+           if (this.check(TokenType.Identifier)) ref += this.advance().value;
+           while (this.check(TokenType.Dot)) { this.advance(); ref += '.' + this.consumeIdentifier(); }
+           body[key] = { value: ref, isRef: true };
+         } else {
+           let ref = this.consumeIdentifier();
+           while (this.check(TokenType.Dot)) { this.advance(); ref += '.' + this.consumeIdentifier(); }
+           body[key] = { value: ref, isRef: true };
+         }
+         if (this.check(TokenType.Comma)) this.advance();
+       }
+       this.consume(TokenType.RightBrace);
+    } else if (this.check(TokenType.Dollar)) {
+      // respond 200 $variable — forward variable directly
+      let ref = this.advance().value;
+      if (this.check(TokenType.Identifier)) ref += this.advance().value;
+      while (this.check(TokenType.Dot)) { this.advance(); ref += '.' + this.consumeIdentifier(); }
+      body = { __varRef: ref } as any;
     } else if (this.check(TokenType.Dot)) {
       body = this.advance().value + this.consumeIdentifier();
     }
@@ -3486,6 +3500,49 @@ export class Parser {
     }
 
     // --- Backend let (query, builtins, method calls) → emits Let node ---
+    // let x = file "path"  (v0.36)
+    if (this.check(TokenType.Identifier) && this.peek().value === 'file') {
+      this.advance(); // consume 'file'
+      const path = this.consume(TokenType.String).value;
+      return { type: 'Let', name, value: { kind: 'file', path }, line: start.line, col: start.col };
+    }
+    // let x = fetch "url" { ... }  (v0.36)
+    if (this.check(TokenType.Identifier) && this.peek().value === 'fetch') {
+      this.advance(); // consume 'fetch'
+      const url = this.consume(TokenType.String).value;
+      let method = 'GET';
+      const headers: Record<string, string> = {};
+      let bodyExpr = '';
+      if (this.check(TokenType.LeftBrace)) {
+        this.consume(TokenType.LeftBrace);
+        while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          const key = this.peek();
+          if (key.type === TokenType.Identifier && key.value === 'method') {
+            this.advance(); method = this.advance().value;
+          } else if (key.type === TokenType.Identifier && key.value === 'headers') {
+            this.advance();
+            this.consume(TokenType.LeftBrace);
+            while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+              const hKey = this.consumeIdentifier();
+              if (this.check(TokenType.Colon)) this.advance();
+              const hVal = this.advance().value;
+              headers[hKey] = hVal;
+              if (this.check(TokenType.Newline)) this.advance();
+            }
+            this.consume(TokenType.RightBrace);
+          } else if (key.type === TokenType.Identifier && key.value === 'body') {
+            this.advance();
+            bodyExpr = this.collectPipeExpr(true, false);
+          } else if (key.type === TokenType.Newline) {
+            this.advance();
+          } else {
+            this.advance();
+          }
+        }
+        this.consume(TokenType.RightBrace);
+      }
+      return { type: 'Let', name, value: { kind: 'fetch', url, method, headers, bodyExpr }, line: start.line, col: start.col };
+    }
     // let x = query "..."
     if (this.check(TokenType.Query)) {
       this.advance(); // consume 'query'

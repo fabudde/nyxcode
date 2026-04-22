@@ -1929,6 +1929,8 @@ api GET /api/posts/:id/views auth {
 - `api METHOD /path [auth] { }` — custom Express endpoints.
 - `query "SQL"` — raw SQL. `$field` → parameterized (no injection).
 - `validate { field rules }` — same rules as tables (`required`, `min`, `max`, `format`).
+- `respond 200 { key: "value", active: true }` — JSON response with colon syntax, unquoted booleans/numbers.
+- `respond 200 $variable` — forward a variable directly as JSON response.
 - `auth` → requires JWT token (uses `authMiddleware`).
 - Path params (`:id`) auto-map to `req.params`. Body params to `req.body`.
 - Smart return: aggregates (`COUNT`/`SUM`) → single object. `LIMIT 1` → single. Else → array.
@@ -1954,6 +1956,8 @@ api POST /api/ask {
 }
 ```
 - `fetch "url" { method, headers, body }` — non-streaming HTTP, result in `$fetchResult`
+- `let x = fetch "url" { ... }` — fetch result assigned to variable `x`
+- `let x = file "path"` — read file at runtime into variable `x`
 - `stream fetch "url" { ... }` — SSE proxy, streams response back to client
 - `file "path"` — read file at runtime into `__file_content`
 - `$body` → `req.body`, `$env.X` → `process.env.X` in api context

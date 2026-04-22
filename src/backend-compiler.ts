@@ -466,6 +466,24 @@ function compileApiRoute(api: ApiNode): string {
       handlerBody += `    const ${l.name} = await ${l.value.target}.${l.value.method}(${l.value.args.join(', ')});\n`;
     } else if (l.value.kind === 'arithmetic') {
       handlerBody += `    const ${l.name} = ${l.value.expr};\n`;
+    } else if (l.value.kind === 'file') {
+      handlerBody += `    const ${l.name} = require('fs').readFileSync(${JSON.stringify(l.value.path)}, 'utf-8');\n`;
+    } else if (l.value.kind === 'fetch') {
+      const url = compileApiUrl(l.value.url);
+      let opts = `{ method: '${l.value.method || 'GET'}'`;
+      const hdrs: string[] = [];
+      if (l.value.bodyExpr) hdrs.push("'Content-Type': 'application/json'");
+      if (l.value.headers) {
+        for (const [k, v] of Object.entries(l.value.headers)) {
+          const val = (v as string).startsWith('$') ? compileApiExpr(v as string) : JSON.stringify(v);
+          hdrs.push(`${JSON.stringify(k)}: ${val}`);
+        }
+      }
+      if (hdrs.length) opts += `, headers: { ${hdrs.join(', ')} }`;
+      if (l.value.bodyExpr) opts += `, body: JSON.stringify(${compileApiExpr(l.value.bodyExpr)})`;
+      opts += ' }';
+      handlerBody += `    const __fetch_${l.name} = await fetch(${url}, ${opts});\n`;
+      handlerBody += `    const ${l.name} = await __fetch_${l.name}.json();\n`;
     }
   }
 
@@ -579,11 +597,19 @@ function compileApiRoute(api: ApiNode): string {
 
   if (!handlerBody.includes('res.') && !handlerBody.includes('return') && responds.length > 0) {
     const r = responds[0];
-    if (r.body && typeof r.body === 'object') {
+    if (r.body && typeof r.body === 'object' && (r.body as any).__varRef) {
+      // respond 200 $variable — forward variable directly
+      const ref = compileApiExpr((r.body as any).__varRef);
+      handlerBody += `    res.status(${r.status || 200}).json(${ref});\n`;
+    } else if (r.body && typeof r.body === 'object') {
       // Build response object, resolving variable references
       const entries = Object.entries(r.body).map(([k, v]) => {
         if (typeof v === 'object' && v !== null && (v as any).isRef) {
           return `${JSON.stringify(k)}: ${(v as any).value}`;
+        }
+        // Unquoted literals: true, false, null, numbers
+        if (v === 'true' || v === 'false' || v === 'null' || /^\d+(\.\d+)?$/.test(v as string)) {
+          return `${JSON.stringify(k)}: ${v}`;
         }
         return `${JSON.stringify(k)}: ${JSON.stringify(v)}`;
       });
