@@ -411,6 +411,13 @@ function compileApiRoute(api: ApiNode): string {
     if (stmt.type === 'Email') emails.push(stmt);
     if (stmt.type === 'ActionCall') actionCalls.push(stmt);
   }
+
+  // v0.35: Process fetch/stream/file statements in order
+  const orderedStmts = api.body.filter((s: any) =>
+    s.type === 'ApiFetch' || s.type === 'StreamFetch' || s.type === 'ApiFile' ||
+    (s.type === 'Let' && (s as any).value?.kind === 'fetch') ||
+    (s.type === 'Let' && (s as any).value?.kind === 'file')
+  );
   
   let handlerBody = '';
   
@@ -520,7 +527,57 @@ function compileApiRoute(api: ApiNode): string {
         }
       }
     }
-  } else if (responds.length > 0) {
+  }
+
+  // v0.35: Process fetch/stream/file in order of appearance
+  for (const stmt of api.body) {
+    const s = stmt as any;
+    if (s.type === 'ApiFile') {
+      handlerBody += `    const __file_content = require('fs').readFileSync(${JSON.stringify(s.path)}, 'utf-8');\n`;
+    }
+    if (s.type === 'ApiFetch') {
+      const url = compileApiUrl(s.url);
+      let opts = `{ method: '${s.method || 'GET'}'`;
+      const hdrs: string[] = [];
+      if (s.bodyExpr) hdrs.push("'Content-Type': 'application/json'");
+      if (s.headers) {
+        for (const [k, v] of Object.entries(s.headers)) {
+          const val = (v as string).startsWith('$') ? compileApiExpr(v as string) : JSON.stringify(v);
+          hdrs.push(`${JSON.stringify(k)}: ${val}`);
+        }
+      }
+      if (hdrs.length) opts += `, headers: { ${hdrs.join(', ')} }`;
+      if (s.bodyExpr) opts += `, body: JSON.stringify(${compileApiExpr(s.bodyExpr)})`;
+      opts += ' }';
+      const varName = s.asVar || 'fetchResult';
+      handlerBody += `    const __fetch_${varName} = await fetch(${url}, ${opts});\n`;
+      handlerBody += `    const ${varName} = await __fetch_${varName}.json();\n`;
+    }
+    if (s.type === 'StreamFetch') {
+      const url = compileApiUrl(s.url);
+      handlerBody += `    // SSE Stream\n`;
+      handlerBody += `    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });\n`;
+      let opts = `{ method: '${s.method || 'POST'}'`;
+      const hdrs: string[] = ["'Content-Type': 'application/json'"];
+      if (s.headers) {
+        for (const [k, v] of Object.entries(s.headers)) {
+          const val = (v as string).startsWith('$') ? compileApiExpr(v as string) : JSON.stringify(v);
+          hdrs.push(`${JSON.stringify(k)}: ${val}`);
+        }
+      }
+      opts += `, headers: { ${hdrs.join(', ')} }`;
+      if (s.bodyExpr) opts += `, body: JSON.stringify(${compileApiExpr(s.bodyExpr)})`;
+      opts += ' }';
+      handlerBody += `    const __sse = await fetch(${url}, ${opts});\n`;
+      handlerBody += `    const __reader = __sse.body.getReader();\n`;
+      handlerBody += `    const __dec = new TextDecoder();\n`;
+      handlerBody += `    try { while (true) { const {done, value} = await __reader.read(); if (done) break; res.write('data: ' + JSON.stringify(__dec.decode(value, {stream:true})) + '\\n\\n'); } }\n`;
+      handlerBody += `    finally { res.write('data: [DONE]\\n\\n'); res.end(); }\n`;
+      handlerBody += `    return;\n`;
+    }
+  }
+
+  if (!handlerBody.includes('res.') && !handlerBody.includes('return') && responds.length > 0) {
     const r = responds[0];
     if (r.body && typeof r.body === 'object') {
       // Build response object, resolving variable references
@@ -539,7 +596,7 @@ function compileApiRoute(api: ApiNode): string {
   }
   
   return `
-app.${method}('${api.path}', ${middleware}${(api.middleware || []).map(m => 'mw_' + m + ', ').join('')}(req, res) => {
+app.${method}('${api.path}', ${middleware}${(api.middleware || []).map(m => 'mw_' + m + ', ').join('')}async (req, res) => {
   try {
 ${handlerBody}  } catch (e) {
     res.status(500).json({ error: e.message });
@@ -960,6 +1017,32 @@ function compilePipeExpr(expr: string): string {
     .replace(/\$req\.(\w[\w.]*)/g, 'ctx.req.$1')
     .replace(/\$row\.(\w+)/g, 'ctx.row.$1')
     .replace(/\$(\w+)/g, 'ctx.$1');
+}
+
+/** Compile expression in api route context (uses req/res, not ctx) */
+function compileApiExpr(expr: string): string {
+  return expr
+    .replace(/\$env\.(\w+)/g, 'process.env.$1')
+    .replace(/\$body\.(\w+)/g, 'req.body.$1')
+    .replace(/\$body\b/g, 'req.body')
+    .replace(/\$req\.(\w[\w.]*)/g, 'req.$1')
+    .replace(/\$params\.(\w+)/g, 'req.params.$1')
+    .replace(/\$(\w+)/g, '$1');
+}
+
+/** Compile a URL in api route context */
+function compileApiUrl(url: string): string {
+  if (url.startsWith('$')) return compileApiExpr(url);
+  if (url.includes('$env.')) {
+    return '`' + url.replace(/\$env\.(\w+)/g, '${process.env.$1}') + '`';
+  }
+  if (url.includes('$')) {
+    return '`' + url.replace(/\$body\.(\w+)/g, '${req.body.$1}')
+                     .replace(/\$body\b/g, '${req.body}')
+                     .replace(/\$req\.(\w[\w.]*)/g, '${req.$1}')
+                     .replace(/\$(\w+)/g, '${$1}') + '`';
+  }
+  return JSON.stringify(url);
 }
 
 /** Compile a URL that may contain $env refs or $variable refs */

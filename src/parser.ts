@@ -479,6 +479,64 @@ export class Parser {
     return { type: 'PipeFetch', url, options, line: this.peek().line, col: this.peek().col } as any;
   }
 
+  /** Parse: `fetch "url" { method, headers, body }` — non-streaming HTTP request in api blocks */
+  private parseApiFetch(): any {
+    const start = this.advance(); // consume 'fetch'
+    let url = this.advance().value;
+    if (url === '$' && this.check(TokenType.Identifier)) {
+      url = '$' + this.advance().value;
+      while (this.check(TokenType.Dot)) { this.advance(); url += '.' + this.advance().value; }
+    }
+    let method = 'GET';
+    const headers: Record<string, string> = {};
+    let bodyExpr = '';
+    let asVar = 'fetchResult';
+    if (this.check(TokenType.LeftBrace)) {
+      this.consume(TokenType.LeftBrace);
+      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+        const key = this.peek();
+        if (key.type === TokenType.Identifier && key.value === 'method') {
+          this.advance(); method = this.advance().value;
+        } else if (key.type === TokenType.Identifier && key.value === 'headers') {
+          this.advance();
+          this.consume(TokenType.LeftBrace);
+          while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            const hKey = this.consumeIdentifier();
+            if (this.check(TokenType.Colon)) this.advance();
+            const hVal = this.advance().value;
+            headers[hKey] = hVal;
+            if (this.check(TokenType.Newline)) this.advance();
+          }
+          this.consume(TokenType.RightBrace);
+        } else if (key.type === TokenType.Identifier && key.value === 'body') {
+          this.advance();
+          bodyExpr = this.collectPipeExpr(true, false);
+        } else if (key.type === TokenType.Newline) {
+          this.advance();
+        } else {
+          this.advance();
+        }
+      }
+      this.consume(TokenType.RightBrace);
+    }
+    // Optional: `as varname`
+    if (this.check(TokenType.Identifier) && this.peek().value === 'as') {
+      this.advance();
+      asVar = this.consumeIdentifier();
+    }
+    return {
+      type: 'ApiFetch', url, method, headers, bodyExpr, asVar,
+      line: start.line, col: start.col
+    };
+  }
+
+  /** Parse: `file "path"` — read file contents at runtime */
+  private parseApiFile(): any {
+    const start = this.advance(); // consume 'file'
+    const path = this.consume(TokenType.String).value;
+    return { type: 'ApiFile', path, line: start.line, col: start.col };
+  }
+
   private parseStreamFetch(): any {
     const start = this.consume(TokenType.Stream);
     // Expect 'fetch' identifier after 'stream'
@@ -2017,7 +2075,19 @@ export class Parser {
       case TokenType.Head: return this.parseHead();
       case TokenType.Animate: return this.parseAnimate();
       case TokenType.Use: return this.parseUse() as any;
+      // v0.35: stream fetch in api blocks
+      case TokenType.Stream:
+        return this.parseStreamFetch() as any;
       case TokenType.Identifier:
+        case TokenType.Identifier:
+        // v0.35: fetch in api blocks (non-streaming)
+        if (this.peek().value === 'fetch') {
+          return this.parseApiFetch() as any;
+        }
+        // v0.35: file "path" — read file at runtime
+        if (this.peek().value === 'file') {
+          return this.parseApiFile() as any;
+        }
         // v0.31.0 — icon element: `icon "name"` with optional size= and style= (#142)
         if (this.peek().value === 'icon' && this.peekAt(1)?.type === TokenType.String) {
           return this.parseIcon();
