@@ -388,6 +388,13 @@ export class Compiler {
       if (node.type === 'Store') this.processStore(node as any);
     }
 
+    // v0.34: Compile fn declarations, type validators, test blocks
+    for (const node of program.body) {
+      if (node.type === 'Fn') this.compileFnDeclaration(node as any);
+      if (node.type === 'Type') this.compileTypeDeclaration(node as any);
+      if (node.type === 'Test') this.compileTestBlock(node as any);
+    }
+
     // Collect top-level `meta {}` and `head` nodes — they apply to ALL pages
     for (const node of program.body) {
       if (node.type === 'Head') {
@@ -3364,6 +3371,151 @@ export class Compiler {
 `;
 
     return runtime;
+  }
+
+  // --- v0.34: fn, type, test compilation ---
+
+  private compileFnDeclaration(node: any): void {
+    const params = node.params.map((p: any) => {
+      if (p.defaultValue) return `${p.name} = ${p.defaultValue}`;
+      return p.name;
+    }).join(', ');
+
+    if (node.shortForm && node.shortExpr) {
+      this.js.push(`function ${node.name}(${params}) { return ${node.shortExpr}; }`);
+      return;
+    }
+
+    const body = this.compileFnBody(node.body);
+    this.js.push(`function ${node.name}(${params}) {\n${body}\n}`);
+  }
+
+  private compileFnBody(stmts: any[]): string {
+    const lines: string[] = [];
+    for (const stmt of stmts) {
+      switch (stmt.type) {
+        case 'FnSet':
+          lines.push(`  let ${stmt.name} = ${stmt.expr};`);
+          break;
+        case 'FnReturn':
+          lines.push(`  return ${stmt.expr};`);
+          break;
+        case 'FnMatch':
+          lines.push(this.compileFnMatch(stmt));
+          break;
+        case 'FnWhen': {
+          lines.push(`  if (${stmt.condition}) {`);
+          lines.push(this.compileFnBody(stmt.body));
+          lines.push('  }');
+          if (stmt.elseBody) {
+            lines.push('  else {');
+            lines.push(this.compileFnBody(stmt.elseBody));
+            lines.push('  }');
+          }
+          break;
+        }
+        case 'FnTry': {
+          lines.push('  try {');
+          lines.push(this.compileFnBody(stmt.body));
+          lines.push(`  } catch (${stmt.catchParam || '__err'}) {`);
+          lines.push(this.compileFnBody(stmt.catchBody));
+          lines.push('  }');
+          break;
+        }
+        case 'FnThrow':
+          lines.push(`  throw new Error(${stmt.expr});`);
+          break;
+        case 'FnDefer': {
+          // defer implemented as try/finally
+          lines.push('  /* defer */ try {');
+          // Remaining statements would go here — simplified for now
+          lines.push('  } finally {');
+          lines.push(this.compileFnBody(stmt.body));
+          lines.push('  }');
+          break;
+        }
+        case 'FnEach': {
+          lines.push(`  for (const ${stmt.item} of ${stmt.collection}) {`);
+          lines.push(this.compileFnBody(stmt.body));
+          lines.push('  }');
+          break;
+        }
+        case 'FnExpr':
+          lines.push(`  ${stmt.expr};`);
+          break;
+      }
+    }
+    return lines.join('\n');
+  }
+
+  private compileFnMatch(match: any): string {
+    const lines: string[] = [];
+    const subject = match.subject;
+    let first = true;
+    for (const arm of match.arms) {
+      if (arm.isDefault) {
+        lines.push('  else {');
+      } else {
+        const cond = `${subject} === ${arm.pattern}`;
+        lines.push(first ? `  if (${cond}) {` : `  else if (${cond}) {`);
+        first = false;
+      }
+      if (typeof arm.body === 'string') {
+        lines.push(`    return ${arm.body};`);
+      } else {
+        lines.push(this.compileFnBody(arm.body));
+      }
+      lines.push('  }');
+    }
+    return lines.join('\n');
+  }
+
+  private compileTypeDeclaration(node: any): void {
+    // Compile type as a runtime validator function
+    const checks: string[] = [];
+    for (const field of node.fields) {
+      const f = field.name;
+      if (!field.optional) {
+        checks.push(`  if (obj.${f} == null) throw new Error('${node.name}: ${f} is required');`);
+      }
+      switch (field.constraint) {
+        case 'string':
+          checks.push(`  if (obj.${f} != null && typeof obj.${f} !== 'string') throw new Error('${node.name}: ${f} must be a string');`);
+          break;
+        case 'number':
+          checks.push(`  if (obj.${f} != null && typeof obj.${f} !== 'number') throw new Error('${node.name}: ${f} must be a number');`);
+          break;
+        case 'bool':
+          checks.push(`  if (obj.${f} != null && typeof obj.${f} !== 'boolean') throw new Error('${node.name}: ${f} must be a boolean');`);
+          break;
+        case 'email':
+          checks.push(`  if (obj.${f} != null && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(obj.${f})) throw new Error('${node.name}: ${f} must be a valid email');`);
+          break;
+      }
+      if (field.defaultValue) {
+        checks.unshift(`  if (obj.${f} == null) obj.${f} = ${field.defaultValue};`);
+      }
+    }
+    this.js.push(`function validate${node.name}(obj) {\n${checks.join('\n')}\n  return obj;\n}`);
+  }
+
+  private compileTestBlock(node: any): void {
+    // Tests are compiled but only run when invoked with --test flag
+    const assertions: string[] = [];
+    for (const a of node.body) {
+      switch (a.kind) {
+        case 'assert':
+          assertions.push(`  if (!(${a.expr})) throw new Error('Assert failed: ${a.expr.replace(/'/g, "\\'")}');`);
+          break;
+        case 'assertEq':
+          assertions.push(`  if ((${a.expr}) !== (${a.expected})) throw new Error('AssertEq failed: ' + (${a.expr}) + ' !== ' + (${a.expected}));`);
+          break;
+        case 'assertThrows':
+          assertions.push(`  try { ${a.expr}; throw new Error('Expected throw'); } catch(__e) { if (__e.message === 'Expected throw') throw __e; }`);
+          break;
+      }
+    }
+    this.js.push(`// test: ${node.description}\nfunction __test_${node.description.replace(/[^a-zA-Z0-9]/g, '_')}() {\n${assertions.join('\n')}\n  console.log('\\x1b[32m\u2713\\x1b[0m ${node.description}');\n}`);
   }
 
   // --- HTML document builder ---

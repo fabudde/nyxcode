@@ -2393,3 +2393,57 @@ v0.30.0 — The Language Release. DSL → Programming Language.
 Backend primitives: let, action, on, env, email, use, respond.
 Designed by the Rudel: Nyx 🧠, Tyto 🦉, Kiro 🐺, Fabian 🐻 (RFC #132).
 Security audit pending for release. Dogfooded on NyxStatus.com.
+
+## v0.34.0 — Functions, Pattern Matching, Types, Tests
+
+### `fn` — User-Defined Functions
+```nyx
+fn double(x) = x * 2                    # short form
+
+fn shipping(weight, country = "DE") {    # block form with defaults
+  match country {
+    "DE" -> weight * 4.99
+    "US" -> weight * 12.99
+    _ -> weight * 19.99
+  }
+}
+```
+**Rules:** No `$` prefix inside fn. Bare param names. Default params supported.
+
+### `match` — Pattern Matching
+```nyx
+match status {
+  "active" -> "Running"
+  "paused" -> { set msg = "Hold"; return msg }
+  _ -> "Unknown"
+}
+```
+Use `match` for value matching, `when` for boolean checks.
+
+### `when`/`else` in fn
+```nyx
+when x > 10 { return "big" } else { return "small" }
+```
+
+### `try`/`catch` + `throw`
+```nyx
+try { risky() } catch e { return "error: " + e }
+throw "Something went wrong"
+```
+
+### `each` in fn
+```nyx
+each items -> item { set sum = sum + item }
+```
+
+### `type` — Data Shapes
+```nyx
+type User { name: string, email: email, age?: number }
+```
+Compiles to `validateUser(obj)` runtime validator.
+
+### `test` — Built-in Tests
+```nyx
+test "math works" { assertEq 1 + 1, 2; assert true }
+```
+Keywords: `assert`, `assertEq`, `assertThrows`.

@@ -19,7 +19,8 @@ export interface Program extends BaseNode {
 }
 
 export type TopLevelNode = PageNode | ComponentNode | ApiNode | TableNode | StoreNode | ThemeNode | SecurityNode | UseStatement | LayoutNode | ConfigNode | HookNode | MiddlewareNode | FootnotesStatement
-  | PresetNode | HeadStatement | KeyframesNode | EveryNode | ActionNode | OnEventNode | EnvNode | PipeNode;
+  | PresetNode | HeadStatement | KeyframesNode | EveryNode | ActionNode | OnEventNode | EnvNode | PipeNode
+  | FnNode | TypeNode | TestNode;
 
 /** `keyframes name { 0% { ... } 50% { ... } 100% { ... } }` — top-level @keyframes definition (v0.25.0 #110) */
 export interface KeyframesNode extends BaseNode {
@@ -755,6 +756,158 @@ export interface PipeRunStep {
   type: 'PipeRun';
   pipeName: string;
   withParams?: Record<string, string>;
+  line: number;
+  col: number;
+}
+
+// ── v0.34: fn — user-defined functions ─────────────────────────────────
+
+/** `fn name(params) { body }` or `fn name(params) = expr` */
+export interface FnNode extends BaseNode {
+  type: 'Fn';
+  name: string;
+  params: FnParam[];
+  body: FnStatement[];
+  /** If true, this is a single-expression function: `fn f(x) = x * 2` */
+  shortForm: boolean;
+  /** The raw expression for short-form functions */
+  shortExpr?: string;
+}
+
+export interface FnParam {
+  name: string;
+  defaultValue?: string;
+  typeAnnotation?: string;
+}
+
+export type FnStatement =
+  | FnSetStatement
+  | FnReturnStatement
+  | FnMatchStatement
+  | FnWhenStatement
+  | FnTryStatement
+  | FnThrowStatement
+  | FnDeferStatement
+  | FnExprStatement
+  | FnEachStatement;
+
+/** `set x = expression` inside fn */
+export interface FnSetStatement {
+  type: 'FnSet';
+  name: string;
+  expr: string;
+  line: number;
+  col: number;
+}
+
+/** `return expression` inside fn */
+export interface FnReturnStatement {
+  type: 'FnReturn';
+  expr: string;
+  line: number;
+  col: number;
+}
+
+/** `match subject { pattern -> result }` */
+export interface FnMatchStatement {
+  type: 'FnMatch';
+  subject: string;
+  arms: MatchArm[];
+  line: number;
+  col: number;
+}
+
+export interface MatchArm {
+  pattern: string;  // literal value or '_' for default
+  body: FnStatement[] | string;  // statements or single expression
+  isDefault: boolean;
+}
+
+/** `when condition { body }` inside fn (boolean check) */
+export interface FnWhenStatement {
+  type: 'FnWhen';
+  condition: string;
+  body: FnStatement[];
+  elseBody?: FnStatement[];
+  line: number;
+  col: number;
+}
+
+/** `try { body } catch e { handler }` */
+export interface FnTryStatement {
+  type: 'FnTry';
+  body: FnStatement[];
+  catchParam?: string;
+  catchBody: FnStatement[];
+  deferBody?: FnStatement[];
+  line: number;
+  col: number;
+}
+
+/** `throw "message"` or `throw expr` */
+export interface FnThrowStatement {
+  type: 'FnThrow';
+  expr: string;
+  line: number;
+  col: number;
+}
+
+/** `defer { body }` — runs on function exit */
+export interface FnDeferStatement {
+  type: 'FnDefer';
+  body: FnStatement[];
+  line: number;
+  col: number;
+}
+
+/** Raw expression statement inside fn */
+export interface FnExprStatement {
+  type: 'FnExpr';
+  expr: string;
+  line: number;
+  col: number;
+}
+
+/** `each collection -> item { body }` inside fn */
+export interface FnEachStatement {
+  type: 'FnEach';
+  collection: string;
+  item: string;
+  body: FnStatement[];
+  line: number;
+  col: number;
+}
+
+// ── v0.34: type — custom data shapes ──────────────────────────────────
+
+/** `type Name { field: constraint }` */
+export interface TypeNode extends BaseNode {
+  type: 'Type';
+  name: string;
+  fields: TypeField[];
+}
+
+export interface TypeField {
+  name: string;
+  constraint: string;
+  optional: boolean;
+  defaultValue?: string;
+}
+
+// ── v0.34: test — built-in test blocks ────────────────────────────────
+
+/** `test "description" { assertions }` */
+export interface TestNode extends BaseNode {
+  type: 'Test';
+  description: string;
+  body: TestAssertion[];
+}
+
+export interface TestAssertion {
+  kind: 'assert' | 'assertEq' | 'assertThrows';
+  expr: string;
+  expected?: string;
+  message?: string;
   line: number;
   col: number;
 }
