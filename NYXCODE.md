@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.31.0)
+# NYXCODE.md — AI Context File (v0.35.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -2447,3 +2447,30 @@ Compiles to `validateUser(obj)` runtime validator.
 test "math works" { assertEq 1 + 1, 2; assert true }
 ```
 Keywords: `assert`, `assertEq`, `assertThrows`.
+
+## v0.35.0 — SSE Streaming
+
+### `stream fetch` — Server-Sent Events in Pipes
+```nyx
+pipe 'chat' {
+  on api POST /api/chat auth
+  stream fetch "https://api.openai.com/v1/chat/completions" {
+    method POST
+    headers { Authorization: $env.OPENAI_KEY }
+    body $body
+  }
+}
+```
+**Backend:** Generates SSE response (`text/event-stream`), proxies chunked upstream responses.
+**Frontend:** `__nyx_sse(url, body, onChunk, onDone)` helper auto-injected when used.
+**~60% fewer tokens** than equivalent Express.js SSE code.
+
+### Frontend SSE Consumer
+```js
+// Auto-injected by NyxCode when stream is used:
+__nyx_sse('/api/chat', { message: input }, (chunk) => {
+  messages += chunk;  // reactive update
+}, () => {
+  console.log('done');
+});
+```
