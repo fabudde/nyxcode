@@ -1933,6 +1933,32 @@ api GET /api/posts/:id/views auth {
 - Path params (`:id`) auto-map to `req.params`. Body params to `req.body`.
 - Smart return: aggregates (`COUNT`/`SUM`) → single object. `LIMIT 1` → single. Else → array.
 
+### Fetch & Stream in API Blocks (v0.36.0+)
+
+```nyx
+api POST /api/chat {
+  stream fetch "https://api.openai.com/v1/chat/completions" {
+    method POST
+    headers { Authorization: $env.OPENAI_KEY }
+    body $body
+  }
+}
+
+api POST /api/ask {
+  fetch "https://api.example.com" {
+    method POST
+    headers { Authorization: $env.API_KEY }
+    body $body
+  }
+  respond 200 $fetchResult
+}
+```
+- `fetch "url" { method, headers, body }` — non-streaming HTTP, result in `$fetchResult`
+- `stream fetch "url" { ... }` — SSE proxy, streams response back to client
+- `file "path"` — read file at runtime into `__file_content`
+- `$body` → `req.body`, `$env.X` → `process.env.X` in api context
+- Handlers auto-`async` when `fetch`/`stream fetch` present
+
 ### Multi-Query API Blocks (v0.30.0+)
 
 POST/PUT/DELETE API blocks can contain multiple `query` statements. All execute sequentially; only the last query's result is returned.
@@ -2474,3 +2500,46 @@ __nyx_sse('/api/chat', { message: input }, (chunk) => {
   console.log('done');
 });
 ```
+
+## v0.36.0 — Custom Logic in API Blocks
+
+### `fetch` in API Blocks — Non-Streaming HTTP Requests
+```nyx
+api POST /api/ask {
+  fetch "https://api.openai.com/v1/chat/completions" {
+    method POST
+    headers { Authorization: $env.OPENAI_KEY }
+    body $body
+  }
+  respond 200 $fetchResult
+}
+```
+**`$body`** = `req.body`, **`$env.X`** = `process.env.X`, **`$fetchResult`** = parsed JSON response.
+
+### `stream fetch` in API Blocks — SSE Proxy
+```nyx
+api POST /api/chat {
+  stream fetch "https://api.openai.com/v1/chat/completions" {
+    method POST
+    headers { Authorization: $env.OPENAI_KEY }
+    body $body
+  }
+}
+```
+Same as pipe `stream fetch`, but directly in `api` blocks. No `pipe` wrapper needed.
+
+### `file` — Read Files at Runtime
+```nyx
+api POST /api/chat {
+  file "./SYSTEM_PROMPT.md"
+  fetch "https://api.example.com" {
+    method POST
+    body $body
+  }
+  respond 200 $fetchResult
+}
+```
+Reads file contents into `__file_content` variable at request time.
+
+### Why This Matters
+Before v0.36.0, any API orchestration (AI chat, payment webhooks, third-party integrations) required a separate `.js` file. Now it's 100% NyxCode — one `.nyx` file = complete app.
