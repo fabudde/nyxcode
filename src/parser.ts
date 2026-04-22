@@ -501,11 +501,23 @@ export class Parser {
           this.advance();
           this.consume(TokenType.LeftBrace);
           while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            while (this.check(TokenType.Newline)) this.advance();
+            if (this.check(TokenType.RightBrace)) break;
             const hKey = this.consumeIdentifier();
             if (this.check(TokenType.Colon)) this.advance();
-            const hVal = this.advance().value;
-            headers[hKey] = hVal;
-            if (this.check(TokenType.Newline)) this.advance();
+            let hVal = '';
+            while (!this.check(TokenType.RightBrace) && !this.isAtEnd() && !this.check(TokenType.Newline)) {
+              if (this.check(TokenType.Identifier) && this.peekAt(1)?.type === TokenType.Colon) break;
+              const t = this.peek();
+              if (t.type === TokenType.Dollar) {
+                hVal += this.advance().value;
+                if (this.check(TokenType.Identifier)) hVal += this.advance().value;
+                while (this.check(TokenType.Dot)) { hVal += this.advance().value; if (this.check(TokenType.Identifier)) hVal += this.advance().value; }
+              } else {
+                hVal += this.advance().value;
+              }
+            }
+            headers[hKey] = hVal.trim();
           }
           this.consume(TokenType.RightBrace);
         } else if (key.type === TokenType.Identifier && key.value === 'body') {
@@ -565,11 +577,23 @@ export class Parser {
           this.advance();
           this.consume(TokenType.LeftBrace);
           while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            while (this.check(TokenType.Newline)) this.advance();
+            if (this.check(TokenType.RightBrace)) break;
             const hKey = this.consumeIdentifier();
             if (this.check(TokenType.Colon)) this.advance();
-            const hVal = this.advance().value;
-            headers[hKey] = hVal;
-            if (this.check(TokenType.Newline)) this.advance();
+            let hVal = '';
+            while (!this.check(TokenType.RightBrace) && !this.isAtEnd() && !this.check(TokenType.Newline)) {
+              if (this.check(TokenType.Identifier) && this.peekAt(1)?.type === TokenType.Colon) break;
+              const t = this.peek();
+              if (t.type === TokenType.Dollar) {
+                hVal += this.advance().value;
+                if (this.check(TokenType.Identifier)) hVal += this.advance().value;
+                while (this.check(TokenType.Dot)) { hVal += this.advance().value; if (this.check(TokenType.Identifier)) hVal += this.advance().value; }
+              } else {
+                hVal += this.advance().value;
+              }
+            }
+            headers[hKey] = hVal.trim();
           }
           this.consume(TokenType.RightBrace);
         } else if (key.type === TokenType.Identifier && key.value === 'body') {
@@ -3523,11 +3547,23 @@ export class Parser {
             this.advance();
             this.consume(TokenType.LeftBrace);
             while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+              while (this.check(TokenType.Newline)) this.advance();
+              if (this.check(TokenType.RightBrace)) break;
               const hKey = this.consumeIdentifier();
               if (this.check(TokenType.Colon)) this.advance();
-              const hVal = this.advance().value;
-              headers[hKey] = hVal;
-              if (this.check(TokenType.Newline)) this.advance();
+              let hVal = '';
+              while (!this.check(TokenType.RightBrace) && !this.isAtEnd() && !this.check(TokenType.Newline)) {
+                if (this.check(TokenType.Identifier) && this.peekAt(1)?.type === TokenType.Colon) break;
+                const t = this.peek();
+                if (t.type === TokenType.Dollar) {
+                  hVal += this.advance().value;
+                  if (this.check(TokenType.Identifier)) hVal += this.advance().value;
+                  while (this.check(TokenType.Dot)) { hVal += this.advance().value; if (this.check(TokenType.Identifier)) hVal += this.advance().value; }
+                } else {
+                  hVal += this.advance().value;
+                }
+              }
+              headers[hKey] = hVal.trim();
             }
             this.consume(TokenType.RightBrace);
           } else if (key.type === TokenType.Identifier && key.value === 'body') {

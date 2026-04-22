@@ -475,7 +475,7 @@ function compileApiRoute(api: ApiNode): string {
       if (l.value.bodyExpr) hdrs.push("'Content-Type': 'application/json'");
       if (l.value.headers) {
         for (const [k, v] of Object.entries(l.value.headers)) {
-          const val = (v as string).startsWith('$') ? compileApiExpr(v as string) : JSON.stringify(v);
+          const val = compileHeaderValue(v as string);
           hdrs.push(`${JSON.stringify(k)}: ${val}`);
         }
       }
@@ -560,7 +560,7 @@ function compileApiRoute(api: ApiNode): string {
       if (s.bodyExpr) hdrs.push("'Content-Type': 'application/json'");
       if (s.headers) {
         for (const [k, v] of Object.entries(s.headers)) {
-          const val = (v as string).startsWith('$') ? compileApiExpr(v as string) : JSON.stringify(v);
+          const val = compileHeaderValue(v as string);
           hdrs.push(`${JSON.stringify(k)}: ${val}`);
         }
       }
@@ -579,7 +579,7 @@ function compileApiRoute(api: ApiNode): string {
       const hdrs: string[] = ["'Content-Type': 'application/json'"];
       if (s.headers) {
         for (const [k, v] of Object.entries(s.headers)) {
-          const val = (v as string).startsWith('$') ? compileApiExpr(v as string) : JSON.stringify(v);
+          const val = compileHeaderValue(v as string);
           hdrs.push(`${JSON.stringify(k)}: ${val}`);
         }
       }
@@ -1043,6 +1043,26 @@ function compilePipeExpr(expr: string): string {
     .replace(/\$req\.(\w[\w.]*)/g, 'ctx.req.$1')
     .replace(/\$row\.(\w+)/g, 'ctx.row.$1')
     .replace(/\$(\w+)/g, 'ctx.$1');
+}
+
+/** Compile a header value expression (handles "Bearer " + $env.KEY concatenation) */
+function compileHeaderValue(expr: string): string {
+  // Concatenation: "Bearer " + $env.KEY
+  if (expr.includes('+') && expr.includes('$')) {
+    const parts = expr.split('+').map(p => {
+      const t = p.trim();
+      if (t.startsWith('$env.')) return '${process.env.' + t.slice(5) + '}';
+      if (t.startsWith('$body.')) return '${req.body.' + t.slice(6) + '}';
+      if (t.startsWith('$')) return '${' + compileApiExpr(t) + '}';
+      return p.trimStart();  // Keep trailing space from string literal
+    });
+    return '`' + parts.join('') + '`';
+  }
+  if (expr.includes('$env.')) {
+    return '`' + expr.replace(/\$env\.(\w+)/g, '${process.env.$1}') + '`';
+  }
+  if (expr.startsWith('$')) return compileApiExpr(expr);
+  return JSON.stringify(expr);
 }
 
 /** Compile expression in api route context (uses req/res, not ctx) */
