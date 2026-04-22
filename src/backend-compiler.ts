@@ -605,7 +605,9 @@ function compileApiRoute(api: ApiNode): string {
       // Build response object, resolving variable references
       const entries = Object.entries(r.body).map(([k, v]) => {
         if (typeof v === 'object' && v !== null && (v as any).isRef) {
-          return `${JSON.stringify(k)}: ${(v as any).value}`;
+          // Strip $ prefix from variable refs (NyxCode $var → JS var)
+          const ref = (v as any).value.replace(/^\$/, '');
+          return `${JSON.stringify(k)}: ${ref}`;
         }
         // Unquoted literals: true, false, null, numbers
         if (v === 'true' || v === 'false' || v === 'null' || /^\d+(\.\d+)?$/.test(v as string)) {
