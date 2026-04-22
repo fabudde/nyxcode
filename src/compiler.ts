@@ -80,6 +80,7 @@ export class Compiler {
   private options: CompilerOptions;
   private css: string[] = [];
   private js: string[] = [];
+  private hasSSE: boolean = false;
   private componentId: number = 0;
   private indent: number = 0;
   private pageClass: string = '';
@@ -309,7 +310,7 @@ export class Compiler {
       }
 
       const css = this.css.join('\n');
-      const js = this.js.length > 0 ? this.buildJS() : '';
+      const js = this.js.length > 0 || this.hasSSE ? this.buildJS() : '';
 
       // Extract page title from first h1
       const pageTitle = this.extractPageTitle(page) || this.pathToTitle(page.path);
@@ -388,11 +389,17 @@ export class Compiler {
       if (node.type === 'Store') this.processStore(node as any);
     }
 
-    // v0.34: Compile fn declarations, type validators, test blocks
+    // v0.34+: Compile fn declarations, type validators, test blocks
     for (const node of program.body) {
       if (node.type === 'Fn') this.compileFnDeclaration(node as any);
       if (node.type === 'Type') this.compileTypeDeclaration(node as any);
       if (node.type === 'Test') this.compileTestBlock(node as any);
+      // v0.35: detect SSE usage in pipes
+      if ((node as any).type === 'Pipe' && (node as any).steps) {
+        for (const step of (node as any).steps) {
+          if (step.type === 'StreamFetch') this.hasSSE = true;
+        }
+      }
     }
 
     // Collect top-level `meta {}` and `head` nodes — they apply to ALL pages
@@ -437,7 +444,7 @@ export class Compiler {
     }
 
     const css = this.css.join('\n');
-    const js = this.js.length > 0 ? this.buildJS() : '';
+    const js = this.js.length > 0 || this.hasSSE ? this.buildJS() : '';
 
     this.layout = null; // Reset
     return {
@@ -3571,7 +3578,35 @@ ${this.scripts.length > 0 ? '<script>' + (this.refNames.length > 0 ? 'const refs
   }
 
   private buildJS(): string {
-    return this.js.join('\n');
+    const parts = [...this.js];
+    // Inject SSE helper if any stream/sse features are used
+    if (this.hasSSE) {
+      parts.unshift(`// NyxCode SSE Helper (v0.35)
+async function __nyx_sse(url, body, onChunk, onDone) {
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const text = decoder.decode(value, { stream: true });
+    const lines = text.split('\\n');
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6);
+        if (data === '[DONE]') { if (onDone) onDone(); return; }
+        try { onChunk(JSON.parse(data)); } catch(e) { onChunk(data); }
+      }
+    }
+  }
+  if (onDone) onDone();
+}`);
+    }
+    return parts.join('\n');
   }
 
   // --- Helpers ---

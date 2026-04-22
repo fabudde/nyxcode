@@ -256,6 +256,10 @@ export class Parser {
     if (token.type === TokenType.When) {
       return this.parsePipeWhen();
     }
+    // stream fetch — SSE streaming (v0.35)
+    if (token.type === TokenType.Stream) {
+      return this.parseStreamFetch();
+    }
     // Identifier-based steps: set, transform, fetch, log, notify, abort, webhook, run
     if (token.type === TokenType.Identifier) {
       switch (token.value) {
@@ -473,6 +477,58 @@ export class Parser {
       options.as = this.consumeIdentifier();
     }
     return { type: 'PipeFetch', url, options, line: this.peek().line, col: this.peek().col } as any;
+  }
+
+  private parseStreamFetch(): any {
+    const start = this.consume(TokenType.Stream);
+    // Expect 'fetch' identifier after 'stream'
+    const fetchKw = this.advance();
+    if (fetchKw.value !== 'fetch') {
+      throw this.error("Expected 'fetch' after 'stream'");
+    }
+    // URL (string or $variable)
+    let url = this.advance().value;
+    if (url === '$' && this.check(TokenType.Identifier)) {
+      url = '$' + this.advance().value;
+      while (this.check(TokenType.Dot)) { this.advance(); url += '.' + this.advance().value; }
+    }
+    // Parse { method, headers, body } block
+    let method = 'POST';
+    const headers: Record<string, string> = {};
+    let bodyExpr = '';
+    if (this.check(TokenType.LeftBrace)) {
+      this.consume(TokenType.LeftBrace);
+      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+        const key = this.peek();
+        if (key.type === TokenType.Identifier && key.value === 'method') {
+          this.advance();
+          method = this.advance().value;
+        } else if (key.type === TokenType.Identifier && key.value === 'headers') {
+          this.advance();
+          this.consume(TokenType.LeftBrace);
+          while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+            const hKey = this.consumeIdentifier();
+            if (this.check(TokenType.Colon)) this.advance();
+            const hVal = this.advance().value;
+            headers[hKey] = hVal;
+            if (this.check(TokenType.Newline)) this.advance();
+          }
+          this.consume(TokenType.RightBrace);
+        } else if (key.type === TokenType.Identifier && key.value === 'body') {
+          this.advance();
+          bodyExpr = this.collectPipeExpr(true, false);
+        } else if (key.type === TokenType.Newline) {
+          this.advance();
+        } else {
+          this.advance();
+        }
+      }
+      this.consume(TokenType.RightBrace);
+    }
+    return {
+      type: 'StreamFetch', url, method, headers, bodyExpr,
+      line: start.line, col: start.col
+    };
   }
 
   // Helper: collect expression tokens, merging $ with following identifier
@@ -4081,6 +4137,7 @@ private parseElement(): ElementNode {
       TokenType.Let, TokenType.Const, TokenType.Env, TokenType.Email,
       TokenType.Fn, TokenType.Match, TokenType.Return, TokenType.Type,
       TokenType.Try, TokenType.Catch, TokenType.Defer, TokenType.Test, TokenType.Throw,
+      TokenType.Stream,
     ]);
     return keywordTypes.has(token.type);
   }
@@ -4440,7 +4497,7 @@ private parseElement(): ElementNode {
             tok.type === TokenType.Layout || tok.type === TokenType.Theme ||
             tok.type === TokenType.Security || tok.type === TokenType.Config ||
             tok.type === TokenType.Env || tok.type === TokenType.Every ||
-            tok.type === TokenType.EOF) break;
+            tok.type === TokenType.Stream || tok.type === TokenType.EOF) break;
         if (tok.type === TokenType.RightBrace) break;
         if (stopAtBrace && tok.type === TokenType.LeftBrace) break;
       }

@@ -55,6 +55,7 @@ export enum TokenType {
   PipeBlock = 'PipeBlock',
 
   // v0.34: fn, match, type, try/catch, test, defer, throw, return
+  Stream = 'Stream',
   Fn = 'Fn',
   Match = 'Match',
   Return = 'Return',
@@ -141,7 +142,8 @@ export const KEYWORDS: Record<string, TokenType> = {
   email: TokenType.Email,
   pipe: TokenType.PipeBlock,
 
-  // v0.34: full programming language keywords
+  // v0.34+: full programming language keywords
+  stream: TokenType.Stream,
   fn: TokenType.Fn,
   match: TokenType.Match,
   return: TokenType.Return,

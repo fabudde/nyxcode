@@ -911,3 +911,28 @@ export interface TestAssertion {
   line: number;
   col: number;
 }
+
+// ── v0.35: stream — SSE streaming support ─────────────────────────────
+
+/** Stream step inside a pipe: `stream fetch URL { ... }` */
+export interface StreamFetchStep {
+  type: 'StreamFetch';
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  bodyExpr: string;
+  line: number;
+  col: number;
+}
+
+/** Frontend SSE consumer: `sse METHOD /url { body } -> stateVar` */
+export interface SseConsumer {
+  type: 'SseConsumer';
+  method: string;
+  url: string;
+  bodyExpr: string;
+  targetVar: string;
+  mode: 'append' | 'replace';
+  line: number;
+  col: number;
+}

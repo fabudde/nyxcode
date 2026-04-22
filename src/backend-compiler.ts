@@ -1025,6 +1025,49 @@ function compilePipeStep(step: any, pipeName: string, indent: string = '    '): 
       lines.push(`${indent}ctx.${varName} = await __fetch_resp_${varName}.json();`);
       return lines.join('\n');
     }
+    case 'StreamFetch': {
+      // SSE streaming — proxy a chunked response to the client
+      const sseUrl = step.url.startsWith('$') ? compilePipeExpr(step.url) : JSON.stringify(step.url);
+      const sseMethod = step.method || 'POST';
+      const lines: string[] = [];
+      lines.push(`${indent}// SSE Stream (v0.35)`);
+      lines.push(`${indent}res.writeHead(200, {`);
+      lines.push(`${indent}  'Content-Type': 'text/event-stream',`);
+      lines.push(`${indent}  'Cache-Control': 'no-cache',`);
+      lines.push(`${indent}  'Connection': 'keep-alive',`);
+      lines.push(`${indent}  'X-Accel-Buffering': 'no'`);
+      lines.push(`${indent}});`);
+      // Build fetch options
+      let fetchOpts = `{ method: '${sseMethod}'`;
+      const hdrs: string[] = [`'Content-Type': 'application/json'`];
+      if (step.headers) {
+        for (const [k, v] of Object.entries(step.headers)) {
+          const val = (v as string).startsWith('$') ? compilePipeExpr(v as string) : JSON.stringify(v);
+          hdrs.push(`${JSON.stringify(k)}: ${val}`);
+        }
+      }
+      fetchOpts += `, headers: { ${hdrs.join(', ')} }`;
+      if (step.bodyExpr) {
+        fetchOpts += `, body: JSON.stringify(${compilePipeExpr(step.bodyExpr)})`;
+      }
+      fetchOpts += ' }';
+      lines.push(`${indent}const __sse_resp = await fetch(${sseUrl}, ${fetchOpts});`);
+      lines.push(`${indent}const __sse_reader = __sse_resp.body.getReader();`);
+      lines.push(`${indent}const __sse_decoder = new TextDecoder();`);
+      lines.push(`${indent}try {`);
+      lines.push(`${indent}  while (true) {`);
+      lines.push(`${indent}    const { done, value } = await __sse_reader.read();`);
+      lines.push(`${indent}    if (done) break;`);
+      lines.push(`${indent}    const chunk = __sse_decoder.decode(value, { stream: true });`);
+      lines.push(`${indent}    res.write('data: ' + JSON.stringify(chunk) + '\\n\\n');`);
+      lines.push(`${indent}  }`);
+      lines.push(`${indent}} finally {`);
+      lines.push(`${indent}  res.write('data: [DONE]\\n\\n');`);
+      lines.push(`${indent}  res.end();`);
+      lines.push(`${indent}}`);
+      lines.push(`${indent}return; // SSE handled, skip normal respond`);
+      return lines.join('\n');
+    }
     case 'PipeSet': {
       const expr = compilePipeExpr(step.expression);
       return `${indent}ctx.${step.name} = ${expr}; // pipe: ${pipeName}`;
