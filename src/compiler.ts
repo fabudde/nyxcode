@@ -3390,12 +3390,18 @@ export class Compiler {
     this.js.push(`function ${node.name}(${params}) {\n${body}\n}`);
   }
 
-  private compileFnBody(stmts: any[]): string {
+  private compileFnBody(stmts: any[], declaredVars?: Set<string>): string {
+    const declared = declaredVars || new Set<string>();
     const lines: string[] = [];
     for (const stmt of stmts) {
       switch (stmt.type) {
         case 'FnSet':
-          lines.push(`  let ${stmt.name} = ${stmt.expr};`);
+          if (declared.has(stmt.name)) {
+            lines.push(`  ${stmt.name} = ${stmt.expr};`);
+          } else {
+            declared.add(stmt.name);
+            lines.push(`  let ${stmt.name} = ${stmt.expr};`);
+          }
           break;
         case 'FnReturn':
           lines.push(`  return ${stmt.expr};`);
@@ -3405,20 +3411,20 @@ export class Compiler {
           break;
         case 'FnWhen': {
           lines.push(`  if (${stmt.condition}) {`);
-          lines.push(this.compileFnBody(stmt.body));
+          lines.push(this.compileFnBody(stmt.body, declared));
           lines.push('  }');
           if (stmt.elseBody) {
             lines.push('  else {');
-            lines.push(this.compileFnBody(stmt.elseBody));
+            lines.push(this.compileFnBody(stmt.elseBody, declared));
             lines.push('  }');
           }
           break;
         }
         case 'FnTry': {
           lines.push('  try {');
-          lines.push(this.compileFnBody(stmt.body));
+          lines.push(this.compileFnBody(stmt.body, declared));
           lines.push(`  } catch (${stmt.catchParam || '__err'}) {`);
-          lines.push(this.compileFnBody(stmt.catchBody));
+          lines.push(this.compileFnBody(stmt.catchBody, declared));
           lines.push('  }');
           break;
         }
@@ -3426,17 +3432,15 @@ export class Compiler {
           lines.push(`  throw new Error(${stmt.expr});`);
           break;
         case 'FnDefer': {
-          // defer implemented as try/finally
           lines.push('  /* defer */ try {');
-          // Remaining statements would go here — simplified for now
           lines.push('  } finally {');
-          lines.push(this.compileFnBody(stmt.body));
+          lines.push(this.compileFnBody(stmt.body, declared));
           lines.push('  }');
           break;
         }
         case 'FnEach': {
           lines.push(`  for (const ${stmt.item} of ${stmt.collection}) {`);
-          lines.push(this.compileFnBody(stmt.body));
+          lines.push(this.compileFnBody(stmt.body, declared));
           lines.push('  }');
           break;
         }
@@ -3448,7 +3452,7 @@ export class Compiler {
     return lines.join('\n');
   }
 
-  private compileFnMatch(match: any): string {
+  private compileFnMatch(match: any, declared?: Set<string>): string {
     const lines: string[] = [];
     const subject = match.subject;
     let first = true;
@@ -3463,7 +3467,7 @@ export class Compiler {
       if (typeof arm.body === 'string') {
         lines.push(`    return ${arm.body};`);
       } else {
-        lines.push(this.compileFnBody(arm.body));
+        lines.push(this.compileFnBody(arm.body, declared));
       }
       lines.push('  }');
     }

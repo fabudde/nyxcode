@@ -4390,7 +4390,26 @@ private parseElement(): ElementNode {
 
   private parseFnEach(): FnStatement {
     const start = this.consume(TokenType.Each);
-    const collection = this.consumeIdentifier();
+    // Collection can be a complex expression — consume until we hit -> at top level
+    let collection = '';
+    let parenDepth = 0;
+    while (!this.isAtEnd()) {
+      const tok = this.peek();
+      if (tok.type === TokenType.Arrow && parenDepth === 0) break;
+      if (tok.type === TokenType.LeftParen) parenDepth++;
+      if (tok.type === TokenType.RightParen) parenDepth--;
+      const t = this.advance();
+      if (t.type === TokenType.String) {
+        collection += '"' + t.value + '"';
+      } else {
+        if (collection.length > 0 && !collection.endsWith('(') && !collection.endsWith('.') &&
+            t.value !== '.' && t.value !== '(' && t.value !== ')' && t.value !== '[' && t.value !== ']') {
+          collection += ' ';
+        }
+        collection += t.value;
+      }
+    }
+    collection = collection.trim();
     this.consume(TokenType.Arrow);
     const item = this.consumeIdentifier();
     this.consume(TokenType.LeftBrace);
@@ -4487,8 +4506,19 @@ private parseElement(): ElementNode {
         body.push({ kind: 'assert', expr, line: tok.line, col: tok.col });
       } else if (tok.type === TokenType.Identifier && tok.value === 'assertEq') {
         this.advance();
+        // Collect expression tokens, respecting paren depth for commas
         const exprTokens: string[] = [];
-        while (!this.check(TokenType.Comma) && !this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+        let parenD = 0;
+        while (!this.isAtEnd()) {
+          const p = this.peek();
+          if (p.type === TokenType.LeftParen) parenD++;
+          if (p.type === TokenType.RightParen) parenD--;
+          // Only split on comma at top level (outside parens)
+          if (p.type === TokenType.Comma && parenD === 0) break;
+          if (p.type === TokenType.RightBrace && parenD <= 0) break;
+          // Stop at next assertion keyword
+          if (parenD === 0 && p.type === TokenType.Identifier &&
+              (p.value === 'assert' || p.value === 'assertEq' || p.value === 'assertThrows')) break;
           const t = this.advance();
           exprTokens.push(t.type === TokenType.String ? '"' + t.value + '"' : t.value);
         }
