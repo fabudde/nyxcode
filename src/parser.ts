@@ -27,6 +27,8 @@ import {
   HeadStatement, AnimateStatement, PseudoElementBlock, LayoutNode, KeyframesNode,
   ScriptStatement, FormAction, ConfigNode, EnvVar, HookNode, MiddlewareNode,
   PipeNode, PipeStep, PipeTrigger, PipeValidateCheck, PipeValidateField,
+  FnNode, FnParam, FnStatement, FnMatchStatement, MatchArm,
+  TypeNode, TypeField, TestNode, TestAssertion,
 } from './ast.js';
 
 /** Set of tags that are recognized as built-in elements */
@@ -147,6 +149,9 @@ export class Parser {
       case TokenType.On: return this.parseOnEvent();
       case TokenType.Every: return this.parseEvery() as any;
       case TokenType.PipeBlock: return this.parsePipeBlock();
+      case TokenType.Fn: return this.parseFnDeclaration();
+      case TokenType.Type: return this.parseTypeDeclaration();
+      case TokenType.Test: return this.parseTestBlock();
       case TokenType.Identifier:
         if (token.value === 'middleware') return this.parseMiddleware();
         if (token.value === 'meta') return this.parseMeta() as any;
@@ -4074,6 +4079,8 @@ private parseElement(): ElementNode {
       TokenType.Raw, TokenType.Limit, TokenType.Animate, TokenType.Effect,
       TokenType.Computed, TokenType.Config, TokenType.Before, TokenType.After,
       TokenType.Let, TokenType.Const, TokenType.Env, TokenType.Email,
+      TokenType.Fn, TokenType.Match, TokenType.Return, TokenType.Type,
+      TokenType.Try, TokenType.Catch, TokenType.Defer, TokenType.Test, TokenType.Throw,
     ]);
     return keywordTypes.has(token.type);
   }
@@ -4205,6 +4212,324 @@ private parseElement(): ElementNode {
     // Type keywords AND constraint keywords — anything that's NOT a new column name
     return ['text', 'email', 'number', 'int', 'float', 'decimal', 'bool', 'auto',
             'required', 'unique', 'default', 'ref'].includes(value);
+  }
+
+  // ── v0.34: fn — user-defined functions ─────────────────────────────
+
+  private parseFnDeclaration(): FnNode {
+    const start = this.consume(TokenType.Fn);
+    const name = this.consumeIdentifier();
+    const params: FnParam[] = [];
+    if (this.check(TokenType.LeftParen)) {
+      this.advance();
+      while (!this.check(TokenType.RightParen) && !this.isAtEnd()) {
+        const paramName = this.consumeIdentifier();
+        let typeAnnotation: string | undefined;
+        let defaultValue: string | undefined;
+        if (this.check(TokenType.Colon)) { this.advance(); typeAnnotation = this.consumeIdentifier(); }
+        if (this.check(TokenType.Equals)) {
+          this.advance();
+          if (this.check(TokenType.String)) defaultValue = '"' + this.advance().value + '"';
+          else if (this.check(TokenType.Number)) defaultValue = this.advance().value;
+          else defaultValue = this.advance().value;
+        }
+        params.push({ name: paramName, typeAnnotation, defaultValue });
+        if (this.check(TokenType.Comma)) this.advance();
+      }
+      this.consume(TokenType.RightParen);
+    }
+    if (this.check(TokenType.Equals)) {
+      this.advance();
+      const expr = this.consumeFnExpression();
+      return { type: 'Fn', name, params, body: [], shortForm: true, shortExpr: expr, line: start.line, col: start.col };
+    }
+    this.consume(TokenType.LeftBrace);
+    const body = this.parseFnBody();
+    this.consume(TokenType.RightBrace);
+    return { type: 'Fn', name, params, body, shortForm: false, line: start.line, col: start.col };
+  }
+
+  private parseFnBody(): FnStatement[] {
+    const stmts: FnStatement[] = [];
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      const token = this.peek();
+      if (token.type === TokenType.Identifier && token.value === 'set') {
+        this.advance();
+        const setName = this.consumeIdentifier();
+        this.consume(TokenType.Equals);
+        const expr = this.consumeFnExpression();
+        stmts.push({ type: 'FnSet', name: setName, expr, line: token.line, col: token.col });
+      } else if (token.type === TokenType.Return) {
+        this.advance();
+        const expr = this.consumeFnExpression();
+        stmts.push({ type: 'FnReturn', expr, line: token.line, col: token.col });
+      } else if (token.type === TokenType.Match) {
+        stmts.push(this.parseFnMatch());
+      } else if (token.type === TokenType.When) {
+        stmts.push(this.parseFnWhen());
+      } else if (token.type === TokenType.Try) {
+        stmts.push(this.parseFnTry());
+      } else if (token.type === TokenType.Throw) {
+        this.advance();
+        const expr = this.consumeFnExpression();
+        stmts.push({ type: 'FnThrow', expr, line: token.line, col: token.col });
+      } else if (token.type === TokenType.Identifier && token.value === 'defer') {
+        this.advance();
+        this.consume(TokenType.LeftBrace);
+        const deferBody = this.parseFnBody();
+        this.consume(TokenType.RightBrace);
+        stmts.push({ type: 'FnDefer', body: deferBody, line: token.line, col: token.col });
+      } else if (token.type === TokenType.Each) {
+        stmts.push(this.parseFnEach());
+      } else {
+        const expr = this.consumeFnExpression();
+        if (expr) stmts.push({ type: 'FnExpr', expr, line: token.line, col: token.col });
+      }
+    }
+    return stmts;
+  }
+
+  private parseFnMatch(): FnMatchStatement {
+    const start = this.consume(TokenType.Match);
+    const subject = this.consumeFnExpression(true);
+    const arms: MatchArm[] = [];
+    this.consume(TokenType.LeftBrace);
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      let pattern: string;
+      let isDefault = false;
+      if (this.check(TokenType.Identifier) && this.peek().value === '_') {
+        pattern = '_'; isDefault = true; this.advance();
+      } else if (this.check(TokenType.String)) {
+        pattern = '"' + this.advance().value + '"';
+      } else if (this.check(TokenType.Number)) {
+        pattern = this.advance().value;
+      } else {
+        pattern = this.advance().value;
+      }
+      this.consume(TokenType.Arrow);
+      if (this.check(TokenType.LeftBrace)) {
+        this.advance();
+        const armBody = this.parseFnBody();
+        this.consume(TokenType.RightBrace);
+        arms.push({ pattern, body: armBody, isDefault });
+      } else {
+        // Single expression arm — stop before next pattern or }
+        const expr = this.consumeMatchArmExpression();
+        arms.push({ pattern, body: expr, isDefault });
+      }
+    }
+    this.consume(TokenType.RightBrace);
+    return { type: 'FnMatch', subject, arms, line: start.line, col: start.col };
+  }
+
+  /** Consume an expression inside a match arm. Stops before the next pattern (string/number/ident + ->) or } */
+  private consumeMatchArmExpression(): string {
+    let expr = '';
+    let parenDepth = 0;
+    while (!this.isAtEnd()) {
+      const tok = this.peek();
+      if (parenDepth === 0) {
+        if (tok.type === TokenType.RightBrace) break;
+        // Check if this is the start of a new match arm: pattern followed by ->
+        if ((tok.type === TokenType.String || tok.type === TokenType.Number ||
+             (tok.type === TokenType.Identifier && (tok.value === '_' || this.isMatchPattern(tok)))) &&
+            this.peekAt(1)?.type === TokenType.Arrow) {
+          break; // New match arm starts here
+        }
+      }
+      if (tok.type === TokenType.LeftParen) parenDepth++;
+      if (tok.type === TokenType.RightParen) { if (parenDepth === 0) break; parenDepth--; }
+      const t = this.advance();
+      if (t.type === TokenType.String) {
+        expr += '"' + t.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+      } else {
+        if (expr.length > 0 && !expr.endsWith('(') && !expr.endsWith('.') && t.value !== '.' && t.value !== '(' && t.value !== ')' && t.value !== ',') expr += ' ';
+        expr += t.value;
+      }
+    }
+    return expr.trim();
+  }
+
+  private isMatchPattern(tok: Token): boolean {
+    // Any identifier that's followed by -> could be a match pattern (like true, false, null, custom names)
+    return tok.type === TokenType.Identifier;
+  }
+
+  private parseFnWhen(): FnStatement {
+    const start = this.consume(TokenType.When);
+    const condition = this.consumeFnExpression(true);
+    this.consume(TokenType.LeftBrace);
+    const body = this.parseFnBody();
+    this.consume(TokenType.RightBrace);
+    let elseBody: FnStatement[] | undefined;
+    if (this.check(TokenType.Else)) {
+      this.advance();
+      this.consume(TokenType.LeftBrace);
+      elseBody = this.parseFnBody();
+      this.consume(TokenType.RightBrace);
+    }
+    return { type: 'FnWhen', condition, body, elseBody, line: start.line, col: start.col };
+  }
+
+  private parseFnTry(): FnStatement {
+    const start = this.consume(TokenType.Try);
+    this.consume(TokenType.LeftBrace);
+    const body = this.parseFnBody();
+    this.consume(TokenType.RightBrace);
+    let catchParam: string | undefined;
+    let catchBody: FnStatement[] = [];
+    if (this.check(TokenType.Catch)) {
+      this.advance();
+      if (this.check(TokenType.Identifier)) catchParam = this.advance().value;
+      this.consume(TokenType.LeftBrace);
+      catchBody = this.parseFnBody();
+      this.consume(TokenType.RightBrace);
+    }
+    return { type: 'FnTry', body, catchParam, catchBody, line: start.line, col: start.col };
+  }
+
+  private parseFnEach(): FnStatement {
+    const start = this.consume(TokenType.Each);
+    const collection = this.consumeIdentifier();
+    this.consume(TokenType.Arrow);
+    const item = this.consumeIdentifier();
+    this.consume(TokenType.LeftBrace);
+    const body = this.parseFnBody();
+    this.consume(TokenType.RightBrace);
+    return { type: 'FnEach', collection, item, body, line: start.line, col: start.col };
+  }
+
+  private consumeFnExpression(stopAtBrace: boolean = false): string {
+    let expr = '';
+    let parenDepth = 0;
+    let bracketDepth = 0;
+    let braceDepth = 0;
+    while (!this.isAtEnd()) {
+      const tok = this.peek();
+      if (parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
+        if (tok.type === TokenType.Return || tok.type === TokenType.Match ||
+            tok.type === TokenType.When || tok.type === TokenType.Try ||
+            tok.type === TokenType.Throw || tok.type === TokenType.Each ||
+            tok.type === TokenType.Catch || tok.type === TokenType.Else) break;
+        if (tok.type === TokenType.Identifier && (tok.value === 'set' || tok.value === 'defer')) break;
+        // Stop at top-level keywords (short-form fn expressions must end here)
+        if (tok.type === TokenType.Fn || tok.type === TokenType.Test ||
+            tok.type === TokenType.Type || tok.type === TokenType.Page ||
+            tok.type === TokenType.Component || tok.type === TokenType.Api ||
+            tok.type === TokenType.Table || tok.type === TokenType.Store ||
+            tok.type === TokenType.PipeBlock || tok.type === TokenType.Action ||
+            tok.type === TokenType.Layout || tok.type === TokenType.Theme ||
+            tok.type === TokenType.Security || tok.type === TokenType.Config ||
+            tok.type === TokenType.Env || tok.type === TokenType.Every ||
+            tok.type === TokenType.EOF) break;
+        if (tok.type === TokenType.RightBrace) break;
+        if (stopAtBrace && tok.type === TokenType.LeftBrace) break;
+      }
+      if (tok.type === TokenType.LeftParen) parenDepth++;
+      if (tok.type === TokenType.RightParen) { if (parenDepth === 0) break; parenDepth--; }
+      if (tok.type === TokenType.LeftBracket) bracketDepth++;
+      if (tok.type === TokenType.RightBracket) { if (bracketDepth === 0) break; bracketDepth--; }
+      if (tok.type === TokenType.LeftBrace) braceDepth++;
+      if (tok.type === TokenType.RightBrace) { if (braceDepth === 0) break; braceDepth--; }
+      const t = this.advance();
+      if (t.type === TokenType.String) {
+        expr += '"' + t.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+      } else {
+        const needsSpace = expr.length > 0 && !expr.endsWith('(') && !expr.endsWith('[') && !expr.endsWith('.');
+        if (needsSpace && !expr.endsWith('.') && t.value !== '.' && t.value !== '(' && t.value !== ')' && t.value !== '[' && t.value !== ']' && t.value !== ',') {
+          expr += ' ';
+        }
+        expr += t.value;
+      }
+    }
+    return expr.trim();
+  }
+
+  // ── v0.34: type — custom data shapes ────────────────────────────────
+
+  private parseTypeDeclaration(): TypeNode {
+    const start = this.consume(TokenType.Type);
+    const name = this.consumeIdentifier();
+    const fields: TypeField[] = [];
+    this.consume(TokenType.LeftBrace);
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      const fieldName = this.consumeIdentifier();
+      let optional = false;
+      if (this.check(TokenType.Question)) { this.advance(); optional = true; }
+      this.consume(TokenType.Colon);
+      const constraint = this.consumeIdentifier();
+      let defaultValue: string | undefined;
+      if (this.check(TokenType.Equals)) {
+        this.advance();
+        if (this.check(TokenType.String)) defaultValue = this.advance().value;
+        else if (this.check(TokenType.Number)) defaultValue = this.advance().value;
+        else defaultValue = this.advance().value;
+      }
+      fields.push({ name: fieldName, constraint, optional, defaultValue });
+      if (this.check(TokenType.Comma)) this.advance();
+    }
+    this.consume(TokenType.RightBrace);
+    return { type: 'Type', name, fields, line: start.line, col: start.col };
+  }
+
+  // ── v0.34: test — built-in test blocks ──────────────────────────────
+
+  private parseTestBlock(): TestNode {
+    const start = this.consume(TokenType.Test);
+    const description = this.consume(TokenType.String).value;
+    const body: TestAssertion[] = [];
+    this.consume(TokenType.LeftBrace);
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      const tok = this.peek();
+      if (tok.type === TokenType.Identifier && tok.value === 'assert') {
+        this.advance();
+        const expr = this.consumeTestExpression();
+        body.push({ kind: 'assert', expr, line: tok.line, col: tok.col });
+      } else if (tok.type === TokenType.Identifier && tok.value === 'assertEq') {
+        this.advance();
+        const exprTokens: string[] = [];
+        while (!this.check(TokenType.Comma) && !this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+          const t = this.advance();
+          exprTokens.push(t.type === TokenType.String ? '"' + t.value + '"' : t.value);
+        }
+        let expected = '';
+        if (this.check(TokenType.Comma)) { this.advance(); expected = this.consumeTestExpression(); }
+        body.push({ kind: 'assertEq', expr: exprTokens.join(' '), expected, line: tok.line, col: tok.col });
+      } else if (tok.type === TokenType.Identifier && tok.value === 'assertThrows') {
+        this.advance();
+        const expr = this.consumeTestExpression();
+        body.push({ kind: 'assertThrows', expr, line: tok.line, col: tok.col });
+      } else {
+        this.advance();
+      }
+    }
+    this.consume(TokenType.RightBrace);
+    return { type: 'Test', description, body, line: start.line, col: start.col };
+  }
+
+
+  /** Consume expression inside test blocks — stops at assert/assertEq/assertThrows/} */
+  private consumeTestExpression(): string {
+    let expr = '';
+    let parenDepth = 0;
+    while (!this.isAtEnd()) {
+      const tok = this.peek();
+      if (parenDepth === 0) {
+        if (tok.type === TokenType.RightBrace) break;
+        if (tok.type === TokenType.Identifier &&
+            (tok.value === 'assert' || tok.value === 'assertEq' || tok.value === 'assertThrows')) break;
+      }
+      if (tok.type === TokenType.LeftParen) parenDepth++;
+      if (tok.type === TokenType.RightParen) { if (parenDepth === 0) break; parenDepth--; }
+      const t = this.advance();
+      if (t.type === TokenType.String) {
+        expr += '"' + t.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+      } else {
+        if (expr.length > 0 && !expr.endsWith('(') && !expr.endsWith('.') && t.value !== '.' && t.value !== '(' && t.value !== ')' && t.value !== ',') expr += ' ';
+        expr += t.value;
+      }
+    }
+    return expr.trim();
   }
 
   private error(message: string): Error {

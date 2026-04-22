@@ -54,6 +54,17 @@ export enum TokenType {
   Email = 'Email',
   PipeBlock = 'PipeBlock',
 
+  // v0.34: fn, match, type, try/catch, test, defer, throw, return
+  Fn = 'Fn',
+  Match = 'Match',
+  Return = 'Return',
+  Type = 'Type',
+  Try = 'Try',
+  Catch = 'Catch',
+  Defer = 'Defer',
+  Test = 'Test',
+  Throw = 'Throw',
+
   // Operators & Punctuation
   LeftBrace = 'LeftBrace',       // {
   RightBrace = 'RightBrace',     // }
@@ -129,6 +140,17 @@ export const KEYWORDS: Record<string, TokenType> = {
   env: TokenType.Env,
   email: TokenType.Email,
   pipe: TokenType.PipeBlock,
+
+  // v0.34: full programming language keywords
+  fn: TokenType.Fn,
+  match: TokenType.Match,
+  return: TokenType.Return,
+  type: TokenType.Type,
+  try: TokenType.Try,
+  catch: TokenType.Catch,
+  defer: TokenType.Defer,
+  test: TokenType.Test,
+  throw: TokenType.Throw,
 };
 
 export interface Token {
