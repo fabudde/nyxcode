@@ -962,6 +962,23 @@ function compilePipeExpr(expr: string): string {
     .replace(/\$(\w+)/g, 'ctx.$1');
 }
 
+/** Compile a URL that may contain $env refs or $variable refs */
+function compilePipeUrl(url: string): string {
+  if (url.startsWith('$')) return compilePipeExpr(url);
+  if (url.includes('$env.')) {
+    // Template literal for $env interpolation
+    return '`' + url.replace(/\$env\.(\w+)/g, '${process.env.$1}') + '`';
+  }
+  if (url.includes('$')) {
+    // Template literal for any other $ refs
+    return '`' + url.replace(/\$body\.(\w+)/g, '${ctx.req.body.$1}')
+                     .replace(/\$body\b/g, '${ctx.req.body}')
+                     .replace(/\$req\.(\w[\w.]*)/g, '${ctx.req.$1}')
+                     .replace(/\$(\w+)/g, '${ctx.$1}') + '`';
+  }
+  return JSON.stringify(url);
+}
+
 function compilePipeSql(sql: string): { safeSql: string; paramList: string[] } {
   const params = [...sql.matchAll(/\$(\w[\w.]*)/g)].map(m => m[1]);
   const safeSql = sql.replace(/\$[\w.]+/g, '?');
@@ -1013,7 +1030,7 @@ function compilePipeStep(step: any, pipeName: string, indent: string = '    '): 
       }
     }
     case 'PipeFetch': {
-      const urlExpr = step.url.startsWith('$') ? compilePipeExpr(step.url) : JSON.stringify(step.url);
+      const urlExpr = compilePipeUrl(step.url);
       const timeoutMs = step.options.timeout ? parseInt(step.options.timeout) * 1000 : 10000;
       const method = step.options.method || 'GET';
       const varName = step.options.as || 'fetchResult';
@@ -1029,15 +1046,7 @@ function compilePipeStep(step: any, pipeName: string, indent: string = '    '): 
     }
     case 'StreamFetch': {
       // SSE streaming — proxy a chunked response to the client
-      let sseUrl: string;
-      if (step.url.startsWith('$')) {
-        sseUrl = compilePipeExpr(step.url);
-      } else if (step.url.includes('$env.')) {
-        // URL contains $env refs — use template literal
-        sseUrl = '`' + step.url.replace(/\$env\.(\w+)/g, '${process.env.$1}') + '`';
-      } else {
-        sseUrl = JSON.stringify(step.url);
-      }
+      const sseUrl = compilePipeUrl(step.url);
       const sseMethod = step.method || 'POST';
       const lines: string[] = [];
       lines.push(`${indent}// SSE Stream (v0.35)`);
