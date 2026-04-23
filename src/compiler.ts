@@ -4256,8 +4256,28 @@ async function __nyx_sse(url, body, onChunk, onDone) {
     switch (expr.type) {
       case 'PropertyAccess':
         return 'data' + expr.path;
-      case 'BinaryExpression':
-        return `${this.expressionToJS(expr.left)} ${expr.operator} ${this.expressionToJS(expr.right)}`;
+      case 'MemberExpression':
+        return `${this.expressionToJS(expr.object)}.${expr.property}`;
+      case 'IndexExpression':
+        return `${this.expressionToJS(expr.object)}[${this.expressionToJS(expr.index)}]`;
+      case 'CallExpression':
+        return `${this.expressionToJS(expr.callee)}(${expr.args.map(a => this.expressionToJS(a)).join(', ')})`;
+      case 'PipeExpression':
+        return this.compilePipeExpr(expr);
+      case 'BinaryExpression': {
+        const op = expr.operator === 'and' ? '&&' : expr.operator === 'or' ? '||' : expr.operator;
+        return `(${this.expressionToJS(expr.left)} ${op} ${this.expressionToJS(expr.right)})`;
+      }
+      case 'UnaryExpression':
+        return `(${expr.operator}${this.expressionToJS(expr.operand)})`;
+      case 'TernaryExpression':
+        return `(${this.expressionToJS(expr.condition)} ? ${this.expressionToJS(expr.consequent)} : ${this.expressionToJS(expr.alternate)})`;
+      case 'AwaitExpression':
+        return `(await ${this.expressionToJS(expr.argument)})`;
+      case 'ArrayLiteral':
+        return `[${expr.elements.map(e => this.expressionToJS(e)).join(', ')}]`;
+      case 'BooleanLiteral':
+        return String(expr.value);
       case 'StringLiteral':
         return `"${expr.value}"`;
       case 'NumberLiteral':
@@ -4268,6 +4288,87 @@ async function __nyx_sse(url, body, onChunk, onDone) {
         return expr.name;
       default:
         return '';
+    }
+  }
+
+  /** Compile pipe expression built-ins to JS */
+  private compilePipeExpr(expr: import('./ast.js').PipeExpression): string {
+    const input = this.expressionToJS(expr.input);
+    const args = expr.args.map(a => this.expressionToJS(a));
+    switch (expr.builtin) {
+      case 'len': return `(${input}).length`;
+      case 'filter': {
+        if (args.length === 0) return input;
+        // filter prop op value → arr.filter(x => x.prop op value)
+        const [prop, ...rest] = args;
+        if (rest.length >= 2) {
+          return `(${input}).filter(__x => __x.${this.expressionToJS(expr.args[0])} ${rest[0]} ${rest.slice(1).join(' ')})`;
+        }
+        // Simple truthy filter: items | filter active
+        return `(${input}).filter(__x => __x.${args[0]})`;
+      }
+      case 'map': {
+        if (args.length === 0) return input;
+        return `(${input}).map(__x => __x.${args[0]})`;
+      }
+      case 'sort': {
+        if (args.length === 0) return `[...(${input})].sort()`;
+        const field = args[0];
+        const desc = args.length > 1 && expr.args[1].type === 'Identifier' && (expr.args[1] as any).name === 'desc';
+        if (desc) return `[...(${input})].sort((__a, __b) => __b.${field} - __a.${field})`;
+        return `[...(${input})].sort((__a, __b) => __a.${field} - __b.${field})`;
+      }
+      case 'sum': {
+        if (args.length === 0) return `(${input}).reduce((__a, __b) => __a + __b, 0)`;
+        return `(${input}).reduce((__a, __x) => __a + __x.${args[0]}, 0)`;
+      }
+      case 'includes':
+        return `(${input}).includes(${args[0]})`;
+      case 'join':
+        return `(${input}).join(${args[0] || '""'})`;
+      case 'split':
+        return `(${input}).split(${args[0] || '""'})`;
+      case 'keys':
+        return `Object.keys(${input})`;
+      case 'values':
+        return `Object.values(${input})`;
+      case 'uppercase':
+        return `(${input}).toUpperCase()`;
+      case 'lowercase':
+        return `(${input}).toLowerCase()`;
+      case 'trim':
+        return `(${input}).trim()`;
+      case 'replace':
+        return args.length >= 2 ? `(${input}).replace(${args[0]}, ${args[1]})` : input;
+      case 'round':
+        return args.length > 0 ? `(Math.round((${input}) * Math.pow(10, ${args[0]})) / Math.pow(10, ${args[0]}))` : `Math.round(${input})`;
+      case 'floor':
+        return `Math.floor(${input})`;
+      case 'ceil':
+        return `Math.ceil(${input})`;
+      case 'abs':
+        return `Math.abs(${input})`;
+      case 'first':
+        return `(${input})[0]`;
+      case 'last':
+        return `(${input})[(${input}).length - 1]`;
+      case 'reverse':
+        return `[...(${input})].reverse()`;
+      case 'unique':
+        return `[...new Set(${input})]`;
+      case 'flat':
+        return `(${input}).flat()`;
+      case 'count':
+        return `(${input}).length`;
+      case 'isEmpty':
+        return `((${input}).length === 0)`;
+      case 'take':
+        return `(${input}).slice(0, ${args[0] || '1'})`;
+      case 'skip':
+        return `(${input}).slice(${args[0] || '0'})`;
+      default:
+        // Unknown builtin — pass through as method call
+        return `(${input}).${expr.builtin}(${args.join(', ')})`;
     }
   }
 

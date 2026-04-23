@@ -530,6 +530,9 @@ export class Lexer {
       case '&': this.emit(TokenType.Ampersand, ch, startCol); break;
       case '|': this.emit(TokenType.Pipe, ch, startCol); break;
       case '/': this.emit(TokenType.Slash, ch, startCol); break;
+      case '+': this.emit(TokenType.Plus, ch, startCol); break;
+      case '*': this.emit(TokenType.Star, ch, startCol); break;
+      case '%': this.emit(TokenType.Percent, ch, startCol); break;
 
       case '.':
         if (this.peek() === '.') {
@@ -545,7 +548,7 @@ export class Lexer {
           this.advance();
           this.emit(TokenType.Arrow, '->', startCol);
         } else {
-          // Negative number or identifier with dash
+          // Keep as Identifier for CSS compat (-webkit etc.)
           this.emit(TokenType.Identifier, '-', startCol);
         }
         break;

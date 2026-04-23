@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.35.0)
+# NYXCODE.md — AI Context File (v0.37.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -2547,3 +2547,44 @@ Reads file contents into `__file_content` variable at request time.
 
 ### Why This Matters
 Before v0.36.0, any API orchestration (AI chat, payment webhooks, third-party integrations) required a separate `.js` file. Now it's 100% NyxCode — one `.nyx` file = complete app.
+
+## v0.37.0 — Full Expressiveness Engine
+
+NyxCode can now build **anything** for the web. Complete expression engine overhaul.
+
+### Arithmetic: `+` `-` `*` `/` `%`
+```nyx
+when .count + 1 > 0 { div "has items" }
+when .price * .qty > 100 { span "expensive" }
+```
+Precedence: `*`/`/`/`%` → `+`/`-` → comparisons → `and`/`or`.
+
+### Logic: `and` `or` `not`
+```nyx
+when .active and .visible { div "shown" }
+when .admin or .editor { nav "Dashboard" }
+when not .hidden { section "Content" }
+```
+
+### Member Access & Method Calls
+```nyx
+when user.profile.name == "Nyx" { ... }
+when items[0].price > 50 { ... }
+when items.includes("hello") { ... }
+```
+
+### Pipe Built-ins (30+)
+```nyx
+items | len | filter price > 10 | map name | sort price desc
+name | uppercase | trim | split "," | join " "
+price | round 2
+obj | keys
+items | first | last | reverse | unique | take 5 | skip 10
+```
+
+### Ternary, Booleans, Arrays
+```nyx
+condition ? "yes" : "no"
+.active == true
+[1, 2, 3] | len
+```

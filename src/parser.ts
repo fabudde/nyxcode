@@ -437,7 +437,7 @@ export class Parser {
     const sql = this.consume(TokenType.String).value;
     // Optional 'as varname'
     let asVar: string | undefined;
-    if (this.check(TokenType.Identifier) && this.peek().value === 'as') {
+    if ((this.check(TokenType.Identifier) || this.check(TokenType.As)) && this.peek().value === 'as') {
       this.advance();
       asVar = this.consumeIdentifier();
     }
@@ -472,7 +472,7 @@ export class Parser {
       this.consume(TokenType.RightBracket);
     }
     // Optional 'as varname'
-    if (this.check(TokenType.Identifier) && this.peek().value === 'as') {
+    if ((this.check(TokenType.Identifier) || this.check(TokenType.As)) && this.peek().value === 'as') {
       this.advance();
       options.as = this.consumeIdentifier();
     }
@@ -532,7 +532,7 @@ export class Parser {
       this.consume(TokenType.RightBrace);
     }
     // Optional: `as varname`
-    if (this.check(TokenType.Identifier) && this.peek().value === 'as') {
+    if ((this.check(TokenType.Identifier) || this.check(TokenType.As)) && this.peek().value === 'as') {
       this.advance();
       asVar = this.consumeIdentifier();
     }
@@ -698,7 +698,7 @@ export class Parser {
       collection += this.advance().value;
     }
     let itemName = 'item';
-    if (this.check(TokenType.Identifier) && this.peek().value === 'as') {
+    if ((this.check(TokenType.Identifier) || this.check(TokenType.As)) && this.peek().value === 'as') {
       this.advance(); // consume 'as'
       itemName = this.consumeIdentifier();
     }
@@ -1287,7 +1287,7 @@ export class Parser {
     // v0.23.0 — `@theme as "name" { ... }` registers a named theme (extractable as base)
     let themeName: string | undefined;
     let themeExtends: string | undefined;
-    if (this.check(TokenType.Identifier) && this.peek().value === 'as') {
+    if ((this.check(TokenType.Identifier) || this.check(TokenType.As)) && this.peek().value === 'as') {
       this.advance(); // consume 'as'
       if (!this.check(TokenType.String)) {
         throw this.error('Expected string literal after `@theme as`, e.g. `@theme as "brand-base" { ... }`');
@@ -4016,7 +4016,7 @@ private parseElement(): ElementNode {
       }
       // Attribute: key=value or key="complex value" (including keyword tokens like style=)
       // Attribute: key=value — handle keywords that can also be attribute names
-      else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form || next.type === TokenType.Data || next.type === TokenType.State || next.type === TokenType.Preset || next.type === TokenType.Email || next.type === TokenType.Action || next.type === TokenType.Let || next.type === TokenType.Const || next.type === TokenType.Env) && this.peekAt(1)?.type === TokenType.Equals) {
+      else if ((next.type === TokenType.Identifier || next.type === TokenType.Style || next.type === TokenType.Auth || next.type === TokenType.Form || next.type === TokenType.Data || next.type === TokenType.State || next.type === TokenType.Preset || next.type === TokenType.Email || next.type === TokenType.Action || next.type === TokenType.Let || next.type === TokenType.Const || next.type === TokenType.Env || next.type === TokenType.Type || next.type === TokenType.Fn || next.type === TokenType.Match || next.type === TokenType.Test) && this.peekAt(1)?.type === TokenType.Equals) {
         const name = this.advance().value;
         this.advance(); // =
         const valToken = this.peek();
@@ -4182,22 +4182,195 @@ private parseElement(): ElementNode {
   // --- Expression parsing ---
 
   private parseExpression(): Expression {
-    const left = this.parsePrimary();
+    return this.parseTernary();
+  }
 
-    // Binary expression: left op right
-    if (this.isBinaryOp()) {
-      const op = this.advance().value;
-      const right = this.parsePrimary();
-      return { type: 'BinaryExpression', left, operator: op, right, line: left.line, col: left.col };
+  /** Ternary: expr ? expr : expr */
+  private parseTernary(): Expression {
+    let expr = this.parsePipe();
+    if (this.check(TokenType.Question)) {
+      this.advance();
+      const consequent = this.parsePipe();
+      this.consume(TokenType.Colon);
+      const alternate = this.parsePipe();
+      expr = { type: 'TernaryExpression', condition: expr, consequent, alternate, line: expr.line, col: expr.col };
     }
+    return expr;
+  }
 
+  /** Pipe: expr | builtin args */
+  private parsePipe(): Expression {
+    let expr = this.parseOr();
+    while (this.check(TokenType.Pipe)) {
+      this.advance();
+      const builtin = this.consumeIdentifier();
+      const args: Expression[] = [];
+      // Collect pipe arguments: stop at pipe, comparison ops, logic ops, newline, brace, etc.
+      while (!this.isAtEnd() && !this.check(TokenType.Pipe) && !this.check(TokenType.Newline) &&
+             !this.check(TokenType.RightBrace) && !this.check(TokenType.RightParen) &&
+             !this.check(TokenType.RightBracket) && !this.check(TokenType.Question) &&
+             !this.check(TokenType.Colon) && !this.check(TokenType.EOF) &&
+             !this.isComparisonOp() && !this.check(TokenType.And) && !this.check(TokenType.Or) &&
+             !this.check(TokenType.Ampersand) && !this.check(TokenType.LeftBrace)) {
+        args.push(this.parsePrimary());
+      }
+      expr = { type: 'PipeExpression', input: expr, builtin, args, line: expr.line, col: expr.col };
+    }
+    // After pipe, allow comparison: items | len > 0
+    if (this.isComparisonOp()) {
+      const op = this.advance().value;
+      const right = this.parseAddition();
+      expr = { type: 'BinaryExpression', left: expr, operator: op, right, line: expr.line, col: expr.col };
+    }
+    return expr;
+  }
+
+  /** Or: expr or expr */
+  private parseOr(): Expression {
+    let left = this.parseAnd();
+    while ((this.check(TokenType.Or)) ||
+           (this.check(TokenType.Pipe) && this.peekAt(1)?.type === TokenType.Pipe)) {
+      this.advance();
+      const right = this.parseAnd();
+      left = { type: 'BinaryExpression', left, operator: 'or', right, line: left.line, col: left.col };
+    }
     return left;
+  }
+
+  /** And: expr and expr */
+  private parseAnd(): Expression {
+    let left = this.parseComparison();
+    while (this.check(TokenType.And) || this.check(TokenType.Ampersand)) {
+      this.advance();
+      const right = this.parseComparison();
+      left = { type: 'BinaryExpression', left, operator: 'and', right, line: left.line, col: left.col };
+    }
+    return left;
+  }
+
+  /** Comparison: expr == != < > <= >= expr */
+  private parseComparison(): Expression {
+    let left = this.parseAddition();
+    if (this.isComparisonOp()) {
+      const op = this.advance().value;
+      const right = this.parseAddition();
+      left = { type: 'BinaryExpression', left, operator: op, right, line: left.line, col: left.col };
+    }
+    return left;
+  }
+
+  private isComparisonOp(): boolean {
+    const t = this.peek().type;
+    return t === TokenType.DoubleEquals || t === TokenType.NotEquals ||
+      t === TokenType.LessThan || t === TokenType.GreaterThan ||
+      t === TokenType.LessEquals || t === TokenType.GreaterEquals;
+  }
+
+  /** Addition: expr + - expr */
+  private parseAddition(): Expression {
+    let left = this.parseMultiplication();
+    while (this.check(TokenType.Plus) || this.check(TokenType.Minus) ||
+           (this.check(TokenType.Identifier) && this.peek().value === '-')) {
+      const op = this.advance().value;
+      const right = this.parseMultiplication();
+      left = { type: 'BinaryExpression', left, operator: op, right, line: left.line, col: left.col };
+    }
+    return left;
+  }
+
+  /** Multiplication: expr * / % expr */
+  private parseMultiplication(): Expression {
+    let left = this.parseUnary();
+    while (this.check(TokenType.Star) || this.check(TokenType.Slash) || this.check(TokenType.Percent)) {
+      const op = this.advance().value;
+      const right = this.parseUnary();
+      left = { type: 'BinaryExpression', left, operator: op, right, line: left.line, col: left.col };
+    }
+    return left;
+  }
+
+  /** Unary: not expr, !expr, -expr */
+  private parseUnary(): Expression {
+    if (this.check(TokenType.Not) || this.check(TokenType.Bang)) {
+      const op = this.advance().value;
+      const operand = this.parseUnary();
+      return { type: 'UnaryExpression', operator: op === 'not' ? '!' : op, operand, line: operand.line, col: operand.col };
+    }
+    if (this.check(TokenType.Minus) || (this.check(TokenType.Identifier) && this.peek().value === '-')) {
+      const t = this.advance();
+      const operand = this.parseUnary();
+      return { type: 'UnaryExpression', operator: '-', operand, line: t.line, col: t.col };
+    }
+    return this.parsePostfix();
+  }
+
+  /** Postfix: member access, index access, function calls */
+  private parsePostfix(): Expression {
+    let expr = this.parsePrimary();
+    while (true) {
+      if (this.check(TokenType.Dot)) {
+        this.advance();
+        const prop = this.consumeIdentifier();
+        // Check for method call: obj.method(args)
+        if (this.check(TokenType.LeftParen)) {
+          this.advance();
+          const args: Expression[] = [];
+          while (!this.check(TokenType.RightParen) && !this.isAtEnd()) {
+            if (args.length > 0) this.consume(TokenType.Comma);
+            args.push(this.parseExpression());
+          }
+          this.consume(TokenType.RightParen);
+          const callee: Expression = { type: 'MemberExpression', object: expr, property: prop, line: expr.line, col: expr.col };
+          expr = { type: 'CallExpression', callee, args, line: expr.line, col: expr.col };
+        } else {
+          expr = { type: 'MemberExpression', object: expr, property: prop, line: expr.line, col: expr.col };
+        }
+      } else if (this.check(TokenType.LeftBracket)) {
+        this.advance();
+        const index = this.parseExpression();
+        this.consume(TokenType.RightBracket);
+        expr = { type: 'IndexExpression', object: expr, index, line: expr.line, col: expr.col };
+      } else if (this.check(TokenType.LeftParen) && expr.type === 'Identifier') {
+        // function call: fn(args)
+        this.advance();
+        const args: Expression[] = [];
+        while (!this.check(TokenType.RightParen) && !this.isAtEnd()) {
+          if (args.length > 0) this.consume(TokenType.Comma);
+          args.push(this.parseExpression());
+        }
+        this.consume(TokenType.RightParen);
+        expr = { type: 'CallExpression', callee: expr, args, line: expr.line, col: expr.col };
+      } else {
+        break;
+      }
+    }
+    return expr;
   }
 
   private parsePrimary(): Expression {
     const token = this.peek();
 
-    // Property access: .user.name
+    // Parenthesized expression: (expr)
+    if (token.type === TokenType.LeftParen) {
+      this.advance();
+      const expr = this.parseExpression();
+      this.consume(TokenType.RightParen);
+      return expr;
+    }
+
+    // Array literal: [1, 2, 3]
+    if (token.type === TokenType.LeftBracket) {
+      this.advance();
+      const elements: Expression[] = [];
+      while (!this.check(TokenType.RightBracket) && !this.isAtEnd()) {
+        if (elements.length > 0) this.consume(TokenType.Comma);
+        elements.push(this.parseExpression());
+      }
+      this.consume(TokenType.RightBracket);
+      return { type: 'ArrayLiteral', elements, line: token.line, col: token.col };
+    }
+
+    // Property access: .user.name (legacy syntax, keep for backwards compat)
     if (token.type === TokenType.Dot) {
       this.advance();
       let path = '.';
@@ -4213,9 +4386,20 @@ private parseElement(): ElementNode {
     if (token.type === TokenType.Dollar) {
       this.advance();
       const store = this.consumeIdentifier();
-      this.consume(TokenType.Dot);
-      const field = this.consumeIdentifier();
-      return { type: 'StoreAccess', store, field, line: token.line, col: token.col };
+      if (this.check(TokenType.Dot)) {
+        this.consume(TokenType.Dot);
+        const field = this.consumeIdentifier();
+        return { type: 'StoreAccess', store, field, line: token.line, col: token.col };
+      }
+      // Just $name (pipe context variable)
+      return { type: 'Identifier', name: '$' + store, line: token.line, col: token.col };
+    }
+
+    // Await expression
+    if (token.type === TokenType.Await) {
+      this.advance();
+      const argument = this.parsePostfix();
+      return { type: 'AwaitExpression', argument, line: token.line, col: token.col };
     }
 
     // String literal
@@ -4228,6 +4412,12 @@ private parseElement(): ElementNode {
     if (token.type === TokenType.Number) {
       this.advance();
       return { type: 'NumberLiteral', value: parseFloat(token.value), line: token.line, col: token.col };
+    }
+
+    // Boolean literals
+    if (token.type === TokenType.Identifier && (token.value === 'true' || token.value === 'false')) {
+      this.advance();
+      return { type: 'BooleanLiteral', value: token.value === 'true', line: token.line, col: token.col };
     }
 
     // Identifier (including keywords used as variable names in expressions)
@@ -4396,7 +4586,10 @@ private parseElement(): ElementNode {
     return t === TokenType.DoubleEquals || t === TokenType.NotEquals ||
       t === TokenType.LessThan || t === TokenType.GreaterThan ||
       t === TokenType.LessEquals || t === TokenType.GreaterEquals ||
-      t === TokenType.Ampersand || t === TokenType.Pipe;
+      t === TokenType.Ampersand || t === TokenType.Pipe ||
+      t === TokenType.Plus || t === TokenType.Minus ||
+      t === TokenType.Star || t === TokenType.Slash || t === TokenType.Percent ||
+      t === TokenType.And || t === TokenType.Or;
   }
 
   private isStatementStart(): boolean {

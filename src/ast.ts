@@ -357,9 +357,18 @@ export interface Attribute {
 export type Expression =
   | StringLiteral
   | NumberLiteral
+  | BooleanLiteral
+  | ArrayLiteral
   | PropertyAccess
+  | MemberExpression
+  | IndexExpression
+  | CallExpression
+  | PipeExpression
+  | UnaryExpression
   | BinaryExpression
+  | TernaryExpression
   | StoreAccess
+  | AwaitExpression
   | Identifier;
 
 export interface StringLiteral extends BaseNode {
@@ -393,6 +402,68 @@ export interface StoreAccess extends BaseNode {
 export interface Identifier extends BaseNode {
   type: 'Identifier';
   name: string;
+}
+
+// v0.37: New expression types for full expressiveness
+
+export interface BooleanLiteral extends BaseNode {
+  type: 'BooleanLiteral';
+  value: boolean;
+}
+
+export interface ArrayLiteral extends BaseNode {
+  type: 'ArrayLiteral';
+  elements: Expression[];
+}
+
+/** obj.prop or obj.method() — dot access on any expression */
+export interface MemberExpression extends BaseNode {
+  type: 'MemberExpression';
+  object: Expression;
+  property: string;
+}
+
+/** obj[expr] — bracket access */
+export interface IndexExpression extends BaseNode {
+  type: 'IndexExpression';
+  object: Expression;
+  index: Expression;
+}
+
+/** fn(args) or obj.method(args) */
+export interface CallExpression extends BaseNode {
+  type: 'CallExpression';
+  callee: Expression;
+  args: Expression[];
+}
+
+/** expr | builtin args — pipe built-in */
+export interface PipeExpression extends BaseNode {
+  type: 'PipeExpression';
+  input: Expression;
+  builtin: string;
+  args: Expression[];
+}
+
+/** !expr or not expr or -expr */
+export interface UnaryExpression extends BaseNode {
+  type: 'UnaryExpression';
+  operator: string;
+  operand: Expression;
+}
+
+/** condition ? consequent : alternate */
+export interface TernaryExpression extends BaseNode {
+  type: 'TernaryExpression';
+  condition: Expression;
+  consequent: Expression;
+  alternate: Expression;
+}
+
+/** await expr */
+export interface AwaitExpression extends BaseNode {
+  type: 'AwaitExpression';
+  argument: Expression;
 }
 
 export interface RawExpression extends BaseNode {

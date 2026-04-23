@@ -54,6 +54,22 @@ export enum TokenType {
   Email = 'Email',
   PipeBlock = 'PipeBlock',
 
+  // v0.37: logic + arithmetic operators
+  And = 'And',
+  Or = 'Or',
+  Not = 'Not',
+  Plus = 'Plus',           // +
+  Minus = 'Minus',         // -
+  Star = 'Star',           // *
+  Percent = 'Percent',     // %
+  In = 'In',               // in (for each x in items)
+  Await = 'Await',
+  Import = 'Import',
+  From = 'From',
+  As = 'As',
+  If = 'If',
+  ElseIf = 'ElseIf',
+
   // v0.34: fn, match, type, try/catch, test, defer, throw, return
   Stream = 'Stream',
   Fn = 'Fn',
@@ -141,6 +157,17 @@ export const KEYWORDS: Record<string, TokenType> = {
   env: TokenType.Env,
   email: TokenType.Email,
   pipe: TokenType.PipeBlock,
+
+  // v0.37: logic + control
+  and: TokenType.And,
+  or: TokenType.Or,
+  not: TokenType.Not,
+  in: TokenType.In,
+  await: TokenType.Await,
+  import: TokenType.Import,
+  from: TokenType.From,
+  as: TokenType.As,
+  if: TokenType.If,
 
   // v0.34+: full programming language keywords
   stream: TokenType.Stream,
