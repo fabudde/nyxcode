@@ -4603,6 +4603,10 @@ private parseElement(): ElementNode {
       t.type === TokenType.State || t.type === TokenType.Effect ||
       t.type === TokenType.Computed || t.type === TokenType.Head ||
       t.type === TokenType.Animate ||
+      t.type === TokenType.Let || t.type === TokenType.Const ||
+      t.type === TokenType.Fn || t.type === TokenType.Match ||
+      t.type === TokenType.Test || t.type === TokenType.Type ||
+      t.type === TokenType.Return ||
       (t.type === TokenType.Identifier && t.value === 'footnotes' && this.peekAt(1)?.type === TokenType.LeftBrace) ||
       (t.type === TokenType.Identifier && t.value === 'meta' && this.peekAt(1)?.type === TokenType.LeftBrace) ||
       (t.type === TokenType.Identifier && t.value === 'icon' && this.peekAt(1)?.type === TokenType.String) ||
