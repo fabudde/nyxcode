@@ -179,3 +179,15 @@ describe('v0.37: Interpolation expression evaluation (#168-#171)', () => {
     assert.ok(html.includes('78.5'), 'should evaluate const expression at compile time');
   });
 });
+
+describe('v0.37: String literal pipe in interpolation (#170 final)', () => {
+  it('string literal with uppercase pipe evaluates at compile time', () => {
+    const { html } = compile('page "/" {\n  p "Upper: ${\'hello\' | uppercase}"\n}');
+    assert.ok(html.includes('HELLO'), 'should evaluate to HELLO at compile time');
+    assert.ok(!html.includes("uppercase"), 'should NOT contain raw pipe name');
+  });
+  it('string literal with lowercase pipe evaluates at compile time', () => {
+    const { html } = compile('page "/" {\n  p "Lower: ${\'WORLD\' | lowercase}"\n}');
+    assert.ok(html.includes('world'), 'should evaluate to world at compile time');
+  });
+});

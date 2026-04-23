@@ -1429,8 +1429,11 @@ export class Compiler {
               resolved += ph;
             } else {
               // All const — try to evaluate at compile time
-              let allConst = true;
               let evalExpr = exprStr;
+              // Rewrite pipes to JS for const evaluation too
+              if (evalExpr.includes('|')) {
+                evalExpr = this.compileInterpolationPipe(evalExpr);
+              }
               for (const [name, val] of this.constVars) {
                 evalExpr = evalExpr.replace(new RegExp('\\b' + name + '\\b', 'g'), val);
               }
