@@ -144,3 +144,38 @@ describe('v0.37: Expression engine', () => {
     });
   });
 });
+
+describe('v0.37: Interpolation expression evaluation (#168-#171)', () => {
+  it('#168: let variable arithmetic in ${} compiles to reactive template', () => {
+    const { html } = compile('page "/" {\n  let a = 10\n  let b = 3\n  p "a + b = ${a + b}"\n}');
+    assert.ok(html.includes('data-nyx-tpl'), 'should have reactive template');
+    assert.ok(html.includes('state.a + state.b') || html.includes('state.a') , 'should reference state vars');
+    assert.ok(!html.includes('${a + b}'), 'should NOT have raw ${} in output');
+  });
+
+  it('#169: ternary with let variables compiles', () => {
+    const { html } = compile('page "/" {\n  let score = 85\n  p "Grade: ${score > 90 ? \'A\' : \'B\'}"\n}');
+    assert.ok(html.includes('data-nyx-tpl'), 'should have reactive template');
+    assert.ok(!html.includes("${score"), 'should NOT have raw ${} in output');
+  });
+
+  it('#170: pipe built-ins in ${} compile to JS methods', () => {
+    const { html } = compile('page "/" {\n  let name = "nyx"\n  p "Upper: ${name | uppercase}"\n}');
+    assert.ok(html.includes('data-nyx-tpl'), 'should have reactive template');
+    assert.ok(html.includes('toUpperCase'), 'should compile uppercase pipe to toUpperCase');
+    assert.ok(!html.includes('${name | uppercase}'), 'should NOT have raw pipe in output');
+  });
+
+  it('#171: let declarations do not leak as HTML attributes', () => {
+    const { html } = compile('page "/" {\n  div {\n    let score = 85\n    let passed = 1\n    h2 "Test"\n    p "Score: ${score}"\n  }\n}');
+    assert.ok(!html.includes('score="85"'), 'should NOT have score as HTML attribute');
+    assert.ok(!html.includes('passed="1"'), 'should NOT have passed as HTML attribute');
+    assert.ok(!html.includes('${let}'), 'should NOT have ${let} text');
+  });
+
+  it('const variables inline at compile time in expressions', () => {
+    const { html } = compile('page "/" {\n  const pi = 3.14\n  const r = 5\n  p "Area: ${pi * r * r}"\n}');
+    // Const vars should be evaluated at compile time
+    assert.ok(html.includes('78.5'), 'should evaluate const expression at compile time');
+  });
+});

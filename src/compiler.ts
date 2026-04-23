@@ -1338,46 +1338,120 @@ export class Compiler {
 
     switch (content.type) {
       case 'StringLiteral': {
-        // Check for {varName} and ${varName} interpolation patterns referencing state/computed/store vars
-        const interpolationPattern = /\$?\{(\w+(?:\.\w+)?)\}/g;
-        let match: RegExpExecArray | null;
-        const bindings: Array<{full: string, expr: string}> = [];
-        let resolvedValue = content.value;
-        // First pass: inline const vars (compile-time substitution)
-        while ((match = interpolationPattern.exec(content.value)) !== null) {
-          const varRef = match[1];
-          if (this.constVars.has(varRef)) {
-            // Const: inline the value at compile time (strip quotes for strings)
-            let constVal = this.constVars.get(varRef)!;
-            if (constVal.startsWith('"') && constVal.endsWith('"')) constVal = constVal.slice(1, -1);
-            resolvedValue = resolvedValue.replace(match[0], constVal);
+        // v0.37: Extract all ${...} interpolations (balanced braces)
+        const rawValue = content.value;
+        const parts: Array<{text: string} | {expr: string, full: string}> = [];
+        let lastIdx = 0;
+        for (let i = 0; i < rawValue.length; i++) {
+          if (rawValue[i] === '$' && rawValue[i+1] === '{') {
+            if (i > lastIdx) parts.push({ text: rawValue.slice(lastIdx, i) });
+            let depth = 1, j = i + 2;
+            while (j < rawValue.length && depth > 0) {
+              if (rawValue[j] === '{') depth++;
+              else if (rawValue[j] === '}') depth--;
+              if (depth > 0) j++;
+            }
+            const exprStr = rawValue.slice(i + 2, j);
+            parts.push({ expr: exprStr, full: rawValue.slice(i, j + 1) });
+            lastIdx = j + 1;
+            i = j;
+          } else if (rawValue[i] === '{' && /^\w/.test(rawValue.slice(i+1))) {
+            // Also handle {varName} (without $)
+            const m = rawValue.slice(i).match(/^\{(\w+(?:\.\w+)?)\}/);
+            if (m) {
+              if (i > lastIdx) parts.push({ text: rawValue.slice(lastIdx, i) });
+              parts.push({ expr: m[1], full: m[0] });
+              lastIdx = i + m[0].length;
+              i = lastIdx - 1;
+            }
           }
         }
-        // Second pass: find reactive bindings in the resolved value
-        interpolationPattern.lastIndex = 0;
-        const reactivePattern = /\$?\{(\w+(?:\.\w+)?)\}/g;
-        while ((match = reactivePattern.exec(resolvedValue)) !== null) {
-          const varRef = match[1];
-          const dotParts = varRef.split('.');
-          if (this.constVars.has(varRef)) continue; // already inlined
-          if (dotParts.length === 2 && this.stores.has(dotParts[0])) {
-            bindings.push({ full: match[0], expr: `state.${dotParts[0]}.${dotParts[1]}` });
-          } else if (this.stateVars.has(varRef)) {
-            bindings.push({ full: match[0], expr: `state.${varRef}` });
-          } else if (this.computedVars.has(varRef)) {
-            bindings.push({ full: match[0], expr: `computed.${varRef}` });
+        if (lastIdx < rawValue.length) parts.push({ text: rawValue.slice(lastIdx) });
+        // If no interpolations found, just return escaped text
+        if (parts.every(p => 'text' in p)) {
+          return this.escapeContent(rawValue);
+        }
+        // Resolve each interpolation
+        const hasReactive: Array<{placeholder: string, jsExpr: string}> = [];
+        let resolved = '';
+        let tplIdx = 0;
+        for (const part of parts) {
+          if ('text' in part) {
+            resolved += part.text;
+          } else {
+            const exprStr = part.expr;
+            // Simple identifier: score, count, user.name
+            const simpleMatch = exprStr.match(/^(\w+(?:\.\w+)?)$/);
+            if (simpleMatch) {
+              const varRef = simpleMatch[1];
+              if (this.constVars.has(varRef)) {
+                let cv = this.constVars.get(varRef)!;
+                if (cv.startsWith('"') && cv.endsWith('"')) cv = cv.slice(1, -1);
+                resolved += cv;
+                continue;
+              }
+              const dotParts = varRef.split('.');
+              if (dotParts.length === 2 && this.stores.has(dotParts[0])) {
+                const ph = `__EXPR${tplIdx++}__`;
+                hasReactive.push({ placeholder: ph, jsExpr: `state.${dotParts[0]}.${dotParts[1]}` });
+                resolved += ph;
+                continue;
+              }
+              if (this.stateVars.has(varRef)) {
+                const ph = `__EXPR${tplIdx++}__`;
+                hasReactive.push({ placeholder: ph, jsExpr: `state.${varRef}` });
+                resolved += ph;
+                continue;
+              }
+              if (this.computedVars.has(varRef)) {
+                const ph = `__EXPR${tplIdx++}__`;
+                hasReactive.push({ placeholder: ph, jsExpr: `computed.${varRef}` });
+                resolved += ph;
+                continue;
+              }
+            }
+            // Complex expression: score * 2, name | uppercase, score > 90 ? 'A' : 'B'
+            // Rewrite variable references to state.X / computed.X
+            let jsExpr = exprStr;
+            // Handle pipe built-ins: name | uppercase → state.name.toUpperCase()
+            if (jsExpr.includes('|')) {
+              jsExpr = this.compileInterpolationPipe(jsExpr);
+            } else {
+              // Replace bare variable refs with state.X
+              jsExpr = this.rewriteVarRefs(jsExpr);
+            }
+            // Check if any state/computed vars are referenced → needs reactivity
+            const refsState = [...this.stateVars.keys(), ...this.computedVars.keys()].some(v =>
+              new RegExp('\\b' + v + '\\b').test(exprStr));
+            if (refsState) {
+              const ph = `__EXPR${tplIdx++}__`;
+              hasReactive.push({ placeholder: ph, jsExpr });
+              resolved += ph;
+            } else {
+              // All const — try to evaluate at compile time
+              let allConst = true;
+              let evalExpr = exprStr;
+              for (const [name, val] of this.constVars) {
+                evalExpr = evalExpr.replace(new RegExp('\\b' + name + '\\b', 'g'), val);
+              }
+              try {
+                const result = new Function('return (' + evalExpr + ')')();
+                resolved += String(result);
+              } catch {
+                resolved += '${' + exprStr + '}'; // fallback: keep raw
+              }
+            }
           }
         }
-        if (bindings.length > 0) {
+        if (hasReactive.length > 0) {
           this.hasReactivity = true;
-          // Build template: "Count: ${count}" -> __NYX_TPL:Count: {{state.count}}
-          let tpl = this.escapeContent(resolvedValue);
-          for (const b of bindings) {
-            tpl = tpl.replace(b.full, `{{${b.expr}}}`);
+          let tpl = this.escapeContent(resolved);
+          for (const r of hasReactive) {
+            tpl = tpl.replace(r.placeholder, `{{${r.jsExpr}}}`);
           }
           return `__NYX_TPL:${tpl}`;
         }
-        return this.escapeContent(resolvedValue);
+        return this.escapeContent(resolved);
       }
       case 'PropertyAccess':
         return `\${${this.propertyToJS(content.path)}}`;
@@ -1408,6 +1482,96 @@ export class Compiler {
       default:
         return '';
     }
+  }
+
+
+  /** v0.37: Rewrite bare variable refs in expressions to state.X / computed.X */
+  private rewriteVarRefs(expr: string): string {
+    let result = expr;
+    // Replace state vars: score → state.score
+    for (const [name] of this.stateVars) {
+      result = result.replace(new RegExp('\\b' + name + '\\b', 'g'), 'state.' + name);
+    }
+    // Replace computed vars: total → computed.total
+    for (const [name] of this.computedVars) {
+      result = result.replace(new RegExp('\\b' + name + '\\b', 'g'), 'computed.' + name);
+    }
+    // Replace store refs: user.name → state.user.name
+    for (const [name] of this.stores) {
+      result = result.replace(new RegExp('\\b' + name + '\\.', 'g'), 'state.' + name + '.');
+    }
+    return result;
+  }
+
+  /** v0.37: Compile pipe expressions in string interpolation: name | uppercase → state.name.toUpperCase() */
+  private compileInterpolationPipe(expr: string): string {
+    const parts = expr.split('|').map(s => s.trim());
+    if (parts.length < 2) return this.rewriteVarRefs(expr);
+    // First part is the input expression
+    let result = this.rewriteVarRefs(parts[0]);
+    // Apply each pipe built-in
+    for (let i = 1; i < parts.length; i++) {
+      const pipeExpr = parts[i].trim();
+      const [builtin, ...args] = pipeExpr.split(/\s+/);
+      switch (builtin) {
+        case 'len': case 'length': case 'count': result = `(${result}).length`; break;
+        case 'uppercase': result = `(${result}).toUpperCase()`; break;
+        case 'lowercase': result = `(${result}).toLowerCase()`; break;
+        case 'trim': result = `(${result}).trim()`; break;
+        case 'reverse': result = `[...(${result})].reverse()`; break;
+        case 'first': result = `(${result})[0]`; break;
+        case 'last': result = `((a) => a[a.length-1])(${result})`; break;
+        case 'keys': result = `Object.keys(${result})`; break;
+        case 'values': result = `Object.values(${result})`; break;
+        case 'unique': result = `[...new Set(${result})]`; break;
+        case 'flat': result = `(${result}).flat()`; break;
+        case 'isEmpty': result = `(${result}).length === 0`; break;
+        case 'abs': result = `Math.abs(${result})`; break;
+        case 'floor': result = `Math.floor(${result})`; break;
+        case 'ceil': result = `Math.ceil(${result})`; break;
+        case 'join': result = `(${result}).join(${args[0] || '","'})`; break;
+        case 'split': result = `(${result}).split(${args[0] || '","'})`; break;
+        case 'round': {
+          const decimals = args[0] ? parseInt(args[0]) : 0;
+          if (decimals > 0) result = `(Math.round((${result})*${10**decimals})/${10**decimals})`;
+          else result = `Math.round(${result})`;
+          break;
+        }
+        case 'replace': result = `(${result}).replace(${args[0] || '""'}, ${args[1] || '""'})`; break;
+        case 'take': result = `(${result}).slice(0, ${args[0] || '1'})`; break;
+        case 'skip': result = `(${result}).slice(${args[0] || '1'})`; break;
+        case 'sum': {
+          if (args[0]) result = `(${result}).reduce((s,x) => s + x.${args[0]}, 0)`;
+          else result = `(${result}).reduce((s,x) => s + x, 0)`;
+          break;
+        }
+        case 'filter': {
+          const field = args[0] || '';
+          const op = args[1] || '';
+          const val = args.slice(2).join(' ') || '';
+          if (field && op && val) result = `(${result}).filter(x => x.${field} ${op} ${val})`;
+          break;
+        }
+        case 'map': {
+          if (args[0]) result = `(${result}).map(x => x.${args[0]})`;
+          break;
+        }
+        case 'sort': {
+          const field = args[0] || '';
+          const dir = args[1] || 'asc';
+          if (field) {
+            if (dir === 'desc') result = `[...(${result})].sort((a,b) => b.${field} - a.${field})`;
+            else result = `[...(${result})].sort((a,b) => a.${field} - b.${field})`;
+          } else {
+            result = `[...(${result})].sort()`;
+          }
+          break;
+        }
+        case 'includes': result = `(${result}).includes(${args[0] || '""'})`; break;
+        default: result = `(${result}).${builtin}(${args.join(', ')})`; break;
+      }
+    }
+    return result;
   }
 
   private compileAttributes(attrs: Attribute[]): string {
@@ -3313,12 +3477,22 @@ export class Compiler {
       const tpl = el.getAttribute('data-nyx-tpl');
       const update = () => {
         try {
-          el.textContent = tpl.replace(/\{\{(\\w+(?:\\.\\w+)*)\}\}/g, (_, expr) => {
-            const parts = expr.split('.');
-            if (parts[0] === 'state' && parts.length === 2) return __nyx.state[parts[1]] ?? '';
-            if (parts[0] === 'state' && parts.length === 3) return __nyx.state[parts[1]+'.'+parts[2]] ?? '';
-            if (parts[0] === 'computed' && parts.length === 2) return __nyx.computed[parts[1]] ?? '';
-            return '';
+          el.textContent = tpl.replace(/\{\{(.+?)\}\}/g, (_, expr) => {
+            const parts = expr.trim().split('.');
+            // Simple: {{state.score}} or {{computed.total}}
+            if (/^(state|computed)\\.[a-zA-Z_]\\w*$/.test(expr.trim())) {
+              if (parts[0] === 'state') return __nyx.state[parts[1]] ?? '';
+              if (parts[0] === 'computed') return __nyx.computed[parts[1]] ?? '';
+            }
+            // Store: {{state.user.name}}
+            if (/^state\\.[a-zA-Z_]\\w*\\.[a-zA-Z_]\\w*$/.test(expr.trim())) {
+              return __nyx.state[parts[1]+'.'+parts[2]] ?? '';
+            }
+            // v0.37: Complex expressions: {{state.score * 2}}, {{state.name.toUpperCase()}}
+            try {
+              const fn = new Function('state', 'computed', 'return (' + expr + ')');
+              return fn(__nyx.state, __nyx.computed) ?? '';
+            } catch { return ''; }
           });
         } catch(e) {}
       };
