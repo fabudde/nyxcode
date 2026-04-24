@@ -635,7 +635,7 @@ function compileApiRoute(api: ApiNode): string {
     }
   }
 
-  if (!handlerBody.includes('res.') && !handlerBody.includes('return') && responds.length > 0) {
+  if (responds.length > 0) {
     const r = responds[0];
     if (r.body && typeof r.body === 'object' && (r.body as any).__varRef) {
       // respond 200 $variable — forward variable directly
