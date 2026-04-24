@@ -546,17 +546,19 @@ function compileApiRoute(api: ApiNode): string {
       const q = queries[0];
       const sql = q.sql;
       const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
-      const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; return `${paramSrc(p)}.${p}`; }).join(', ');
+      const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; if (p.startsWith('body.')) return `req.body.${p.slice(5)}`; if (p.startsWith('params.')) return `req.params.${p.slice(7)}`; if (p.startsWith('env.')) return `process.env.${p.slice(4)}`; return `${paramSrc(p)}.${p}`; }).join(', ');
       const safeSql = sql.replace(/\$([\w.]+)/g, '?');
       const sqlLower = safeSql.toLowerCase();
       const isSingleRow = /\blimit\s+1\b/.test(sqlLower) || /\b(count|sum|avg|min|max)\s*\(/.test(sqlLower);
       if (isSingleRow) {
         handlerBody += `    const row = db.prepare(\`${safeSql}\`).get(${paramList});\n`;
         handlerBody += `    if (!row) return res.status(404).json({ error: 'Not found' });\n`;
-        handlerBody += `    res.json(row);\n`;
+        // #180: Skip auto-response if explicit respond statements exist
+        if (responds.length === 0) handlerBody += `    res.json(row);\n`;
       } else {
         handlerBody += `    const rows = db.prepare(\`${safeSql}\`).all(${paramList});\n`;
-        handlerBody += `    res.json(rows);\n`;
+        // #180: Skip auto-response if explicit respond statements exist
+        if (responds.length === 0) handlerBody += `    res.json(rows);\n`;
       }
     } else {
       // POST/PUT/DELETE: execute ALL queries sequentially, respond after last
@@ -564,7 +566,7 @@ function compileApiRoute(api: ApiNode): string {
         const q = queries[i];
         const sql = q.sql;
         const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
-        const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; return `${paramSrc(p)}.${p}`; }).join(', ');
+        const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; if (p.startsWith('body.')) return `req.body.${p.slice(5)}`; if (p.startsWith('params.')) return `req.params.${p.slice(7)}`; if (p.startsWith('env.')) return `process.env.${p.slice(4)}`; return `${paramSrc(p)}.${p}`; }).join(', ');
         const safeSql = sql.replace(/\$([\w.]+)/g, '?');
         const isLast = i === queries.length - 1;
         
