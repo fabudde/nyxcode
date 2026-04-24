@@ -357,7 +357,7 @@ function compileHook(hook: HookNode): string {
       const q = stmt as QueryStatement;
       const params = [...q.sql.matchAll(/\$(\w+)/g)].map((m: any) => m[1]);
       const safeSql = q.sql.replace(/\$([\w.]+)/g, '?');
-      const paramList = params.map(p => `req.body.${p}`).join(', ');
+      const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; if (p.startsWith('body.')) return `req.body.${p.slice(5)}`; if (p.startsWith('params.')) return `req.params.${p.slice(7)}`; if (p.startsWith('env.')) return `process.env.${p.slice(4)}`; return `req.body.${p}`; }).join(', ');
       code += `    db.prepare(\`${safeSql}\`).run(${paramList});
 `;
     }
@@ -482,7 +482,7 @@ function compileApiRoute(api: ApiNode): string {
     if (l.value.kind === 'query') {
       const sql = l.value.sql;
       const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
-      const paramList = params.map(p => p.startsWith('req.') ? p : `req.body.${p}`).join(', ');
+      const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; if (p.startsWith('body.')) return `req.body.${p.slice(5)}`; if (p.startsWith('params.')) return `req.params.${p.slice(7)}`; if (p.startsWith('env.')) return `process.env.${p.slice(4)}`; return `req.body.${p}`; }).join(', ');
       const safeSql = sql.replace(/\$([\w.]+)/g, '?');
       const isSingleRow = /\blimit\s+1\b/i.test(safeSql) || /\bWHERE\s+\w+\s*=\s*\?/i.test(safeSql);
       if (isSingleRow) {
