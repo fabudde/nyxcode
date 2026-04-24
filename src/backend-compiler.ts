@@ -665,7 +665,7 @@ function compileApiRoute(api: ApiNode): string {
   for (let i = 0; i < rateLimits.length; i++) {
     const rl = rateLimits[i];
     const varName = `rl_${method}${api.path.replace(/[^a-zA-Z0-9]/g, '_')}_${i}`;
-    rateLimiterDecls += `const ${varName} = rateLimit({ windowMs: ${rl.windowMs}, max: ${rl.max}, message: { error: 'Rate limit exceeded', retryAfter: ${Math.ceil(rl.windowMs / 1000)} }, standardHeaders: true, legacyHeaders: false });\n`;
+    rateLimiterDecls += `const ${varName} = rateLimit({ windowMs: ${rl.windowMs}, max: ${rl.max}, message: { error: 'Rate limit exceeded', retryAfter: ${Math.ceil(rl.windowMs / 1000)} }, standardHeaders: true, legacyHeaders: false, validate: { trustProxy: false } });\n`;
     rateLimiterMiddleware += `${varName}, `;
   }
 
@@ -1551,7 +1551,7 @@ const rateLimit = require('express-rate-limit');
 ${useImports}
 
 const app = express();
-app.set('trust proxy', true);
+app.set('trust proxy', 1); // number, not boolean — express-rate-limit v7 compat
 
 ${configValidation}
 app.use(express.json());
