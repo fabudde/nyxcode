@@ -1,8 +1,8 @@
-# NYXCODE.md — AI Context File (v0.37.0)
+# NYXCODE.md — AI Context File (v0.38.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
-A token-efficient language replacing TypeScript/Next.js. One `.nyx` file = full-stack app with DB, Auth, API, frontend. **25% fewer tokens than Tailwind, 82% fewer than Next.js.** Compiles to HTML+CSS+JS (frontend) and Express+SQLite (backend). Node-based runtime.
+A token-efficient language replacing TypeScript/Next.js. One `.nyx` file = full-stack app with DB, Auth, API, frontend. **25% fewer tokens than Tailwind, 82% fewer than Next.js.** Now with **Tailwind CSS compatibility** — use the classes you already know, compiled to native CSS at build time. Zero runtime. Compiles to HTML+CSS+JS (frontend) and Express+SQLite (backend). Node-based runtime.
 
 ## Quick Start
 ```bash
