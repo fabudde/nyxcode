@@ -573,10 +573,12 @@ function compileApiRoute(api: ApiNode): string {
         if (isLast) {
           if (safeSql.toLowerCase().startsWith('insert')) {
             handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${paramList});\n`;
-            handlerBody += `    res.status(201).json({ id: info.lastInsertRowid, ...req.body });\n`;
+            // #180: Skip auto-response if explicit respond statements exist
+            if (responds.length === 0) handlerBody += `    res.status(201).json({ id: info.lastInsertRowid, ...req.body });\n`;
           } else {
             handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${paramList});\n`;
-            handlerBody += `    res.json({ changes: info.changes });\n`;
+            // #180: Skip auto-response if explicit respond statements exist
+            if (responds.length === 0) handlerBody += `    res.json({ changes: info.changes });\n`;
           }
         } else {
           handlerBody += `    db.prepare(\`${safeSql}\`).run(${paramList});\n`;
@@ -657,7 +659,8 @@ function compileApiRoute(api: ApiNode): string {
     } else {
       handlerBody += `    res.status(${r.status || 200}).json(${JSON.stringify(r.body || { ok: true })});\n`;
     }
-  } else {
+  } else if (!handlerBody.includes('res.json') && !handlerBody.includes('res.status')) {
+    // #180: Only add default response if no response was already generated
     handlerBody += `    res.json({ ok: true });\n`;
   }
   
