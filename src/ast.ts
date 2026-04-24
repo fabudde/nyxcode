@@ -54,6 +54,14 @@ export interface ApiNode extends BaseNode {
   auth?: boolean;
   guard?: string; // role name
   middleware?: string[]; // named middleware
+  rateLimits?: RateLimit[]; // #174: per-endpoint rate limits
+}
+
+/** Rate limit definition for api blocks */
+export interface RateLimit {
+  max: number;
+  window: string; // 'second' | 'minute' | 'hour' | 'day'
+  windowMs: number; // computed milliseconds
 }
 
 /** `middleware name { before/after hooks }` */
@@ -130,6 +138,7 @@ export type Statement =
   | ValidateStatement
   | RespondStatement
   | LimitStatement
+  | RateLimitStatement
   | QueryStatement
   | StateStatement
   | EffectStatement
@@ -330,6 +339,14 @@ export interface RespondStatement extends BaseNode {
 export interface LimitStatement extends BaseNode {
   type: 'Limit';
   value: string;
+}
+
+/** `rate 10/min` — per-endpoint rate limiting (#174) */
+export interface RateLimitStatement extends BaseNode {
+  type: 'RateLimit';
+  max: number;
+  window: string; // 'second' | 'min' | 'minute' | 'hour' | 'day'
+  windowMs: number;
 }
 
 /** `query "SQL"` (standalone in API) */

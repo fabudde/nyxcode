@@ -81,6 +81,7 @@ export enum TokenType {
   Defer = 'Defer',
   Test = 'Test',
   Throw = 'Throw',
+  Rate = 'Rate',
 
   // Operators & Punctuation
   LeftBrace = 'LeftBrace',       // {
@@ -178,6 +179,7 @@ export const KEYWORDS: Record<string, TokenType> = {
   try: TokenType.Try,
   catch: TokenType.Catch,
   defer: TokenType.Defer,
+  rate: TokenType.Rate,
   test: TokenType.Test,
   throw: TokenType.Throw,
 };

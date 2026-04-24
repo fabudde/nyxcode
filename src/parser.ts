@@ -2084,6 +2084,7 @@ export class Parser {
       case TokenType.Validate: return this.parseValidate();
       case TokenType.Respond: return this.parseRespond();
       case TokenType.Limit: return this.parseLimitStmt();
+      case TokenType.Rate: return this.parseRateLimit();
       case TokenType.Query: return this.parseQuery();
       case TokenType.Let: return this.parseLet();
       case TokenType.Const: return this.parseConst();
@@ -3486,6 +3487,32 @@ export class Parser {
     return { type: 'Limit', value: value.trim(), line: start.line, col: start.col };
   }
 
+  // #174: rate limiting — `rate 10/min`, `rate 100/hour`, `rate 1000/day`
+  private parseRateLimit(): any {
+    const start = this.consume(TokenType.Rate);
+    // Parse: number
+    const maxToken = this.advance();
+    const max = parseInt(maxToken.value, 10);
+    if (isNaN(max)) throw this.error(`rate: expected number, got '${maxToken.value}'`);
+    
+    // The lexer tokenizes `/min` as a single Identifier token (paths start with /)
+    const unitToken = this.advance();
+    const rawUnit = unitToken.value;
+    // Strip leading / if present
+    const unit = rawUnit.startsWith('/') ? rawUnit.slice(1).toLowerCase() : rawUnit.toLowerCase();
+    
+    const windowMap: Record<string, number> = {
+      's': 1000, 'sec': 1000, 'second': 1000,
+      'min': 60000, 'minute': 60000,
+      'h': 3600000, 'hr': 3600000, 'hour': 3600000,
+      'd': 86400000, 'day': 86400000,
+    };
+    const windowMs = windowMap[unit];
+    if (!windowMs) throw this.error(`rate: unknown time unit '${rawUnit}'. Use sec, min, hour, or day`);
+    
+    return { type: 'RateLimit', max, window: unit, windowMs, line: start.line, col: start.col };
+  }
+
   private parseLet(): any {
     const start = this.consume(TokenType.Let);
     const name = this.consumeIdentifier();
@@ -4607,6 +4634,7 @@ private parseElement(): ElementNode {
       t.type === TokenType.Fn || t.type === TokenType.Match ||
       t.type === TokenType.Test || t.type === TokenType.Type ||
       t.type === TokenType.Return ||
+      t.type === TokenType.Rate ||
       (t.type === TokenType.Identifier && t.value === 'footnotes' && this.peekAt(1)?.type === TokenType.LeftBrace) ||
       (t.type === TokenType.Identifier && t.value === 'meta' && this.peekAt(1)?.type === TokenType.LeftBrace) ||
       (t.type === TokenType.Identifier && t.value === 'icon' && this.peekAt(1)?.type === TokenType.String) ||

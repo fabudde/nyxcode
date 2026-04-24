@@ -402,6 +402,7 @@ function compileApiRoute(api: ApiNode): string {
   const lets: any[] = [];
   const emails: any[] = [];
   const actionCalls: any[] = [];
+  const rateLimits: any[] = []; // #174
   
   for (const stmt of api.body) {
     if (stmt.type === 'Query') queries.push(stmt as QueryStatement);
@@ -410,6 +411,7 @@ function compileApiRoute(api: ApiNode): string {
     if (stmt.type === 'Let') lets.push(stmt);
     if (stmt.type === 'Email') emails.push(stmt);
     if (stmt.type === 'ActionCall') actionCalls.push(stmt);
+    if (stmt.type === 'RateLimit') rateLimits.push(stmt);
   }
 
   // v0.35: Process fetch/stream/file statements in order
@@ -623,8 +625,18 @@ function compileApiRoute(api: ApiNode): string {
     handlerBody += `    res.json({ ok: true });\n`;
   }
   
+  // #174: Generate rate limiter declarations
+  let rateLimiterDecls = '';
+  let rateLimiterMiddleware = '';
+  for (let i = 0; i < rateLimits.length; i++) {
+    const rl = rateLimits[i];
+    const varName = `rl_${method}${api.path.replace(/[^a-zA-Z0-9]/g, '_')}_${i}`;
+    rateLimiterDecls += `const ${varName} = rateLimit({ windowMs: ${rl.windowMs}, max: ${rl.max}, message: { error: 'Rate limit exceeded', retryAfter: ${Math.ceil(rl.windowMs / 1000)} }, standardHeaders: true, legacyHeaders: false });\n`;
+    rateLimiterMiddleware += `${varName}, `;
+  }
+
   return `
-app.${method}('${api.path}', ${middleware}${(api.middleware || []).map(m => 'mw_' + m + ', ').join('')}async (req, res) => {
+${rateLimiterDecls}app.${method}('${api.path}', ${rateLimiterMiddleware}${middleware}${(api.middleware || []).map(m => 'mw_' + m + ', ').join('')}async (req, res) => {
   try {
 ${handlerBody}  } catch (e) {
     // #177: Production-safe error response

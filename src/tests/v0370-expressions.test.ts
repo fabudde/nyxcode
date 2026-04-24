@@ -1,6 +1,8 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { Parser } from '../parser.js';
+import { parse } from '../index.js';
+import { compileBackend } from '../backend-compiler.js';
 import { Compiler } from '../compiler.js';
 import { Lexer } from '../lexer.js';
 
@@ -222,3 +224,77 @@ describe('v0.37.5: #178 each container display:contents', () => {
   });
 });
 
+
+// #174: Rate limiting for api blocks
+describe('v0.37.7: rate limiting in api blocks', () => {
+  it('parses rate 10/min', () => {
+    const input = `table users { name text }
+api POST /test {
+  rate 10/min
+  query "SELECT 1"
+  respond 200 { ok: true }
+}`;
+    const ast = parseAST(input);
+    const api = ast.body.find((n: any) => n.type === 'Api');
+    assert.ok(api, 'should parse api block');
+    const rateStmt = (api as any).body.find((s: any) => s.type === 'RateLimit');
+    assert.ok(rateStmt, 'should have RateLimit statement');
+    assert.strictEqual(rateStmt.max, 10);
+    assert.strictEqual(rateStmt.windowMs, 60000);
+  });
+
+  it('parses rate 100/hour', () => {
+    const input = `table users { name text }
+api GET /data {
+  rate 100/hour
+  respond 200 { ok: true }
+}`;
+    const ast = parseAST(input);
+    const api = ast.body.find((n: any) => n.type === 'Api');
+    const rateStmt = (api as any).body.find((s: any) => s.type === 'RateLimit');
+    assert.ok(rateStmt);
+    assert.strictEqual(rateStmt.max, 100);
+    assert.strictEqual(rateStmt.windowMs, 3600000);
+  });
+
+  it('compiles rate to express-rate-limit middleware', () => {
+    const input = `table users { name text }
+api POST /test {
+  rate 5/min
+  respond 200 { ok: true }
+}`;
+    const ast = parseAST(input);
+    const code = compileBackend(ast.body.filter(n => n.type === 'Table'), ast.body.filter(n => n.type === 'Api'));
+    assert.ok(code.includes('rateLimit({'), 'should generate rateLimit call');
+    assert.ok(code.includes('windowMs: 60000'), 'should have 60s window');
+    assert.ok(code.includes('max: 5'), 'should have max 5');
+    assert.ok(code.includes('Rate limit exceeded'), 'should have error message');
+  });
+
+  it('supports multiple rate limits on same endpoint', () => {
+    const input = `table users { name text }
+api POST /bid {
+  rate 10/min
+  rate 100/hour
+  respond 200 { ok: true }
+}`;
+    const ast = parseAST(input);
+    const api = ast.body.find((n: any) => n.type === 'Api');
+    const rates = (api as any).body.filter((s: any) => s.type === 'RateLimit');
+    assert.strictEqual(rates.length, 2, 'should have 2 rate limits');
+    assert.strictEqual(rates[0].max, 10);
+    assert.strictEqual(rates[1].max, 100);
+  });
+
+  it('supports day and second units', () => {
+    const input = `table users { name text }
+api GET /slow {
+  rate 1000/day
+  respond 200 { ok: true }
+}`;
+    const ast = parseAST(input);
+    const rateStmt = (ast.body.find((n: any) => n.type === 'Api') as any).body.find((s: any) => s.type === 'RateLimit');
+    assert.strictEqual(rateStmt.max, 1000);
+    assert.strictEqual(rateStmt.windowMs, 86400000);
+  });
+});
