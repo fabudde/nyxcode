@@ -212,3 +212,12 @@ describe('v0.37.4: #173 .field inside \${} in each template', () => {
       ".company inside interpolation should be rewritten");
   });
 });
+
+describe('v0.37.5: #178 each container display:contents', () => {
+  it('each wrapper div has display:contents for grid/flex compatibility', () => {
+    const input = 'page "/" {\n  data items = get /api/items\n  div grid=4 {\n    each items -> div {\n      p .name\n    }\n  }\n}';
+    const result = compile(input);
+    assert.ok(result.html.includes('display:contents'),
+      'each wrapper should have display:contents');
+  });
+});

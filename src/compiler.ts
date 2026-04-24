@@ -1913,7 +1913,8 @@ export class Compiler {
     \`).join('');
   }`);
 
-    return `${this.ind()}<div id="${containerId}"></div>\n`;
+    // #178: display:contents makes wrapper invisible to grid/flex layout
+    return `${this.ind()}<div id="${containerId}" style="display:contents"></div>\n`;
   }
 
   private compileEachBody(each: EachStatement, varName: string): string {
