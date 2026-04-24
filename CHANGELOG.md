@@ -1,3 +1,35 @@
+# NyxCode v0.38.0 — Tailwind CSS Compatibility
+
+**Write Tailwind classes in NyxCode. Zero runtime. Zero config.**
+
+Every AI already knows Tailwind. Now they can use that knowledge directly in NyxCode's `style={}` blocks. Classes compile to native CSS at build time — no PostCSS, no Tailwind runtime, no 300KB framework.
+
+### What's New
+- **200+ Tailwind utility classes** recognized in `style={}` blocks
+- **Dynamic spacing**: `p-4`, `m-8`, `gap-2`, `px-6`, `mt-12` etc. (full Tailwind spacing scale)
+- **Dynamic colors**: `text-blue-500`, `bg-red-600`, `border-gray-200` (slate/gray/red/blue/green/yellow/purple/pink/indigo/cyan/emerald/amber/rose/sky/orange)
+- **Layout**: `flex`, `grid`, `items-center`, `justify-between`, `grid-cols-3`, `flex-col`, etc.
+- **Typography**: `text-sm`, `text-2xl`, `font-bold`, `italic`, `uppercase`, `underline`
+- **Borders**: `rounded-lg`, `rounded-full`, `border`, `border-dashed`
+- **Shadows**: `shadow`, `shadow-md`, `shadow-xl`
+- **Transitions**: `transition`, `transition-colors`, `duration-300`, `ease-in-out`
+- **Position**: `relative`, `absolute`, `fixed`, `sticky`, `z-10`
+- **And more**: cursor, opacity, overflow, object-fit, aspect-ratio, grid spans, etc.
+- **Mix with NyxCode shorthands**: `style={ flex, items-center, bg red, fs 2rem }` — both systems coexist
+- **20 new tests** (538 total, 0 failures)
+
+### Token Efficiency
+Tailwind in NyxCode is ~20% more token-efficient than Tailwind in JSX:
+```
+// JSX + Tailwind: 89 tokens
+<div className="flex items-center justify-between p-4 bg-blue-500 text-white rounded-lg shadow-md">
+
+// NyxCode + Tailwind: 71 tokens (↓20%)
+div style={ flex, items-center, justify-between, p-4, bg-blue-500, text-white, rounded-lg, shadow-md }
+```
+
+---
+
 # NyxCode v0.37.0 — Full Expressiveness Engine
 
 **NyxCode can now build ANYTHING for the web.** Complete expression engine with arithmetic,

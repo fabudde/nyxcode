@@ -13,6 +13,7 @@
  */
 
 import { Token, TokenType } from './tokens.js';
+import { resolveTailwindClass } from './tailwind-compat.js';
 import { COLUMN_TYPES, COLUMN_CONSTRAINTS } from './compiler-context.js';
 import {
   Program, TopLevelNode, PageNode, ComponentNode, ApiNode,
@@ -4088,7 +4089,22 @@ private parseElement(): ElementNode {
               propVal += (propVal ? ' ' : '') + this.advance().value;
             }
             if (this.check(TokenType.Comma)) this.advance();
-            if (propName && propVal) props.push(propName + ': ' + propVal);
+            if (propName && propVal) {
+              // Try Tailwind combo: e.g. propName="items", propVal="center" → "items-center"
+              const twCombo = resolveTailwindClass(`${propName}-${propVal}`);
+              if (twCombo) {
+                for (const decl of twCombo) props.push(decl.name + ': ' + decl.value);
+              } else {
+                props.push(propName + ': ' + propVal);
+              }
+            } else if (propName && !propVal) {
+              // Valueless prop — check if it's a Tailwind utility class
+              const tw = resolveTailwindClass(propName);
+              if (tw) {
+                for (const decl of tw) props.push(decl.name + ': ' + decl.value);
+              }
+              // If not Tailwind, silently drop (was already the behavior)
+            }
           }
           if (this.check(TokenType.RightBrace)) this.advance();
           attributes.push({ name: 'style', value: '__nyx__' + props.join('; ') });

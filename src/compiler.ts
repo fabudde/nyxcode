@@ -20,6 +20,7 @@ import {
 } from './ast.js';
 
 import { readFileSync } from 'fs';
+import { resolveTailwindClass } from './tailwind-compat.js';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { nearestMatches, didYouMean } from './suggest.js';
@@ -4062,8 +4063,19 @@ async function __nyx_sse(url, body, onChunk, onDone) {
         return [{ name: 'text-wrap', value: 'balance' }];
       case 'pretty':
         return [{ name: 'text-wrap', value: 'pretty' }];
-      default:
+      default: {
+        // Tailwind compatibility layer
+        if (!value) {
+          // No value → try as standalone Tailwind class (e.g., "flex", "hidden", "italic")
+          const tw = resolveTailwindClass(name);
+          if (tw) return tw;
+        } else {
+          // Has value → try name-value combo as Tailwind class (e.g., name="items", value="center" → "items-center")
+          const twCombo = resolveTailwindClass(`${name}-${value}`);
+          if (twCombo) return twCombo;
+        }
         return null;
+      }
     }
   }
 
