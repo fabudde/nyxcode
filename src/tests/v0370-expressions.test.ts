@@ -378,3 +378,37 @@ api POST /items {
     assert.ok(code.includes('exceeds maximum length'), 'should limit string length');
   });
 });
+
+// #175: Auth context — $auth.id mapping in api blocks
+describe('v0.37.10: $auth mapping in api blocks', () => {
+  it('compiles $auth.id to req.user.id', () => {
+    const input = `table posts { title text, author_id number }
+
+api POST /posts auth {
+  query "INSERT INTO posts (title, author_id) VALUES ($body.title, $auth.id)"
+  respond 200 { ok: true }
+}`;
+    const ast = parseAST(input);
+    const code = compileBackend(
+      ast.body.filter((n: any) => n.type === 'Table') as any,
+      ast.body.filter((n: any) => n.type === 'Api') as any
+    );
+    assert.ok(code.includes('req.user.id'), '$auth.id should compile to req.user.id');
+    assert.ok(code.includes('authMiddleware'), 'auth flag should add authMiddleware');
+  });
+
+  it('compiles $auth.email to req.user.email', () => {
+    const input = `table logs { action text, user_email text }
+
+api POST /logs auth {
+  query "INSERT INTO logs (action, user_email) VALUES ($body.action, $auth.email)"
+  respond 200 { ok: true }
+}`;
+    const ast = parseAST(input);
+    const code = compileBackend(
+      ast.body.filter((n: any) => n.type === 'Table') as any,
+      ast.body.filter((n: any) => n.type === 'Api') as any
+    );
+    assert.ok(code.includes('req.user.email'), '$auth.email should compile to req.user.email');
+  });
+});

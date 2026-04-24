@@ -546,7 +546,7 @@ function compileApiRoute(api: ApiNode): string {
       const q = queries[0];
       const sql = q.sql;
       const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
-      const paramList = params.map(p => p.startsWith('req.') ? p : `${paramSrc(p)}.${p}`).join(', ');
+      const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; return `${paramSrc(p)}.${p}`; }).join(', ');
       const safeSql = sql.replace(/\$([\w.]+)/g, '?');
       const sqlLower = safeSql.toLowerCase();
       const isSingleRow = /\blimit\s+1\b/.test(sqlLower) || /\b(count|sum|avg|min|max)\s*\(/.test(sqlLower);
@@ -564,7 +564,7 @@ function compileApiRoute(api: ApiNode): string {
         const q = queries[i];
         const sql = q.sql;
         const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
-        const paramList = params.map(p => p.startsWith('req.') ? p : `${paramSrc(p)}.${p}`).join(', ');
+        const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; return `${paramSrc(p)}.${p}`; }).join(', ');
         const safeSql = sql.replace(/\$([\w.]+)/g, '?');
         const isLast = i === queries.length - 1;
         
@@ -1128,6 +1128,8 @@ function compileApiExpr(expr: string): string {
     .replace(/\$body\b/g, 'req.body')
     .replace(/\$req\.(\w[\w.]*)/g, 'req.$1')
     .replace(/\$params\.(\w+)/g, 'req.params.$1')
+    .replace(/\$auth\.(\w[\w.]*)/g, 'req.user.$1') // #175: auth context from JWT
+    .replace(/\$auth\b/g, 'req.user') // #175: full auth object
     .replace(/\$(\w+)/g, '$1');
 }
 
@@ -1141,6 +1143,7 @@ function compileApiUrl(url: string): string {
     return '`' + url.replace(/\$body\.(\w+)/g, '${req.body.$1}')
                      .replace(/\$body\b/g, '${req.body}')
                      .replace(/\$req\.(\w[\w.]*)/g, '${req.$1}')
+                     .replace(/\$auth\.(\w[\w.]*)/g, '${req.user.$1}')
                      .replace(/\$(\w+)/g, '${$1}') + '`';
   }
   return JSON.stringify(url);
