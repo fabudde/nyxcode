@@ -409,6 +409,67 @@ Property shorthands work in `style {}` blocks, `preset` definitions, inline styl
 | `anim` | animation |  |  |
 | `si` | scroll-snap-type | `sa` | scroll-snap-align |
 
+## Tailwind CSS Compatibility (v0.38.0) 🌀
+
+**Write Tailwind classes directly in NyxCode `style={}` blocks.** They compile to native CSS at build time — no Tailwind runtime, no PostCSS, no config. Just the classes you know, compiled to optimal CSS.
+
+```nyx
+// Tailwind classes in style={}
+div style={ flex, items-center, justify-between, p-4, bg-blue-500, text-white, rounded-lg, shadow-md } {
+  h1 style={ text-2xl, font-bold } "Hello!"
+  p style={ text-sm, opacity-50 } "Subtext"
+}
+
+// Grid layout
+div style={ grid, grid-cols-3, gap-4, mt-8 } {
+  div style={ bg-white, rounded-xl, shadow-lg, p-6 } "Card 1"
+  div style={ bg-gray-100, rounded-xl, p-6, border, border-gray-200 } "Card 2"
+  div style={ bg-slate-800, text-white, rounded-xl, p-6 } "Card 3"
+}
+```
+
+Compiles to clean inline CSS:
+```html
+<div style="display:flex; align-items:center; justify-content:space-between; padding:1rem;
+  background-color:#3b82f6; color:#fff; border-radius:0.5rem;
+  box-shadow:0 4px 6px -1px rgb(0 0 0/0.1)">
+```
+
+### Supported Tailwind Classes
+
+| Category | Classes |
+|----------|--------|
+| **Display** | `block`, `inline-block`, `flex`, `inline-flex`, `grid`, `inline-grid`, `hidden`, `contents` |
+| **Flex** | `flex-row`, `flex-col`, `flex-wrap`, `flex-nowrap`, `flex-1`, `flex-auto`, `flex-none`, `grow`, `shrink` |
+| **Alignment** | `items-start/center/end/baseline/stretch`, `justify-start/center/end/between/around/evenly`, `self-*` |
+| **Spacing** | `p-{0-96}`, `px/py/pt/pr/pb/pl-*`, `m-{0-96}`, `mx/my/mt/mr/mb/ml-*`, `gap-*`, `gap-x/y-*` |
+| **Sizing** | `w-full/screen/auto/fit`, `h-full/screen/auto`, `min-h-screen`, `max-w-sm/md/lg/xl/2xl-7xl/prose` |
+| **Typography** | `text-xs/sm/base/lg/xl/2xl-5xl`, `text-left/center/right`, `font-thin..extrabold`, `italic`, `underline`, `uppercase` |
+| **Colors** | `text-{color}-{shade}`, `bg-{color}-{shade}`, `border-{color}-{shade}` — slate, gray, red, blue, green, yellow, purple, pink, indigo, cyan, emerald, amber, rose, sky, orange |
+| **Border** | `rounded`, `rounded-sm/md/lg/xl/2xl/3xl/full/none`, `border`, `border-0/2/4`, `border-solid/dashed/none` |
+| **Shadow** | `shadow`, `shadow-sm/md/lg/xl/2xl/none` |
+| **Position** | `static`, `fixed`, `absolute`, `relative`, `sticky`, `inset-0`, `top/right/bottom/left-0` |
+| **Grid** | `grid-cols-{1-12}`, `col-span-{1-6}/full`, `place-items-center`, `place-content-center` |
+| **Effects** | `opacity-{0/50/75/100}`, `transition`, `transition-all/colors/none`, `duration-{75-500}`, `ease-*` |
+| **Z-Index** | `z-{0/10/20/30/40/50}` |
+| **Misc** | `cursor-pointer/default/not-allowed`, `pointer-events-none/auto`, `select-none/all`, `overflow-hidden/auto/scroll`, `object-cover/contain` |
+
+### Mix with NyxCode Shorthands
+
+Tailwind classes and NyxCode shorthands coexist in the same `style={}` block:
+
+```nyx
+div style={ flex, items-center, bg red, fs 2rem, p-4, shadow-lg } "Mixed!"
+// Tailwind: flex, items-center, p-4, shadow-lg
+// NyxCode:  bg red, fs 2rem
+```
+
+### Why This Matters
+
+- **For AIs**: Every AI already knows Tailwind. Now they can use that knowledge in NyxCode without learning new shorthands.
+- **Zero runtime**: Tailwind classes compile to CSS at build time. No 300KB framework.
+- **Cherry-pick**: Use Tailwind for layout (`flex, items-center, p-4`) and NyxCode for design (`bg theme.primary, shadow 0 2px 10px`).
+
 ## Layout Attributes — On Any Element
 ```nyx
 div flex=col center gap=2rem { ... }     # Flexbox column, centered, 2rem gap
