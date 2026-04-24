@@ -2134,7 +2134,15 @@ export class Compiler {
     if (content.type === 'PropertyAccess') {
       return `\${${varName}${this.toOptionalChain(content.path)}}`;
     }
-    if (content.type === 'StringLiteral') return content.value;
+    if (content.type === 'StringLiteral') {
+      // #173: Resolve .field references inside ${} interpolation in each templates
+      // e.g. "${.commits} commits" → "${item.commits} commits"
+      let val = content.value;
+      val = val.replace(/\$\{\s*\.([a-zA-Z_][a-zA-Z0-9_.]*)/g, (_: string, field: string) => {
+        return `\${${varName}.${field}`;
+      });
+      return val;
+    }
     if (content.type === 'Identifier') return `\${${content.name}}`;
     return '';
   }

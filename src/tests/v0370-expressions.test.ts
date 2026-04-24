@@ -191,3 +191,24 @@ describe('v0.37: String literal pipe in interpolation (#170 final)', () => {
     assert.ok(html.includes('world'), 'should evaluate to world at compile time');
   });
 });
+
+
+describe('v0.37.4: #173 .field inside \${} in each template', () => {
+  it('.field inside interpolation is rewritten to item.field', () => {
+    const input = 'page "/" {\n  data team = get /api/team\n  each team -> div {\n    p .name\n    p "\${.commits} commits"\n    p "Role: \${.role} at \${.company}"\n  }\n}';
+    const result = compile(input);
+    // Direct .name -> item.name (already worked)
+    assert.ok(result.html.includes("item.name") || result.js.includes("item.name"),
+      "Direct .name should be rewritten");
+    // \${.commits} -> \${item.commits} (this is the fix)
+    assert.ok(result.js.includes("item.commits"),
+      ".commits inside interpolation should be rewritten to item.commits");
+    assert.ok(!result.js.includes("\${.commits}"),
+      "Bare .commits should NOT appear in output");
+    // Multiple in one string
+    assert.ok(result.js.includes("item.role"),
+      ".role inside interpolation should be rewritten");
+    assert.ok(result.js.includes("item.company"),
+      ".company inside interpolation should be rewritten");
+  });
+});
