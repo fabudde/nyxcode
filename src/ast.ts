@@ -139,6 +139,7 @@ export type Statement =
   | RespondStatement
   | LimitStatement
   | RateLimitStatement
+  | ExpectStatement
   | QueryStatement
   | StateStatement
   | EffectStatement
@@ -347,6 +348,12 @@ export interface RateLimitStatement extends BaseNode {
   max: number;
   window: string; // 'second' | 'min' | 'minute' | 'hour' | 'day'
   windowMs: number;
+}
+
+/** `expect TypeName` — validate request body against a type (#176) */
+export interface ExpectStatement extends BaseNode {
+  type: 'Expect';
+  typeName: string;
 }
 
 /** `query "SQL"` (standalone in API) */

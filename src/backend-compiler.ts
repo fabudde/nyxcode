@@ -403,6 +403,7 @@ function compileApiRoute(api: ApiNode): string {
   const emails: any[] = [];
   const actionCalls: any[] = [];
   const rateLimits: any[] = []; // #174
+  const expects: any[] = []; // #176
   
   for (const stmt of api.body) {
     if (stmt.type === 'Query') queries.push(stmt as QueryStatement);
@@ -412,6 +413,7 @@ function compileApiRoute(api: ApiNode): string {
     if (stmt.type === 'Email') emails.push(stmt);
     if (stmt.type === 'ActionCall') actionCalls.push(stmt);
     if (stmt.type === 'RateLimit') rateLimits.push(stmt);
+    if (stmt.type === 'Expect') expects.push(stmt);
   }
 
   // v0.35: Process fetch/stream/file statements in order
@@ -422,6 +424,38 @@ function compileApiRoute(api: ApiNode): string {
   );
   
   let handlerBody = '';
+  
+  // #176: Generate expect validation from type definitions
+  for (const exp of expects) {
+    const typeDef = _typeRegistry.get(exp.typeName);
+    if (!typeDef) continue; // Type not found — skip (will error at runtime if needed)
+    handlerBody += `    // expect ${exp.typeName} — validate request body\n`;
+    handlerBody += `    if (!req.body || typeof req.body !== 'object') return res.status(400).json({ error: 'Request body required' });\n`;
+    for (const field of typeDef.fields) {
+      const fname = field.name;
+      if (!field.optional) {
+        // Required field
+        handlerBody += `    if (req.body.${fname} === undefined || req.body.${fname} === null) return res.status(400).json({ error: '${fname} is required' });\n`;
+      }
+      // Type checking
+      if (field.constraint === 'text' || field.constraint === 'email') {
+        handlerBody += `    if (req.body.${fname} !== undefined && typeof req.body.${fname} !== 'string') return res.status(400).json({ error: '${fname} must be a string' });\n`;
+        if (field.constraint === 'email') {
+          handlerBody += `    if (req.body.${fname} && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(req.body.${fname})) return res.status(400).json({ error: '${fname} must be a valid email' });\n`;
+        }
+        // Max length protection against payload bombs (#176)
+        handlerBody += `    if (typeof req.body.${fname} === 'string' && req.body.${fname}.length > 10000) return res.status(400).json({ error: '${fname} exceeds maximum length' });\n`;
+      } else if (field.constraint === 'number' || field.constraint === 'int' || field.constraint === 'float' || field.constraint === 'decimal') {
+        handlerBody += `    if (req.body.${fname} !== undefined && typeof req.body.${fname} !== 'number') return res.status(400).json({ error: '${fname} must be a number' });\n`;
+      } else if (field.constraint === 'bool') {
+        handlerBody += `    if (req.body.${fname} !== undefined && typeof req.body.${fname} !== 'boolean') return res.status(400).json({ error: '${fname} must be a boolean' });\n`;
+      }
+    }
+    // Reject unknown fields (allowlist)
+    const allowedFields = typeDef.fields.map((f: any) => f.name);
+    handlerBody += `    const __allowedFields_${exp.typeName} = new Set(${JSON.stringify(allowedFields)});\n`;
+    handlerBody += `    for (const key of Object.keys(req.body)) { if (!__allowedFields_${exp.typeName}.has(key)) return res.status(400).json({ error: 'Unknown field: ' + key }); }\n`;
+  }
   
   // Generate validation code
   for (const v of validates) {
@@ -1446,7 +1480,15 @@ ${intervals.join('\n')}
 }
 // ── Main export ────────────────────────────────────────────────────────
 
-export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config: ConfigNode | undefined = undefined, hooks: HookNode[] = [], pagePaths: string[] = [], middlewares: MiddlewareNode[] = [], everys: any[] = [], actions: any[] = [], envNode?: any, onEvents: any[] = [], useStatements: any[] = [], pipes: PipeNode[] = []): string {
+// #176: Module-level type registry for expect validation
+let _typeRegistry: Map<string, any> = new Map();
+
+export function compileBackend(tables: TableNode[], apis: ApiNode[] = [], config: ConfigNode | undefined = undefined, hooks: HookNode[] = [], pagePaths: string[] = [], middlewares: MiddlewareNode[] = [], everys: any[] = [], actions: any[] = [], envNode?: any, onEvents: any[] = [], useStatements: any[] = [], pipes: PipeNode[] = [], types: any[] = []): string {
+  // #176: Build type registry for expect validation
+  _typeRegistry = new Map();
+  for (const t of types) {
+    if (t.type === 'Type') _typeRegistry.set(t.name, t);
+  }
   const hasUploads = tables.some(t => t.columns.some(c => c.type === 'upload'));
   const realtimeTables = tables.filter(t => t.columns.some(c => c.constraints.includes('realtime')));
   const hasRealtime = realtimeTables.length > 0;

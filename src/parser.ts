@@ -2085,6 +2085,7 @@ export class Parser {
       case TokenType.Respond: return this.parseRespond();
       case TokenType.Limit: return this.parseLimitStmt();
       case TokenType.Rate: return this.parseRateLimit();
+      case TokenType.Expect: return this.parseExpect();
       case TokenType.Query: return this.parseQuery();
       case TokenType.Let: return this.parseLet();
       case TokenType.Const: return this.parseConst();
@@ -3513,6 +3514,13 @@ export class Parser {
     return { type: 'RateLimit', max, window: unit, windowMs, line: start.line, col: start.col };
   }
 
+  // #176: expect TypeName — validate request body against a type definition
+  private parseExpect(): any {
+    const start = this.consume(TokenType.Expect);
+    const typeName = this.consumeIdentifier();
+    return { type: 'Expect', typeName, line: start.line, col: start.col };
+  }
+
   private parseLet(): any {
     const start = this.consume(TokenType.Let);
     const name = this.consumeIdentifier();
@@ -4635,6 +4643,7 @@ private parseElement(): ElementNode {
       t.type === TokenType.Test || t.type === TokenType.Type ||
       t.type === TokenType.Return ||
       t.type === TokenType.Rate ||
+      t.type === TokenType.Expect ||
       (t.type === TokenType.Identifier && t.value === 'footnotes' && this.peekAt(1)?.type === TokenType.LeftBrace) ||
       (t.type === TokenType.Identifier && t.value === 'meta' && this.peekAt(1)?.type === TokenType.LeftBrace) ||
       (t.type === TokenType.Identifier && t.value === 'icon' && this.peekAt(1)?.type === TokenType.String) ||

@@ -298,3 +298,83 @@ api GET /slow {
     assert.strictEqual(rateStmt.windowMs, 86400000);
   });
 });
+
+// #176: Input validation — expect TypeName in api blocks
+describe('v0.37.8: expect type validation in api blocks', () => {
+  it('parses expect statement', () => {
+    const input = `type JobInput { title: text, budget: number }
+
+table jobs { title text, budget number }
+
+api POST /jobs {
+  expect JobInput
+  query "INSERT INTO jobs (title, budget) VALUES ($body.title, $body.budget)"
+  respond 200 { ok: true }
+}`;
+    const ast = parseAST(input);
+    const api = ast.body.find((n: any) => n.type === 'Api');
+    const expectStmt = (api as any).body.find((s: any) => s.type === 'Expect');
+    assert.ok(expectStmt, 'should have Expect statement');
+    assert.strictEqual(expectStmt.typeName, 'JobInput');
+  });
+
+  it('compiles expect to validation code', () => {
+    const input = `type JobInput { title: text, budget: number }
+
+table jobs { title text, budget number }
+
+api POST /jobs {
+  expect JobInput
+  respond 200 { ok: true }
+}`;
+    const ast = parseAST(input);
+    const tables = ast.body.filter((n: any) => n.type === 'Table');
+    const apis = ast.body.filter((n: any) => n.type === 'Api');
+    const types = ast.body.filter((n: any) => n.type === 'Type');
+    const code = compileBackend(tables as any, apis as any, undefined, [], [], [], [], [], undefined, [], [], [], types);
+    assert.ok(code.includes('title is required'), 'should validate required title');
+    assert.ok(code.includes('budget is required'), 'should validate required budget');
+    assert.ok(code.includes('must be a string'), 'should check title is string');
+    assert.ok(code.includes('must be a number'), 'should check budget is number');
+    assert.ok(code.includes('Unknown field'), 'should reject unknown fields');
+  });
+
+  it('handles optional fields', () => {
+    const input = `type UserUpdate { name: text, bio?: text }
+
+table users { name text, bio text }
+
+api POST /users {
+  expect UserUpdate
+  respond 200 { ok: true }
+}`;
+    const ast = parseAST(input);
+    const code = compileBackend(
+      ast.body.filter((n: any) => n.type === 'Table') as any,
+      ast.body.filter((n: any) => n.type === 'Api') as any,
+      undefined, [], [], [], [], [], undefined, [], [], [],
+      ast.body.filter((n: any) => n.type === 'Type')
+    );
+    assert.ok(code.includes('name is required'), 'name should be required');
+    assert.ok(!code.includes('bio is required'), 'bio should NOT be required (optional)');
+  });
+
+  it('protects against payload bombs (max length)', () => {
+    const input = `type Input { title: text }
+
+table items { title text }
+
+api POST /items {
+  expect Input
+  respond 200 { ok: true }
+}`;
+    const ast = parseAST(input);
+    const code = compileBackend(
+      ast.body.filter((n: any) => n.type === 'Table') as any,
+      ast.body.filter((n: any) => n.type === 'Api') as any,
+      undefined, [], [], [], [], [], undefined, [], [], [],
+      ast.body.filter((n: any) => n.type === 'Type')
+    );
+    assert.ok(code.includes('exceeds maximum length'), 'should limit string length');
+  });
+});

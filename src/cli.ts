@@ -1020,7 +1020,8 @@ try {
       const onEvents = ast.body.filter((n: any) => n.type === 'OnEvent') as any[];
       const useStmts = ast.body.filter((n: any) => n.type === 'Use' && n.packageMode) as any[];
       const pipes = ast.body.filter((n: any) => n.type === 'Pipe') as any[];
-      let serverCode = compileBackend(tables, apis, config, hooks, [], middlewares, everys, actions, envNode, onEvents, useStmts, pipes);
+      const types = ast.body.filter((n: any) => n.type === 'Type') as any[];
+      let serverCode = compileBackend(tables, apis, config, hooks, [], middlewares, everys, actions, envNode, onEvents, useStmts, pipes, types);
       if (security) {
         // Inject auth AFTER express.json() but BEFORE create tables
         const authCode = compileAuth(security, tables, config);
