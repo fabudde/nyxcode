@@ -434,11 +434,23 @@ describe('pipe error handling', () => {
         const code = compilePipe(TABLE_BLOCK + "\npipe 'safe' {\n on api POST /api/t\n log \"hello\"\n}");
         assert.match(code, /try \{/);
         assert.match(code, /catch\(e\)/);
-        assert.match(code, /Internal pipe error/);
+        assert.match(code, /Internal server error/);
     });
 
     it('checks headersSent', () => {
         const code = compilePipe(TABLE_BLOCK + "\npipe 'safe' {\n on api POST /api/t\n log \"hello\"\n}");
         assert.match(code, /headersSent/);
     });
+});
+
+// #177: Production-safe error handling
+describe('production error handling', () => {
+  it('global error handler checks NODE_ENV and includes requestId', () => {
+    const ast = parse('table users { name text }');
+    const code = compileBackend(ast.body.filter(n => n.type === 'Table'), []);
+    assert.ok(code.includes('requestId'), 'Error response should include requestId');
+    assert.ok(code.includes('Internal server error'), 'Should have generic error message');
+    assert.ok(code.includes('NODE_ENV'), 'Should check NODE_ENV for production mode');
+    assert.ok(!code.includes("error: err.stack"), 'Should NOT include stack trace in response');
+  });
 });

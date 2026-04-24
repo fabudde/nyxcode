@@ -627,7 +627,14 @@ function compileApiRoute(api: ApiNode): string {
 app.${method}('${api.path}', ${middleware}${(api.middleware || []).map(m => 'mw_' + m + ', ').join('')}async (req, res) => {
   try {
 ${handlerBody}  } catch (e) {
-    res.status(500).json({ error: e.message });
+    // #177: Production-safe error response
+    const reqId = Math.random().toString(36).slice(2, 10);
+    console.error(\`[api:${api.path}][\${reqId}]\`, e.message, e.stack || '');
+    if (process.env.NODE_ENV === 'production') {
+      res.status(500).json({ error: 'Internal server error', requestId: reqId });
+    } else {
+      res.status(500).json({ error: e.message, requestId: reqId });
+    }
   }
 });`;
 }
@@ -1361,8 +1368,9 @@ function compilePipeBlocks(pipes: PipeNode[]): string {
 async function pipe_${safeName}(ctx) {
   try {
 ${body}  } catch(e) {
-    console.error('[pipe:${pipe.name}]', e.message);
-    if (ctx.res && !ctx.res.headersSent) ctx.res.status(500).json({ error: 'Internal pipe error' });
+    const reqId = Math.random().toString(36).slice(2, 10);
+    console.error('[pipe:${pipe.name}][' + reqId + ']', e.message, e.stack || '');
+    if (ctx.res && !ctx.res.headersSent) ctx.res.status(500).json({ error: 'Internal server error', requestId: reqId });
   }
 }`);
 
@@ -1588,9 +1596,16 @@ ${middlewares.map(m => `function mw_${m.name}(req, res, next) { ${m.body}; next(
 
 // ── Error handler ──────────────────────────────────────────────
 
+// #177: Production-safe error handler — never leak stack traces or internals
 app.use((err, req, res, next) => {
-  console.error('Error:', err.message);
-  res.status(500).json({ error: err.message });
+  const reqId = Math.random().toString(36).slice(2, 10);
+  console.error('[' + reqId + '] Error:', err.message, err.stack || '');
+  if (process.env.NODE_ENV === 'production') {
+    res.status(500).json({ error: 'Internal server error', requestId: reqId });
+  } else {
+    // Dev mode: include message (but never stack trace in response)
+    res.status(500).json({ error: err.message, requestId: reqId });
+  }
 });
 
 
