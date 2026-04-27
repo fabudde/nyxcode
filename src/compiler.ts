@@ -5823,6 +5823,55 @@ async function __nyx_sse(url, body, onChunk, onDone) {
         const val = this.resolveStateRefs(stmt.value || stmt.expr || '');
         return `let ${stmt.name}=${val}`;
       }
+      case 'FnPush': {
+        const arrRef = this.resolveVarToState(stmt.array) || `__nyx.state.${stmt.array}`;
+        const pushVal = this.resolveStateRefs(stmt.value || '');
+        return `${arrRef}.push(${pushVal});__nyx.notify('${stmt.array}')`;
+      }
+      case 'FnPop': {
+        const arrRef = this.resolveVarToState(stmt.array) || `__nyx.state.${stmt.array}`;
+        return `${arrRef}.pop();__nyx.notify('${stmt.array}')`;
+      }
+      case 'FnShift': {
+        const arrRef = this.resolveVarToState(stmt.array) || `__nyx.state.${stmt.array}`;
+        return `${arrRef}.shift();__nyx.notify('${stmt.array}')`;
+      }
+      case 'FnRemove': {
+        const arrRef = this.resolveVarToState(stmt.array) || `__nyx.state.${stmt.array}`;
+        const idx = this.resolveStateRefs(stmt.index || '0');
+        return `${arrRef}.splice(${idx},1);__nyx.notify('${stmt.array}')`;
+      }
+      case 'FnCall': {
+        const callExpr = this.resolveStateRefs(stmt.expr || '');
+        return callExpr;
+      }
+      case 'FnWhen': {
+        const cond = this.resolveStateRefs(stmt.condition || '');
+        const body = (stmt.body || []).map((s: any) => this.compileFnStatementToJS(s)).join(';');
+        const elseBody = stmt.elseBody ? (stmt.elseBody || []).map((s: any) => this.compileFnStatementToJS(s)).join(';') : '';
+        return elseBody ? `if(${cond}){${body}}else{${elseBody}}` : `if(${cond}){${body}}`;
+      }
+      case 'FnEach': {
+        const col = this.resolveStateRefs(stmt.collection || '');
+        const item = stmt.itemName || 'item';
+        const body = (stmt.body || []).map((s: any) => this.compileFnStatementToJS(s)).join(';');
+        return `(${col}||[]).forEach(function(${item}){${body}})`;
+      }
+      case 'FnTry': {
+        const tryBody = (stmt.body || []).map((s: any) => this.compileFnStatementToJS(s)).join(';');
+        const catchBody = (stmt.catchBody || []).map((s: any) => this.compileFnStatementToJS(s)).join(';');
+        return `try{${tryBody}}catch(${stmt.catchVar || 'e'}){${catchBody}}`;
+      }
+      case 'FnThrow':
+        return `throw new Error(${this.resolveStateRefs(stmt.expr || '"Error"')})`;
+      case 'FnMatch': {
+        const expr = this.resolveStateRefs(stmt.expr || stmt.subject || '');
+        const cases = (stmt.cases || stmt.arms || []).map((c: any) => {
+          const body = (c.body || []).map((s: any) => this.compileFnStatementToJS(s)).join(';');
+          return c.pattern === '_' ? `default:{${body};break}` : `case ${c.pattern}:{${body};break}`;
+        }).join('');
+        return `switch(${expr}){${cases}}`;
+      }
       default:
         return this.resolveStateRefs(stmt.value || stmt.expr || '');
     }

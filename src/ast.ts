@@ -885,7 +885,64 @@ export type FnStatement =
   | FnThrowStatement
   | FnDeferStatement
   | FnExprStatement
-  | FnEachStatement;
+  | FnEachStatement
+  | FnPushStatement
+  | FnPopStatement
+  | FnRemoveStatement
+  | FnShiftStatement
+  | FnLetStatement
+  | FnCallStatement;
+
+/** v0.50: `push arr value` inside fn */
+export interface FnPushStatement {
+  type: 'FnPush';
+  array: string;
+  value: string;
+  line: number;
+  col: number;
+}
+
+/** v0.50: `pop arr` inside fn */
+export interface FnPopStatement {
+  type: 'FnPop';
+  array: string;
+  line: number;
+  col: number;
+}
+
+/** v0.50: `remove arr index` inside fn */
+export interface FnRemoveStatement {
+  type: 'FnRemove';
+  array: string;
+  index: string;
+  line: number;
+  col: number;
+}
+
+/** v0.50: `shift arr` inside fn */
+export interface FnShiftStatement {
+  type: 'FnShift';
+  array: string;
+  line: number;
+  col: number;
+}
+
+/** v0.50: `let x = expr` inside fn (local, non-reactive) */
+export interface FnLetStatement {
+  type: 'FnLet';
+  name: string;
+  value: string;
+  line: number;
+  col: number;
+}
+
+/** v0.50: `call fnName(args)` inside fn */
+export interface FnCallStatement {
+  type: 'FnCall';
+  expr: string;
+  line: number;
+  col: number;
+}
 
 /** `set x = expression` inside fn */
 export interface FnSetStatement {

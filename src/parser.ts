@@ -7522,6 +7522,38 @@ export class Parser {
         });
       } else if (token.type === TokenType.Each) {
         stmts.push(this.parseFnEach());
+      } else if (token.type === TokenType.Identifier && token.value === 'push') {
+        // v0.50: push arr value
+        this.advance();
+        const arrName = this.consumeIdentifier();
+        const val = this.consumeFnExpression();
+        stmts.push({ type: 'FnPush', array: arrName, value: val, line: token.line, col: token.col } as any);
+      } else if (token.type === TokenType.Identifier && token.value === 'pop') {
+        this.advance();
+        const arrName = this.consumeIdentifier();
+        stmts.push({ type: 'FnPop', array: arrName, line: token.line, col: token.col } as any);
+      } else if (token.type === TokenType.Identifier && token.value === 'shift') {
+        this.advance();
+        const arrName = this.consumeIdentifier();
+        stmts.push({ type: 'FnShift', array: arrName, line: token.line, col: token.col } as any);
+      } else if (token.type === TokenType.Identifier && token.value === 'remove') {
+        // v0.50: remove arr index
+        this.advance();
+        const arrName = this.consumeIdentifier();
+        const idx = this.consumeFnExpression();
+        stmts.push({ type: 'FnRemove', array: arrName, index: idx, line: token.line, col: token.col } as any);
+      } else if (token.type === TokenType.Let) {
+        // v0.50: let x = expr (local variable)
+        this.advance();
+        const letName = this.consumeIdentifier();
+        this.consume(TokenType.Equals);
+        const letVal = this.consumeFnExpression();
+        stmts.push({ type: 'FnLet', name: letName, value: letVal, line: token.line, col: token.col } as any);
+      } else if (token.type === TokenType.Identifier && token.value === 'call') {
+        // v0.50: call fnName(args)
+        this.advance();
+        const callExpr = this.consumeFnExpression();
+        stmts.push({ type: 'FnCall', expr: callExpr, line: token.line, col: token.col } as any);
       } else {
         const expr = this.consumeFnExpression();
         if (expr)
@@ -7733,7 +7765,7 @@ export class Parser {
           break;
         if (
           tok.type === TokenType.Identifier &&
-          (tok.value === "set" || tok.value === "defer")
+          (tok.value === "set" || tok.value === "defer" || tok.value === "push" || tok.value === "pop" || tok.value === "shift" || tok.value === "remove" || tok.value === "call")
         )
           break;
         // Stop at top-level keywords (short-form fn expressions must end here)

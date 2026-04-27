@@ -360,3 +360,19 @@ describe("v0.50: Array Operations", () => {
     assert.ok(html.includes("notify"), "should notify");
   });
 });
+
+describe("v0.50: push/remove in fn bodies (Kiro Bug #1)", () => {
+  it("push in fn body compiles correctly", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let count = 0\n  let items = []\n  fn add() {\n    set count = count + 1\n    push items "new"\n  }\n  button "Add" on:click { call add() }\n}');
+    assert.ok(html.includes("function add()"), "should have fn declaration");
+    assert.ok(html.includes(".push("), "should have array push in fn");
+    assert.ok(html.includes("notify"), "should notify after push");
+    assert.ok(!html.includes("push __nyx"), "raw push should NOT appear");
+  });
+
+  it("remove in fn body compiles correctly", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let items = []\n  fn del(i) {\n    remove items i\n  }\n  p "test"\n}');
+    assert.ok(html.includes("function del(i)"), "should have fn with param");
+    assert.ok(html.includes(".splice("), "should have splice");
+  });
+});
