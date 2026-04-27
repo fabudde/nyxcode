@@ -1,6 +1,6 @@
 {
   "name": "@fabudde/nyxcode",
-  "version": "0.38.3",
+  "version": "0.39.0",
   "description": "NyxCode — The AI-native programming language. One .nyx file = full-stack app. 3.5x fewer tokens than Next.js.",
   "type": "module",
   "main": "dist/index.js",
