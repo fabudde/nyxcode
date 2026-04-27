@@ -5857,8 +5857,17 @@ async function __nyx_sse(url, body, onChunk, onDone) {
     if (!stmt) return '';
     switch (stmt.type) {
       case 'FnSet': {
-        const ref = this.resolveVarToState(stmt.name);
         const val = this.resolveStateRefs(stmt.value || stmt.expr || '');
+        // v0.50: Handle indexed/dotted paths: items[i].type
+        const bracketMatch = stmt.name.match(/^(\w+)\[(.+?)\](.*)$/);
+        if (bracketMatch) {
+          const arrName = bracketMatch[1];
+          const idx = this.resolveStateRefs(bracketMatch[2]);
+          const rest = bracketMatch[3];
+          const arrRef = this.resolveVarToState(arrName) || `__nyx.state.${arrName}`;
+          return `${arrRef}[${idx}]${rest}=${val};__nyx.notify('${arrName}')`;
+        }
+        const ref = this.resolveVarToState(stmt.name);
         return ref ? `${ref}=${val}` : `${stmt.name}=${val}`;
       }
       case 'FnReturn':

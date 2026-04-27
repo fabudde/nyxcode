@@ -7485,7 +7485,31 @@ export class Parser {
       const token = this.peek();
       if (token.type === TokenType.Identifier && token.value === "set") {
         this.advance();
-        const setName = this.consumeIdentifier();
+        // v0.50: Consume full L-value path: name, name.prop, name[expr].prop
+        let setName = this.consumeIdentifier();
+        while (!this.isAtEnd()) {
+          if (this.check(TokenType.Dot)) {
+            this.advance(); // consume .
+            setName += '.' + this.consumeIdentifier();
+          } else if (this.check(TokenType.LeftBracket)) {
+            this.advance(); // consume [
+            let bracketExpr = '';
+            let depth = 1;
+            while (depth > 0 && !this.isAtEnd()) {
+              const t = this.peek();
+              if (t.type === TokenType.LeftBracket) depth++;
+              else if (t.type === TokenType.RightBracket) {
+                depth--;
+                if (depth === 0) { this.advance(); break; }
+              }
+              bracketExpr += t.value;
+              this.advance();
+            }
+            setName += '[' + bracketExpr + ']';
+          } else {
+            break;
+          }
+        }
         this.consume(TokenType.Equals);
         const expr = this.consumeFnExpression();
         stmts.push({

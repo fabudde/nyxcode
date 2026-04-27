@@ -397,3 +397,12 @@ describe("v0.50: Dynamic text interpolation in each templates", () => {
     assert.ok(html.includes("${item}"), "should resolve {item} to template literal");
   });
 });
+
+describe("v0.50: set indexed path in fn body", () => {
+  it("set items[i].type = t in fn compiles correctly", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let items = []\n  fn setType(i, t) {\n    set items[i].type = t\n  }\n  p "test"\n}');
+    assert.ok(html.includes("function setType(i,t)"), "should have fn with params");
+    assert.ok(html.includes(".type=t"), "should set .type property");
+    assert.ok(html.includes("notify"), "should notify");
+  });
+});
