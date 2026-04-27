@@ -2877,6 +2877,13 @@ export class Compiler {
   private resolveTemplateAttrs(attributes: any[], varName: string): string {
     return attributes
       .map((a) => {
+        // v0.50: Compile event handlers in each-loop templates
+        if (a.name.startsWith('on') && a.name.length > 2 && a.name[2] === a.name[2].toUpperCase()) {
+          const eventType = a.name.slice(2).toLowerCase();
+          const action = typeof a.value === 'string' ? a.value : '';
+          const js = this.actionToJS(action).replace(/"/g, "'");
+          return `on${eventType}="${js}"`;
+        }
         if (typeof a.value === "string" && a.value !== "true") {
           // Resolve .field references in attribute values
           let val = a.value;
@@ -5714,6 +5721,8 @@ async function __nyx_sse(url, body, onChunk, onDone) {
     }
     // Normalize spaces around dots: "user . name" -> "user.name"
     action = action.replace(/\s*\.\s*/g, ".");
+    // v0.50: Normalize spaces around brackets: "items [ i ]" -> "items[i]"
+    action = action.replace(/\s*\[\s*/g, "[").replace(/\s*\]\s*/g, "]");
     // State mutations: count += 1, count -= 1, count++, count--, name = "new"
     // Handle compound operators: +=, -=, *=, /=, ++, --
     const compoundMatch = action.match(
@@ -5731,11 +5740,21 @@ async function __nyx_sse(url, body, onChunk, onDone) {
         return `${stateRef} ${op} ${rhsResolved}`;
       }
     }
-    // Simple assignment: name = "new"
-    const assignMatch = action.match(/^(\w[\w.]*)\s*=\s*(.+)$/);
+    // Simple assignment: name = "new" or items[i].active = true
+    const assignMatch = action.match(/^([\w.\[\]]+)\s*=\s*(.+)$/);
     if (assignMatch) {
       const varName = assignMatch[1];
       const rhs = assignMatch[2].trim();
+      // Handle indexed access: items[i].prop → __nyx.state.items[i].prop + notify
+      const bracketMatch = varName.match(/^(\w+)\[(.+?)\](.*)$/);
+      if (bracketMatch) {
+        const arrName = bracketMatch[1];
+        const idx = this.resolveStateRefs(bracketMatch[2]);
+        const rest = bracketMatch[3]; // e.g. .active
+        const arrRef = this.resolveVarToState(arrName) || `__nyx.state.${arrName}`;
+        const rhsResolved = this.resolveStateRefs(rhs).replace(/"/g, "'");
+        return `${arrRef}[${idx}]${rest}=${rhsResolved};__nyx.notify('${arrName}')`;
+      }
       const stateRef = this.resolveVarToState(varName);
       if (stateRef) {
         const rhsResolved = this.resolveStateRefs(rhs).replace(/"/g, "'");

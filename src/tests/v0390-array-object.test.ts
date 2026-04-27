@@ -376,3 +376,16 @@ describe("v0.50: push/remove in fn bodies (Kiro Bug #1)", () => {
     assert.ok(html.includes(".splice("), "should have splice");
   });
 });
+
+describe("v0.50: each with index + array index set", () => {
+  it("each with index variable", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let items = []\n  each items -> item, i {\n    p "{i}: {item}"\n  }\n}');
+    assert.ok(html.includes("(item, i)"), "map callback should have index param");
+  });
+
+  it("set items[i].active compiles to indexed access + notify", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let items = []\n  each items -> item, i {\n    button "Toggle" on:click { set items[i].active = true }\n  }\n}');
+    assert.ok(html.includes("[i].active=true"), "should set indexed property");
+    assert.ok(html.includes("notify"), "should notify after indexed set");
+  });
+});

@@ -210,6 +210,7 @@ export interface EachStatement extends BaseNode {
   collection: string;
   alias?: string;
   element: string;
+  indexVar?: string;  // v0.50: each items -> item, i { }
   attributes?: Attribute[];
   body: Statement[];
 }

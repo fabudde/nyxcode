@@ -3421,6 +3421,13 @@ export class Parser {
     this.consume(TokenType.Arrow);
     const element = this.consumeIdentifier();
 
+    // v0.50: optional index variable: each items -> item, i { }
+    let indexVar: string | undefined;
+    if (this.check(TokenType.Comma)) {
+      this.advance(); // consume comma
+      indexVar = this.consumeIdentifier();
+    }
+
     // Parse optional attributes on the wrapper element (e.g. each items -> div preset=card flex=row { ... })
     const attributes: Attribute[] = [];
     while (!this.check(TokenType.LeftBrace) && !this.isAtEnd()) {
@@ -3463,6 +3470,7 @@ export class Parser {
       collection,
       alias,
       element,
+      indexVar,
       attributes: attributes.length > 0 ? attributes : undefined,
       body,
       line: start.line,
