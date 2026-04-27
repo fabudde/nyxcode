@@ -1,3 +1,121 @@
+# NyxCode v0.39.0 — "The Language Release II" 🔥
+
+**NyxCode is now a full programming language.** All 10 language feature issues (#183-#192) closed in a single session.
+
+## New Features
+
+### #189: Array & Object Literals
+```nyx
+api GET /api/colors {
+  let colors = ["red", "green", "blue"]
+  let config = { theme: "dark", lang: "de" }
+  respond 200 { colors: colors, config: config }
+}
+```
+
+### #184: Mutable Variables (`set`, `push`, `pop`, `shift`)
+```nyx
+api POST /api/process {
+  let count = 0
+  let results = []
+  set count = count + 1
+  set config.theme = "light"    // dot notation
+  push results "first"
+  pop results
+  respond 200 { count: count }
+}
+```
+
+### #183: While & For Loops
+```nyx
+api GET /api/fibonacci {
+  let a = 0
+  let b = 1
+  let seq = []
+  for i in 0..10 {
+    push seq a
+    let temp = b
+    set b = a + b
+    set a = temp
+  }
+  respond 200 { sequence: seq }
+}
+
+api GET /api/countdown {
+  let n = 10
+  while n > 0 {
+    set n = n - 1
+  }
+  respond 200 { done: true }
+}
+```
+⚠️ Infinite loop guard: throws after 10,000 iterations.  
+Custom step: `for i in 0..100 step 5 { }`
+
+### #185: Client-side Reactivity
+```nyx
+page / {
+  let count = 0
+  let todos = []
+  
+  h1 "Count: {count}"
+  button "+" on:click { set count = count + 1 }
+  button "Add Todo" on:click { push todos "new item" }
+  
+  each todos -> todo {
+    p "{todo}"
+  }
+}
+```
+- State changes auto-update DOM (template bindings)
+- Array mutations trigger list re-render via `__nyx.notify()`
+- Two-way binding with `model=` attribute
+
+### #192: Component Events (`emit`)
+```nyx
+component Counter {
+  let count = 0
+  button "+" on:click { emit increment count }
+}
+
+page / {
+  Counter on:increment { set total = total + 1 }
+}
+```
+- `emit eventName [data]` → dispatches CustomEvent with bubbling
+- Parents listen with `on:eventName { }`
+
+### #187: WebSocket
+```nyx
+socket /ws/chat {
+  on connect { }
+  on message { }
+  on close { }
+}
+```
+- Generates WebSocketServer (ws package)
+- Auto-broadcast on message
+- Path-based routing for multiple endpoints
+- Client ID tracking
+
+### #186, #188, #190, #191: Already Implemented!
+- **File Upload** (#186): `table photos { image upload }` → multer middleware
+- **SPA Routing** (#188): Multiple `page` blocks → client-side pushState router
+- **HTTP Client** (#190): `fetch "url" { method, headers, body } as result`
+- **Async/Await** (#191): All API handlers are async, fetch awaits automatically
+
+## Stats
+- **572 tests**, 0 failures
+- **+54 tests** since v0.38.3 (518 → 572)
+- All 10 issues (#183-#192) closed
+- 7 commits in one session
+
+## Breaking Changes
+- `let` in API blocks now generates `let` (not `const`) to allow reassignment
+- None other — fully backward compatible
+
+---
+
 # NyxCode v0.38.3 — Fix: Double colons in inline style={} (Regression #182)
 
 ### Bug Fixes
