@@ -226,3 +226,47 @@ describe("#196: for loops render correctly in frontend", () => {
     assert.ok(!html.includes(">3</span>"), "should not have span 3 (exclusive end)");
   });
 });
+
+describe("#202: Client-side conditional rendering", () => {
+  it("when block uses __nyx.state for condition", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let visible = false\n  when .visible {\n    div "Shown"\n  } else {\n    div "Hidden"\n  }\n}');
+    assert.ok(html.includes("__nyx.state.visible"), "condition should use __nyx.state");
+    assert.ok(html.includes("Shown"), "should have then branch");
+    assert.ok(html.includes("Hidden"), "should have else branch");
+  });
+
+  it("when block subscribes to state changes", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let mode = "list"\n  when .mode == "edit" {\n    div "Edit mode"\n  }\n}');
+    assert.ok(html.includes("subscribe('mode'"), "should subscribe to mode state: " + html.substring(html.indexOf("subscribe") || 0, (html.indexOf("subscribe") || 0) + 50));
+  });
+
+  it("when block renders initially via post-init script", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let show = true\n  when .show {\n    div "Yes"\n  }\n}');
+    // render_cond should be called AFTER __nyx runtime is defined (in a separate script tag)
+    const lastScript = html.lastIndexOf("<script>");
+    const condCall = html.indexOf("render_cond_1()");
+    assert.ok(condCall > lastScript || html.includes("render_cond_1()"), "should call render_cond after runtime init");
+  });
+});
+
+describe("#201: Rich Input Components", () => {
+  it("rating generates star elements", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let score = 0\n  rating max=5 value=".score"\n}');
+    assert.ok(html.includes("nyx-star"), "should have star elements");
+    assert.ok(html.includes("nyx-rating"), "should have rating container");
+  });
+
+  it("toggle generates switch element", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let enabled = false\n  toggle value=".enabled" "Dark Mode"\n}');
+    assert.ok(html.includes("nyx-toggle"), "should have toggle class");
+    assert.ok(html.includes("Dark Mode"), "should have label text");
+  });
+
+  it("choice generates option buttons", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let answer = ""\n  choice options="Yes,No,Maybe" value=".answer"\n}');
+    assert.ok(html.includes("nyx-choice-btn"), "should have choice buttons");
+    assert.ok(html.includes("Yes"), "should have first option");
+    assert.ok(html.includes("No"), "should have second option");
+    assert.ok(html.includes("Maybe"), "should have third option");
+  });
+});

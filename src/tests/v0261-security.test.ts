@@ -90,7 +90,7 @@ describe('v0.26.1: Finding #1 — runtime `when` bare-identifier leak protection
     // Runtime when → wrapper + render_ fn present.
     assert.match(result!.html, /id="cond_\d+"/);
     assert.match(result!.js, /function render_cond_\d+/);
-    assert.match(result!.js, /data\.role == "admin"/);
+    assert.match(result!.js, /__nyx\.state\.role == "admin"/);
     // No warning — dotted refs are always safe.
     assert.ok(!warn.some(w => w.includes('bare identifier')), 'no warning for .dotRef');
   });

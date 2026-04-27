@@ -807,7 +807,7 @@ export class Compiler {
         this.compileStyleWithClass(pageStyle, pageId);
       }
 
-      html += `${this.ind()}<div id="${pageId}" class="nyx-route${pageStyle ? " " + pageId : ""}" data-route="${route}" style="display:none">\n`;
+      html += `${this.ind()}<div id="${pageId}" class="nyx-route${pageStyle ? " " + pageId : ""}" data-route="${route}"${page.auth ? ' data-auth="true"' : ''} style="display:none">\n`;
       this.indent++;
       for (const stmt of page.body) {
         if (stmt === pageStyle) continue;
@@ -822,8 +822,25 @@ export class Compiler {
   // NyxCode SPA Router
   const __routes = document.querySelectorAll('.nyx-route');
   function __navigate(path) {
-    __routes.forEach(r => r.style.display = r.dataset.route === path ? '' : 'none');
+    // #197: Check auth for protected routes
+    let matched = null;
+    __routes.forEach(r => {
+      if (r.dataset.route === path) matched = r;
+      r.style.display = 'none';
+    });
+    if (matched) {
+      if (matched.dataset.auth && !localStorage.getItem('token')) {
+        // Auth required but no token — redirect to login
+        const loginRoute = document.querySelector('[data-route="/login"]');
+        if (loginRoute) { loginRoute.style.display = ''; history.pushState(null, '', '/login'); return; }
+      }
+      matched.style.display = '';
+    } else if (__routes.length > 0) {
+      __routes[0].style.display = '';
+    }
     history.pushState(null, '', path);
+    // Scroll to top on navigation
+    window.scrollTo(0, 0);
   }
   // Handle initial route
   const __initPath = location.pathname || '/';
@@ -1034,6 +1051,11 @@ export class Compiler {
         attributes: [...el.attributes, { name: "type", value: "submit" }],
       };
     }
+
+    // ===== #201: Rich Input Components =====
+    if (el.tag === 'rating') return this.compileRatingInput(el);
+    if (el.tag === 'toggle') return this.compileToggleInput(el);
+    if (el.tag === 'choice') return this.compileChoiceInput(el);
 
     // ===== v0.24.0: nav burger =====
     // Intercept `<nav>` elements that carry a `burger` attribute and rewrite
@@ -2299,6 +2321,12 @@ export class Compiler {
   let ${name} = [];
   let ${name}__loading = true;
   let ${name}__error = null;
+  // #198: Initialize data as reactive state
+  if (typeof __nyx !== 'undefined' && __nyx.createState) {
+    if (!__nyx.subscribers.has('${name}')) __nyx.createState('${name}', []);
+    if (!__nyx.subscribers.has('${name}__loading')) __nyx.createState('${name}__loading', true);
+    if (!__nyx.subscribers.has('${name}__error')) __nyx.createState('${name}__error', null);
+  }
   async function load_${name}() {
     ${name}__loading = true;
     ${name}__error = null;
@@ -2311,6 +2339,13 @@ export class Compiler {
       if(!res.ok){var _e=new Error('HTTP '+res.status);_e.status=res.status;throw _e;}
       var _d = await res.json();
       ${name} = Array.isArray(_d) ? _d : [_d];
+      // #198: Push fetched data into reactive state
+      if (typeof __nyx !== 'undefined' && __nyx.createState) {
+        if (!__nyx.subscribers.has('${name}')) __nyx.createState('${name}', ${name});
+        else __nyx.state['${name}'] = ${name};
+        if (!__nyx.subscribers.has('${name}__loading')) __nyx.createState('${name}__loading', false);
+        else __nyx.state['${name}__loading'] = false;
+      }
       ${name}__loading = false;
       ${hasStates ? `if(document.getElementById('${loadingId}'))document.getElementById('${loadingId}').style.display='none';` : ""}
       ${hasStates ? `if(document.getElementById('${emptyId}'))document.getElementById('${emptyId}').style.display=${name}.length===0?'':'none';` : ""}
@@ -2388,7 +2423,100 @@ export class Compiler {
 
   // --- Each compilation ---
 
-  private compileEach(each: EachStatement): string {
+
+  // ===== #201: Rich Input Components =====
+
+  /** rating max=5 value=".score" → Interactive star rating */
+  private compileRatingInput(el: ElementNode): string {
+    const max = parseInt(el.attributes.find(a => a.name === 'max')?.value as string || '5');
+    const valueAttr = el.attributes.find(a => a.name === 'value');
+    const stateVar = valueAttr ? (valueAttr.value as string).replace(/^\./, '') : '';
+    const id = this.nextId('rating');
+    
+    let stars = '';
+    for (let i = 1; i <= max; i++) {
+      stars += `<span class="nyx-star" data-value="${i}" style="cursor:pointer;font-size:1.5rem;color:#ddd;transition:color 0.15s">★</span>`;
+    }
+    
+    this.css.push(`.nyx-rating .nyx-star.active{color:#f59e0b}.nyx-rating .nyx-star:hover~.nyx-star{color:#ddd}`);
+    
+    if (stateVar) {
+      this.scripts.push(
+        `document.getElementById('${id}').querySelectorAll('.nyx-star').forEach(s=>{` +
+        `s.addEventListener('click',()=>{const v=parseInt(s.dataset.value);` +
+        `if(typeof __nyx!=='undefined')__nyx.state['${stateVar}']=v;` +
+        `document.getElementById('${id}').querySelectorAll('.nyx-star').forEach((st,i)=>{st.style.color=i<v?'#f59e0b':'#ddd'})});` +
+        `s.addEventListener('mouseenter',()=>{const v=parseInt(s.dataset.value);` +
+        `document.getElementById('${id}').querySelectorAll('.nyx-star').forEach((st,i)=>{st.style.color=i<v?'#fbbf24':'#ddd'})});` +
+        `});document.getElementById('${id}').addEventListener('mouseleave',()=>{` +
+        `const v=typeof __nyx!=='undefined'?(__nyx.state['${stateVar}']||0):0;` +
+        `document.getElementById('${id}').querySelectorAll('.nyx-star').forEach((st,i)=>{st.style.color=i<v?'#f59e0b':'#ddd'})});`
+      );
+    }
+    
+    return `${this.ind()}<div id="${id}" class="nyx-rating" style="display:inline-flex;gap:2px">${stars}</div>\n`;
+  }
+
+  /** toggle value=".enabled" → On/off switch */
+  private compileToggleInput(el: ElementNode): string {
+    const valueAttr = el.attributes.find(a => a.name === 'value');
+    const stateVar = valueAttr ? (valueAttr.value as string).replace(/^\./, '') : '';
+    const label = typeof el.content === 'string' ? el.content : (el.content as any)?.value || '';
+    const id = this.nextId('toggle');
+    
+    this.css.push(
+      `.nyx-toggle{position:relative;display:inline-flex;align-items:center;gap:0.5rem;cursor:pointer}` +
+      `.nyx-toggle-track{width:44px;height:24px;border-radius:12px;background:#ccc;transition:background 0.2s;position:relative}` +
+      `.nyx-toggle-track.active{background:#3b82f6}` +
+      `.nyx-toggle-thumb{width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2)}` +
+      `.nyx-toggle-track.active .nyx-toggle-thumb{left:22px}`
+    );
+    
+    if (stateVar) {
+      this.scripts.push(
+        `document.getElementById('${id}').addEventListener('click',()=>{` +
+        `if(typeof __nyx!=='undefined'){__nyx.state['${stateVar}']=!__nyx.state['${stateVar}'];` +
+        `const t=document.getElementById('${id}').querySelector('.nyx-toggle-track');` +
+        `t.classList.toggle('active',__nyx.state['${stateVar}'])}});`
+      );
+    }
+    
+    return `${this.ind()}<div id="${id}" class="nyx-toggle"><div class="nyx-toggle-track"><div class="nyx-toggle-thumb"></div></div>${label ? `<span>${this.escapeHtml(label)}</span>` : ''}</div>\n`;
+  }
+
+  /** choice options="A,B,C,D" value=".answer" → Styled choice buttons */
+  private compileChoiceInput(el: ElementNode): string {
+    const optionsAttr = el.attributes.find(a => a.name === 'options');
+    const options = optionsAttr ? (optionsAttr.value as string).split(',').map(o => o.trim()) : [];
+    const valueAttr = el.attributes.find(a => a.name === 'value');
+    const stateVar = valueAttr ? (valueAttr.value as string).replace(/^\./, '') : '';
+    const id = this.nextId('choice');
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    
+    let buttons = '';
+    for (let i = 0; i < options.length; i++) {
+      buttons += `<button type="button" class="nyx-choice-btn" data-value="${this.escapeHtml(options[i])}" style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;border:2px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer;width:100%;text-align:left;transition:all 0.15s">` +
+        `<span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:#f3f4f6;font-weight:600;font-size:0.8rem">${letters[i] || ''}</span>` +
+        `<span>${this.escapeHtml(options[i])}</span></button>`;
+    }
+    
+    this.css.push(`.nyx-choice-btn:hover{border-color:#3b82f6;background:#eff6ff}.nyx-choice-btn.selected{border-color:#3b82f6;background:#dbeafe}`);
+    
+    if (stateVar) {
+      this.scripts.push(
+        `document.getElementById('${id}').querySelectorAll('.nyx-choice-btn').forEach(b=>{` +
+        `b.addEventListener('click',()=>{` +
+        `document.getElementById('${id}').querySelectorAll('.nyx-choice-btn').forEach(x=>x.classList.remove('selected'));` +
+        `b.classList.add('selected');` +
+        `if(typeof __nyx!=='undefined')__nyx.state['${stateVar}']=b.dataset.value` +
+        `})});`
+      );
+    }
+    
+    return `${this.ind()}<div id="${id}" class="nyx-choice" style="display:flex;flex-direction:column;gap:0.5rem">${buttons}</div>\n`;
+  }
+
+    private compileEach(each: EachStatement): string {
     const varName = each.alias || "item";
     const containerId = this.nextId("list");
 
@@ -2401,6 +2529,9 @@ export class Compiler {
       ${this.compileEachBody(each, varName)}
     \`).join('');
   }`);
+
+    // #199: Subscribe to collection for reactive list re-rendering
+    this.scripts.push(`__nyx.subscribe('${each.collection}', render_${containerId}); render_${containerId}();`);
 
     // #178: display:contents makes wrapper invisible to grid/flex layout
     return `${this.ind()}<div id="${containerId}" style="display:contents"></div>\n`;
@@ -2880,15 +3011,18 @@ export class Compiler {
     }
 
     const condId = this.nextId("cond");
-    const condition = this.expressionToJS(when.condition);
+    const condition = this.conditionToReactiveJS(when.condition);
 
     const thenHtml = when.body.map((s) => this.compileStatement(s)).join("");
     const elseHtml = when.elseBody
       ? when.elseBody.map((s) => this.compileStatement(s)).join("")
       : "";
 
+    // #202: Extract state variable names for reactive subscriptions
+    const stateRefs = this.extractStateRefsFromExpr(when.condition);
+
     this.js.push(`
-  // When: ${condition}
+  // When: ${condition} (#202: reactive conditional)
   function render_${condId}() {
     const el = document.getElementById('${condId}');
     if (!el) return;
@@ -2897,7 +3031,12 @@ export class Compiler {
     } else {
       el.innerHTML = \`${elseHtml.trim()}\`;
     }
-  }`);
+  }
+  `);  // function only — no immediate call
+
+    // #202: Subscribe + initial render AFTER runtime init (via scripts array)
+    const subsCode = stateRefs.map(ref => `__nyx.subscribe('${ref}', render_${condId});`).join('\n    ');
+    this.scripts.push(`${subsCode}\n    render_${condId}();`);
 
     return `${this.ind()}<div id="${condId}"></div>\n`;
   }
@@ -5500,7 +5639,88 @@ async function __nyx_sse(url, body, onChunk, onDone) {
     return result;
   }
 
-  private expressionToJS(expr: Expression): string {
+  // #202: Convert condition expression to JS using __nyx.state references
+  private conditionToReactiveJS(expr: any): string {
+    if (!expr) return 'false';
+    switch (expr.type) {
+      case 'PropertyAccess':
+        // .dotRef → __nyx.state.xxx
+        return `__nyx.state${expr.path}`;
+      case 'MemberExpression':
+        return `${this.conditionToReactiveJS(expr.object)}.${expr.property}`;
+      case 'IndexExpression':
+        return `${this.conditionToReactiveJS(expr.object)}[${this.conditionToReactiveJS(expr.index)}]`;
+      case 'BinaryExpression': {
+        const op = expr.operator === 'and' ? '&&' : expr.operator === 'or' ? '||' : expr.operator;
+        return `(${this.conditionToReactiveJS(expr.left)} ${op} ${this.conditionToReactiveJS(expr.right)})`;
+      }
+      case 'UnaryExpression':
+        return `(${expr.operator}${this.conditionToReactiveJS(expr.operand)})`;
+      case 'TernaryExpression':
+        return `(${this.conditionToReactiveJS(expr.condition)} ? ${this.conditionToReactiveJS(expr.consequent)} : ${this.conditionToReactiveJS(expr.alternate)})`;
+      case 'Identifier':
+        // Bare identifier → check if it's a state variable
+        return `__nyx.state['${expr.name}']`;
+      case 'StoreAccess':
+        return `__nyx.state['${expr.store}.${expr.field}']`;
+      case 'StringLiteral':
+        return `"${expr.value}"`;
+      case 'NumberLiteral':
+        return String(expr.value);
+      case 'BooleanLiteral':
+        return String(expr.value);
+      case 'ArrayLiteral':
+        return `[${(expr.elements || []).map((e: any) => this.conditionToReactiveJS(e)).join(', ')}]`;
+      default:
+        return this.expressionToJS(expr);
+    }
+  }
+
+  // #202: Extract state variable names from expression for reactive subscriptions
+  private extractStateRefsFromExpr(expr: any): string[] {
+    const refs: string[] = [];
+    const walk = (node: any) => {
+      if (!node) return;
+      switch (node.type) {
+        case 'PropertyAccess':
+          // .x → state name is x (the first segment after .)
+          if (node.path) {
+            const parts = node.path.replace(/^\./, '').split('.');
+            if (parts[0]) refs.push(parts[0]);
+          }
+          break;
+        case 'Identifier':
+          refs.push(node.name);
+          break;
+        case 'StoreAccess':
+          refs.push(`${node.store}.${node.field}`);
+          break;
+        case 'BinaryExpression':
+          walk(node.left);
+          walk(node.right);
+          break;
+        case 'UnaryExpression':
+          walk(node.operand);
+          break;
+        case 'TernaryExpression':
+          walk(node.condition);
+          walk(node.consequent);
+          walk(node.alternate);
+          break;
+        case 'MemberExpression':
+          walk(node.object);
+          break;
+        case 'IndexExpression':
+          walk(node.object);
+          walk(node.index);
+          break;
+      }
+    };
+    walk(expr);
+    return [...new Set(refs)];
+  }
+
+    private expressionToJS(expr: Expression): string {
     switch (expr.type) {
       case "PropertyAccess":
         return "data" + expr.path;

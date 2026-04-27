@@ -177,7 +177,7 @@ describe('v0.26.0: #114 compile-time `when __xxx__`', () => {
     // Runtime when wraps content in a div id="cond_N" and emits render_* JS.
     assert.match(html, /id="cond_\d+"/, 'runtime when should emit wrapper div');
     assert.match(js, /function render_cond_\d+/, 'runtime when should emit JS');
-    assert.match(js, /data\.role == "admin"/);
+    assert.match(js, /__nyx\.state\.role == "admin"/);
   });
 
   test('compile-time when produces NO wrapper div and NO runtime JS', () => {
