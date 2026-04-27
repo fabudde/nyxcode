@@ -921,6 +921,18 @@ export class Compiler {
           `@keyframes ${(stmt as AnimateStatement).name} { ${(stmt as AnimateStatement).content} }`,
         );
         return "";
+      // v0.50: fn declarations in pages → client-side functions
+      case "Fn": {
+        const fnNode = stmt as any;
+        const fnParams = (fnNode.params || []).map((p: any) => p.defaultValue ? `${p.name}=${p.defaultValue}` : p.name).join(',');
+        if (fnNode.shortForm && fnNode.shortExpr) {
+          this.scripts.push(`function ${fnNode.name}(${fnParams}){return ${this.resolveStateRefs(fnNode.shortExpr)}}`);
+        } else {
+          const fnBody = (fnNode.body || []).map((s: any) => this.compileFnStatementToJS(s)).join(';');
+          this.scripts.push(`function ${fnNode.name}(${fnParams}){${fnBody}}`);
+        }
+        return "";
+      }
       case "Footnotes":
         return this.compileFootnotes(stmt as any);
       case "Icon":
@@ -5779,6 +5791,26 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       );
     }
     return result;
+  }
+
+  /** v0.50: Compile fn body statements to JS (for client-side fn in pages) */
+  private compileFnStatementToJS(stmt: any): string {
+    if (!stmt) return '';
+    switch (stmt.type) {
+      case 'FnSet': {
+        const ref = this.resolveVarToState(stmt.name);
+        const val = this.resolveStateRefs(stmt.value || stmt.expr || '');
+        return ref ? `${ref}=${val}` : `${stmt.name}=${val}`;
+      }
+      case 'FnReturn':
+        return `return ${this.resolveStateRefs(stmt.value || stmt.expr || '')}`;
+      case 'FnLet': {
+        const val = this.resolveStateRefs(stmt.value || stmt.expr || '');
+        return `let ${stmt.name}=${val}`;
+      }
+      default:
+        return this.resolveStateRefs(stmt.value || stmt.expr || '');
+    }
   }
 
   /** v0.50: Compile if/else in event handlers */

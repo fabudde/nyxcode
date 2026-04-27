@@ -332,3 +332,17 @@ describe("v0.50: Multi-Statement Event Handlers", () => {
     assert.ok(html.includes("catch(err)"), "should have catch with var");
   });
 });
+
+describe("v0.50: Client-Side Functions", () => {
+  it("fn in page compiles to JS function", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let count = 0\n  fn increment() {\n    set count = count + 1\n  }\n  button "Go" on:click { call increment() }\n}');
+    assert.ok(html.includes("function increment()"), "should have function declaration");
+    assert.ok(html.includes("__nyx.state.count"), "should reference state in fn body");
+  });
+
+  it("fn with params and return", () => {
+    const html = compile('meta { title "T" }\npage / {\n  fn double(x) {\n    return x * 2\n  }\n  p "test"\n}');
+    assert.ok(html.includes("function double(x)"), "should have function with param");
+    assert.ok(html.includes("return"), "should have return statement");
+  });
+});

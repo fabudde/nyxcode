@@ -3101,6 +3101,9 @@ export class Parser {
         return this.parseEffect();
       case TokenType.Computed:
         return this.parseComputed();
+      // v0.50: fn declarations inside pages
+      case TokenType.Fn:
+        return this.parseFnDeclaration() as any;
       case TokenType.Head:
         return this.parseHead();
       case TokenType.Animate:
@@ -7752,6 +7755,11 @@ export class Parser {
           tok.type === TokenType.Env ||
           tok.type === TokenType.Every ||
           tok.type === TokenType.Stream ||
+          tok.type === TokenType.Let ||
+          tok.type === TokenType.Const ||
+          tok.type === TokenType.State ||
+          tok.type === TokenType.Effect ||
+          tok.type === TokenType.Computed ||
           tok.type === TokenType.EOF
         )
           break;

@@ -154,7 +154,8 @@ export type Statement =
   | ConstStatement
   | EmailStatement
   | ActionCallStatement
-  | IconStatement;
+  | IconStatement
+  | FnNode;  // v0.50: fn in pages
 
 /** `icon "name"` — renders an icon from the configured icon pack (#142) */
 export interface IconStatement extends BaseNode {
