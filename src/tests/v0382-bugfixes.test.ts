@@ -1,7 +1,7 @@
 /**
  * v0.38.2 Bugfixes: #181 (background-clip + vendor prefix) + #172 (JWT persistence)
  */
-import { describe, it } from "node:test";
+import { describe, it, test } from "node:test";
 import { strict as assert } from "node:assert";
 import { Compiler } from "../compiler.js";
 import { Lexer } from "../lexer.js";
@@ -129,4 +129,28 @@ describe("#172: JWT Secret persistence", () => {
     assert.ok(code.includes(".nyx-data"), "should use .nyx-data directory");
     assert.ok(!code.includes("nyx-dev-"), "should NOT have random dev secret");
   });
+});
+
+// === #182: Double colons in inline style={} with CSS-style syntax ===
+test('#182: inline style with explicit colons (bg: red)', () => {
+  const src = 'meta { title "Test" }\npage / {\n  div style={ bg: red } { p "A" }\n}';
+  const html = compile(src);
+  assert.ok(html.includes('style="background:red"'), 'should have single colon: ' + html);
+  assert.ok(!html.includes('::'), 'should NOT have double colons: ' + html);
+});
+
+test('#182: inline style with semicolon separators', () => {
+  const src = 'meta { title "Test" }\npage / {\n  div style={ bg: blue; p: 1rem } { p "B" }\n}';
+  const html = compile(src);
+  assert.ok(html.includes('background:blue'), 'bg should work: ' + html);
+  assert.ok(html.includes('padding:1rem'), 'padding should work: ' + html);
+  assert.ok(!html.includes(';;'), 'should NOT have double semicolons: ' + html);
+  assert.ok(!html.includes('::'), 'should NOT have double colons: ' + html);
+});
+
+test('#182: vendor prefix with colon syntax', () => {
+  const src = 'meta { title "Test" }\npage / {\n  div style={ -webkit-appearance: none } { p "C" }\n}';
+  const html = compile(src);
+  assert.ok(html.includes('-webkit-appearance:none'), 'vendor prefix should work: ' + html);
+  assert.ok(!html.includes(':: none'), 'should NOT have double colon: ' + html);
 });

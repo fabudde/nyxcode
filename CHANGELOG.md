@@ -1,3 +1,16 @@
+# NyxCode v0.38.3 — Fix: Double colons in inline style={} (Regression #182)
+
+### Bug Fixes
+- **#182**: Fixed double colons (`::`) in inline `style={}` when using CSS-style syntax (`bg: red` instead of `bg red`)
+- **#182**: Fixed double semicolons (`;;`) when using `;` as separator in inline styles
+- Both CSS-style (`bg: red; p: 1rem`) and NyxCode-style (`bg red, p 1rem`) now work correctly
+
+### Stats
+- 549 tests, 0 failures (+3 new regression tests)
+- Reported by Kiro 🐺 QA
+
+---
+
 # NyxCode v0.38.2 — Bugfixes: Vendor Prefix Parsing + JWT Persistence
 
 ### Bug Fixes

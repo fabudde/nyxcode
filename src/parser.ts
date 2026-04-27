@@ -6217,6 +6217,8 @@ export class Parser {
                 propName += "-" + this.advance().value;
               }
             }
+            // #182: Consume optional colon after property name (CSS-style syntax)
+            if (this.check(TokenType.Colon)) this.advance();
             let propVal = "";
             let parenD = 0;
             while (!this.isAtEnd()) {
@@ -6255,7 +6257,8 @@ export class Parser {
               // Outside parens: comma or } ends the property
               if (
                 this.check(TokenType.Comma) ||
-                this.check(TokenType.RightBrace)
+                this.check(TokenType.RightBrace) ||
+                (this.peek()?.type === TokenType.Identifier && this.peek()?.value === ";")
               )
                 break;
               // If we already have a value and the next token is a CSS shorthand, stop
@@ -6269,6 +6272,8 @@ export class Parser {
               propVal += (propVal ? " " : "") + this.advance().value;
             }
             if (this.check(TokenType.Comma)) this.advance();
+            // #182: Also consume semicolons as separators (CSS habit)
+            if (this.peek()?.type === TokenType.Identifier && this.peek()?.value === ";") this.advance();
             if (propName && propVal) {
               // Try Tailwind combo: e.g. propName="items", propVal="center" → "items-center"
               const twCombo = resolveTailwindClass(`${propName}-${propVal}`);
