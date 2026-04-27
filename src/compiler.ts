@@ -2595,9 +2595,21 @@ export class Compiler {
   function render_${containerId}() {
     const container = document.getElementById('${containerId}');
     if (!container) return;
+    // v0.50: Preserve input values across re-renders
+    const __inputs = {};
+    container.querySelectorAll('input,textarea,select').forEach((el, idx) => {
+      __inputs[idx] = { value: el.value, selStart: el.selectionStart, selEnd: el.selectionEnd };
+    });
     container.innerHTML = (__nyx.state['${each.collection}'] || ${each.collection} || []).map((${varName}, ${idxVar}) => \`
       ${this.compileEachBody(each, varName)}
     \`).join('');
+    // v0.50: Restore input values after re-render
+    container.querySelectorAll('input,textarea,select').forEach((el, idx) => {
+      if (__inputs[idx]) {
+        el.value = __inputs[idx].value;
+        try { el.setSelectionRange(__inputs[idx].selStart, __inputs[idx].selEnd); } catch(e) {}
+      }
+    });
   }`);
 
     // #199: Subscribe to collection for reactive list re-rendering
@@ -2963,6 +2975,16 @@ export class Compiler {
               );
             }
           }
+          // v0.50: Resolve {varName.field} interpolation in attributes
+          // e.g. value="{item.text}" → value="${item.text}"
+          val = val.replace(/\{([a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)*)\}/g, (match: string, expr: string) => {
+            // Check if the expression starts with the loop variable
+            if (expr.startsWith(varName + '.') || expr === varName) {
+              return `\${${expr}}`;
+            }
+            // Also resolve state refs: {count} → ${__nyx.state.count}
+            return `\${__nyx.state.${expr}}`;
+          });
           return `${a.name}="${val}"`;
         }
         return a.name;
