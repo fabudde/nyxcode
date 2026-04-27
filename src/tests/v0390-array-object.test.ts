@@ -144,3 +144,35 @@ describe("#183: while/for Loops", () => {
     assert.ok(api.body.find((s: any) => s.type === "While"));
   });
 });
+
+describe("#185: Client-side Reactivity — set in event handlers", () => {
+  it("compiles set in on:click to state mutation", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let count = 0\n  button "+" on:click { set count = count + 1 }\n}');
+    assert.ok(html.includes("__nyx.state.count = __nyx.state.count + 1"), "onclick should mutate state: " + html.substring(html.indexOf("onclick"), html.indexOf("onclick") + 80));
+    assert.ok(!html.includes("set __nyx"), "should not leak 'set' keyword");
+  });
+
+  it("compiles push in on:click with notify", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let items = []\n  button "Add" on:click { push items "new" }\n}');
+    assert.ok(html.includes(".push("), "should have .push() call");
+    assert.ok(html.includes("__nyx.notify"), "should notify after push");
+  });
+
+  it("template binding uses data-nyx-tpl", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let name = "Nyx"\n  h1 "Hello {name}!"\n}');
+    assert.ok(html.includes('data-nyx-tpl="Hello {{state.name}}!"'), "should have template binding");
+  });
+});
+
+describe("#192: Component Events — emit", () => {
+  it("parses emit statement", () => {
+    const ast = parse('meta { title "T" }\ncomponent Counter {\n  let count = 0\n  button "+" on:click { emit change count }\n}\npage / { h1 "T" }');
+    const comp = ast.body.find((n: any) => n.type === "Component");
+    assert.ok(comp, "should have Component node");
+  });
+
+  it("compiles emit in on:click to CustomEvent", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let x = 0\n  button "Fire" on:click { emit myEvent }\n}');
+    assert.ok(html.includes("CustomEvent('myEvent'"), "should dispatch CustomEvent: " + html.substring(html.indexOf("onclick") || 0, (html.indexOf("onclick") || 0) + 100));
+  });
+});

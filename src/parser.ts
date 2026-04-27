@@ -3108,6 +3108,10 @@ export class Parser {
         if (this.peek().value === "set" && this.peekAt(1)?.type === TokenType.Identifier) {
           return this.parseSet();
         }
+        // #192: emit event (component events)
+        if (this.peek().value === "emit") {
+          return this.parseEmit();
+        }
         // #183: while loop
         if (this.peek().value === "while") {
           return this.parseWhile();
@@ -5365,7 +5369,31 @@ export class Parser {
   }
 
 
-  // #183: while condition { body }
+  // #192: emit eventName [data]
+  private parseEmit(): any {
+    const start = this.advance(); // consume 'emit'
+    const eventName = this.advance().value;
+    // Optional data payload
+    let data = '';
+    let parenDepth = 0;
+    while (!this.isAtEnd()) {
+      if (this.check(TokenType.LeftParen)) parenDepth++;
+      if (this.check(TokenType.RightParen)) parenDepth--;
+      if (parenDepth > 0) { data += (data ? ' ' : '') + this.advance().value; continue; }
+      if (this.check(TokenType.RightBrace)) break;
+      const next = this.peek();
+      if (next.type === TokenType.Let || next.type === TokenType.Respond ||
+          (next.type === TokenType.Identifier && (next.value === 'set' || next.value === 'emit' || next.value === 'push'))) break;
+      if (this.check(TokenType.String)) {
+        data += (data ? ' ' : '') + JSON.stringify(this.advance().value);
+      } else {
+        data += (data ? ' ' : '') + this.advance().value;
+      }
+    }
+    return { type: 'Emit', eventName, data: data.trim() || undefined, line: start.line, col: start.col };
+  }
+
+    // #183: while condition { body }
   private parseWhile(): any {
     const start = this.advance(); // consume 'while'
     // Consume condition expression until {

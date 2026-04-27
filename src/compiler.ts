@@ -5340,6 +5340,34 @@ async function __nyx_sse(url, body, onChunk, onDone) {
     if (action.startsWith("{") && action.endsWith("}")) {
       action = action.slice(1, -1).trim();
     }
+    // #184/#185: Handle NyxCode-style mutations in event handlers
+    // "set x = expr" → "x = expr"
+    if (action.startsWith("set ")) {
+      action = action.slice(4).trim();
+    }
+    // "push arr value" → "arr.push(value); notify"  
+    if (action.startsWith("push ")) {
+      const parts = action.slice(5).trim().split(/\s+/);
+      const arrName = parts[0];
+      const val = parts.slice(1).join(' ');
+      const stateRef = this.resolveVarToState(arrName);
+      const valResolved = this.resolveStateRefs(val).replace(/"/g, "'");
+      return `${stateRef || '__nyx.state.' + arrName}.push(${valResolved});__nyx.notify('${arrName}')`;
+    }
+    // "pop arr" → "arr.pop(); notify"
+    if (action.startsWith("pop ")) {
+      const arrName = action.slice(4).trim();
+      const stateRef = this.resolveVarToState(arrName);
+      return `${stateRef || '__nyx.state.' + arrName}.pop();__nyx.notify('${arrName}')`;
+    }
+    // #192: "emit eventName [data]" → dispatch custom event
+    if (action.startsWith("emit ")) {
+      const rest = action.slice(5).trim();
+      const parts = rest.split(/\s+/);
+      const eventName = parts[0];
+      const data = parts.length > 1 ? this.resolveStateRefs(parts.slice(1).join(' ')).replace(/"/g, "'") : 'null';
+      return `this.dispatchEvent(new CustomEvent('${eventName}',{bubbles:true,detail:${data}}))`;
+    }
     if (action.startsWith("navigate")) {
       const path = action.replace("navigate ", "");
       return `window.location.href='${path}'`;
