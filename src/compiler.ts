@@ -909,6 +909,32 @@ export class Compiler {
       case "Icon":
         return this.compileIcon(stmt as any);
       default: {
+        // #196: For loops — static unrolling in frontend
+        if ((stmt as any).type === 'For') {
+          const s = stmt as any;
+          const start = parseInt(s.rangeStart) || 0;
+          const end = parseInt(s.rangeEnd) || 0;
+          const step = parseInt(s.step) || 1;
+          if (!isNaN(start) && !isNaN(end) && end - start <= 1000) {
+            let html = '';
+            for (let idx = start; idx < end; idx += step) {
+              for (const child of s.body) {
+                // Compile child, then replace loop variable references
+                let childHtml = this.compileStatement(child);
+                // Replace {varName} and ${varName} with actual value
+                childHtml = childHtml.replace(new RegExp(`\\$\\{${s.varName}\\}|\\{\\{state\\.${s.varName}\\}\\}`, 'g'), String(idx));
+                childHtml = childHtml.replace(new RegExp(`data-nyx-tpl="[^"]*"`, 'g'), (m: string) => m.replace(new RegExp(`\\{\\{state\\.${s.varName}\\}\\}`, 'g'), String(idx)));
+                html += childHtml;
+              }
+            }
+            return html;
+          }
+          return '';
+        }
+        // #196: While loops — skip in frontend (server-side only)
+        if ((stmt as any).type === 'While') return '';
+        // #184: Set/ArrayMutation — skip in frontend (handled by event handlers)
+        if ((stmt as any).type === 'Set' || (stmt as any).type === 'ArrayMutation') return '';
         // Visitor pattern: check registry for node types added by sub-modules
         const visitor = NODE_VISITORS.get(stmt.type);
         if (visitor) return visitor(this, stmt);
@@ -2371,7 +2397,7 @@ export class Compiler {
   function render_${containerId}() {
     const container = document.getElementById('${containerId}');
     if (!container) return;
-    container.innerHTML = ${each.collection}.map(${varName} => \`
+    container.innerHTML = (__nyx.state['${each.collection}'] || ${each.collection} || []).map(${varName} => \`
       ${this.compileEachBody(each, varName)}
     \`).join('');
   }`);
@@ -4344,10 +4370,13 @@ export class Compiler {
             if (/^state\\.[a-zA-Z_]\\w*\\.[a-zA-Z_]\\w*$/.test(expr.trim())) {
               return __nyx.state[parts[1]+'.'+parts[2]] ?? '';
             }
-            // v0.37: Complex expressions: {{state.score * 2}}, {{state.name.toUpperCase()}}
+            // #193: Complex expressions handled safely without new Function()
+            // Try simple property chain: state.x.y.z
             try {
-              const fn = new Function('state', 'computed', 'return (' + expr + ')');
-              return fn(__nyx.state, __nyx.computed) ?? '';
+              const chain = expr.trim().split('.');
+              let val = chain[0] === 'state' ? __nyx.state : chain[0] === 'computed' ? __nyx.computed : null;
+              for (let ci = 1; ci < chain.length && val != null; ci++) val = val[chain[ci]];
+              return val ?? '';
             } catch { return ''; }
           });
         } catch(e) {}
@@ -5352,7 +5381,7 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       const val = parts.slice(1).join(' ');
       const stateRef = this.resolveVarToState(arrName);
       const valResolved = this.resolveStateRefs(val).replace(/"/g, "'");
-      return `${stateRef || '__nyx.state.' + arrName}.push(${valResolved});__nyx.notify('${arrName}')`;
+      return `if(Array.isArray(${stateRef || '__nyx.state.' + arrName})){${stateRef || '__nyx.state.' + arrName}.push(${valResolved});__nyx.notify('${arrName}')}`;
     }
     // "pop arr" → "arr.pop(); notify"
     if (action.startsWith("pop ")) {

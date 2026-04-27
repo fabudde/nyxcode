@@ -209,3 +209,20 @@ describe("#190: HTTP Client — fetch in API blocks", () => {
     assert.equal(fetchNode.asVar, "result");
   });
 });
+
+describe("#195: render_list uses __nyx.state (not accessor)", () => {
+  it("each in page uses __nyx.state for collection", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let items = ["a", "b"]\n  each items -> item {\n    span "{item}"\n  }\n}');
+    assert.ok(html.includes("__nyx.state['items']"), "should reference __nyx.state: " + html.substring(html.indexOf("items.map") || html.indexOf("__nyx.state") || 0, (html.indexOf("items.map") || html.indexOf("__nyx.state") || 0) + 80));
+  });
+});
+
+describe("#196: for loops render correctly in frontend", () => {
+  it("for loop statically unrolls in page", () => {
+    const html = compile('meta { title "T" }\npage / {\n  for i in 0..3 {\n    span "{i}"\n  }\n}');
+    assert.ok(html.includes(">0</span>"), "should have span 0: " + html);
+    assert.ok(html.includes(">1</span>"), "should have span 1");
+    assert.ok(html.includes(">2</span>"), "should have span 2");
+    assert.ok(!html.includes(">3</span>"), "should not have span 3 (exclusive end)");
+  });
+});
