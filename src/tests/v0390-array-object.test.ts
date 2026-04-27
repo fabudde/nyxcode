@@ -61,3 +61,50 @@ describe("#189: Array/Object Literals — Frontend Compilation", () => {
     assert.ok(html.includes('"yes"'), "should have object values in state");
   });
 });
+
+describe("#184: set — Variable Reassignment", () => {
+  it("parses set statement", () => {
+    const ast = parse('meta { title "T" }\ntable t { n text }\napi POST /api/t {\n  let x = 0\n  set x = 5\n  respond 200 { x: x }\n}\npage / { h1 "T" }');
+    const api = ast.body.find((n: any) => n.type === "Api");
+    const setNode = api.body.find((s: any) => s.type === "Set");
+    assert.ok(setNode, "should create Set node");
+    assert.equal(setNode.target, "x");
+    assert.equal(setNode.expr, "5");
+  });
+
+  it("parses set with dot notation", () => {
+    const ast = parse('meta { title "T" }\ntable t { n text }\napi POST /api/t {\n  let user = { name: "A" }\n  set user.name = "B"\n  respond 200 { user: user }\n}\npage / { h1 "T" }');
+    const api = ast.body.find((n: any) => n.type === "Api");
+    const setNode = api.body.find((s: any) => s.type === "Set");
+    assert.ok(setNode, "should create Set node for dot notation");
+    assert.equal(setNode.target, "user.name");
+  });
+
+  it("parses set with arithmetic expression", () => {
+    const ast = parse('meta { title "T" }\ntable t { n text }\napi POST /api/t {\n  let count = 0\n  set count = count + 1\n  respond 200 { count: count }\n}\npage / { h1 "T" }');
+    const api = ast.body.find((n: any) => n.type === "Api");
+    const setNode = api.body.find((s: any) => s.type === "Set");
+    assert.ok(setNode);
+    assert.equal(setNode.expr, "count + 1");
+  });
+});
+
+describe("#189: push/pop/shift — Array Mutations", () => {
+  it("parses push statement", () => {
+    const ast = parse('meta { title "T" }\ntable t { n text }\napi POST /api/t {\n  let items = []\n  push items "hello"\n  respond 200 { items: items }\n}\npage / { h1 "T" }');
+    const api = ast.body.find((n: any) => n.type === "Api");
+    const pushNode = api.body.find((s: any) => s.type === "ArrayMutation" && s.op === "push");
+    assert.ok(pushNode, "should create ArrayMutation push node");
+    assert.equal(pushNode.target, "items");
+    assert.equal(pushNode.value, '"hello"');
+  });
+
+  it("parses pop statement", () => {
+    const ast = parse('meta { title "T" }\ntable t { n text }\napi POST /api/t {\n  let items = [1, 2, 3]\n  pop items\n  respond 200 { items: items }\n}\npage / { h1 "T" }');
+    const api = ast.body.find((n: any) => n.type === "Api");
+    const popNode = api.body.find((s: any) => s.type === "ArrayMutation" && s.op === "pop");
+    assert.ok(popNode, "should create ArrayMutation pop node");
+    assert.equal(popNode.target, "items");
+    assert.equal(popNode.value, undefined);
+  });
+});

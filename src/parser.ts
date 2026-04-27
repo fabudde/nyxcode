@@ -3104,6 +3104,14 @@ export class Parser {
         return this.parseStreamFetch() as any;
       case TokenType.Identifier:
       case TokenType.Identifier:
+        // #184: set — variable reassignment
+        if (this.peek().value === "set" && this.peekAt(1)?.type === TokenType.Identifier) {
+          return this.parseSet();
+        }
+        // #189: push/pop/shift — array mutation
+        if ((this.peek().value === "push" || this.peek().value === "pop" || this.peek().value === "shift") && this.peekAt(1)?.type === TokenType.Identifier) {
+          return this.parseArrayMutation();
+        }
         // v0.35: fetch in api blocks (non-streaming)
         if (this.peek().value === "fetch") {
           return this.parseApiFetch() as any;
@@ -5346,6 +5354,71 @@ export class Parser {
     const start = this.consume(TokenType.Expect);
     const typeName = this.consumeIdentifier();
     return { type: "Expect", typeName, line: start.line, col: start.col };
+  }
+
+
+  // #184: set variable = expression (variable reassignment)
+  private parseSet(): any {
+    const start = this.advance(); // consume 'set'
+    let target = this.advance().value; // variable name
+    // Support dot notation: set user.name = "Nyx"
+    while (this.peek()?.value === '.' && this.peekAt(1)?.type === TokenType.Identifier) {
+      target += this.advance().value; // .
+      target += this.advance().value; // field
+    }
+    this.consume(TokenType.Equals);
+    // Consume the value expression — stop at statement boundaries
+    let expr = '';
+    let parenDepth = 0;
+    while (!this.isAtEnd()) {
+      // Track parens so we don't break inside function calls
+      if (this.check(TokenType.LeftParen)) parenDepth++;
+      if (this.check(TokenType.RightParen)) parenDepth--;
+      if (parenDepth > 0) { expr += (expr ? ' ' : '') + this.advance().value; continue; }
+      // Stop at } (block end)
+      if (this.check(TokenType.RightBrace)) break;
+      // Stop at statement-starting keywords
+      const next = this.peek();
+      if (next.type === TokenType.Let || next.type === TokenType.Respond ||
+          next.type === TokenType.Query || next.type === TokenType.Email ||
+          next.type === TokenType.Validate || next.type === TokenType.Each ||
+          next.type === TokenType.When || next.type === TokenType.On ||
+          (next.type === TokenType.Identifier && (next.value === 'set' || next.value === 'push' || next.value === 'pop' || next.value === 'shift' || next.value === 'fetch'))) break;
+      if (this.check(TokenType.String)) {
+        expr += (expr ? ' ' : '') + JSON.stringify(this.advance().value);
+      } else {
+        expr += (expr ? ' ' : '') + this.advance().value;
+      }
+    }
+    return { type: 'Set', target, expr: expr.trim(), line: start.line, col: start.col };
+  }
+
+  // #189: push/pop/shift arrayName [value]
+  private parseArrayMutation(): any {
+    const start = this.peek();
+    const op = this.advance().value; // push/pop/shift
+    const target = this.advance().value; // array name
+    let value = '';
+    // push needs a value, pop/shift don't
+    if (op === 'push') {
+      let parenDepth = 0;
+      while (!this.isAtEnd()) {
+        if (this.check(TokenType.LeftParen)) parenDepth++;
+        if (this.check(TokenType.RightParen)) parenDepth--;
+        if (parenDepth > 0) { value += (value ? ' ' : '') + this.advance().value; continue; }
+        if (this.check(TokenType.RightBrace)) break;
+        const next = this.peek();
+        if (next.type === TokenType.Let || next.type === TokenType.Respond ||
+            next.type === TokenType.Query || next.type === TokenType.Each ||
+            (next.type === TokenType.Identifier && (next.value === 'set' || next.value === 'push' || next.value === 'pop' || next.value === 'shift' || next.value === 'fetch'))) break;
+        if (this.check(TokenType.String)) {
+          value += (value ? ' ' : '') + JSON.stringify(this.advance().value);
+        } else {
+          value += (value ? ' ' : '') + this.advance().value;
+        }
+      }
+    }
+    return { type: 'ArrayMutation', op, target, value: value.trim() || undefined, line: start.line, col: start.col };
   }
 
   private parseLet(): any {

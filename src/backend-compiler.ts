@@ -524,8 +524,20 @@ function compileApiRoute(api: ApiNode): string {
       handlerBody += `    const ${l.name} = await __fetch_${l.name}.json();\n`;
     } else if (l.value.kind === 'literal') {
       // #189: Array/object/value literals
-      const expr = typeof l.value.expr === 'string' ? l.value.expr : JSON.stringify(l.value.expr);
-      handlerBody += `    const ${l.name} = ${expr};\n`;
+      let expr: string;
+      const raw = l.value.expr;
+      if (typeof raw === 'string') {
+        expr = raw;
+      } else if (raw && typeof raw === 'object' && raw.type === 'StringLiteral') {
+        expr = JSON.stringify(raw.value);
+      } else if (raw && typeof raw === 'object' && raw.type === 'NumberLiteral') {
+        expr = String(raw.value);
+      } else if (raw === 'true' || raw === 'false') {
+        expr = raw;
+      } else {
+        expr = JSON.stringify(raw);
+      }
+      handlerBody += `    let ${l.name} = ${expr};\n`;
     }
   }
 
@@ -593,8 +605,22 @@ function compileApiRoute(api: ApiNode): string {
     }
   }
 
-  // v0.35: Process fetch/stream/file in order of appearance
+  // v0.35: Process fetch/stream/file + #184/#189 mutations in order of appearance
   for (const stmt of api.body) {
+    // #184: set variable = expression
+    if ((stmt as any).type === 'Set') {
+      const s = stmt as any;
+      handlerBody += `    ${s.target} = ${s.expr};\n`;
+      continue;
+    }
+    // #189: push/pop/shift
+    if ((stmt as any).type === 'ArrayMutation') {
+      const s = stmt as any;
+      if (s.op === 'push') handlerBody += `    ${s.target}.push(${s.value});\n`;
+      else if (s.op === 'pop') handlerBody += `    ${s.target}.pop();\n`;
+      else if (s.op === 'shift') handlerBody += `    ${s.target}.shift();\n`;
+      continue;
+    }
     const s = stmt as any;
     if (s.type === 'ApiFile') {
       handlerBody += `    const __file_content = require('fs').readFileSync(${JSON.stringify(s.path)}, 'utf-8');\n`;
