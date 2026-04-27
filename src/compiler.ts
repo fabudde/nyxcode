@@ -2868,6 +2868,16 @@ export class Compiler {
           return `\${${varName}.${field}`;
         },
       );
+      // v0.50: Resolve {expr} interpolation in each templates
+      // {item} → ${item}, {i + 1} → ${i + 1}, {item.name} → ${item.name}
+      val = val.replace(
+        /\{([^}]+)\}/g,
+        (_: string, expr: string) => {
+          // If expr starts with a dot, it's already handled above
+          if (expr.trim().startsWith('.')) return `\${${varName}${expr.trim()}}`;
+          return `\${${expr.trim()}}`;
+        },
+      );
       return val;
     }
     if (content.type === "Identifier") return `\${${content.name}}`;

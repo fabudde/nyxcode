@@ -389,3 +389,11 @@ describe("v0.50: each with index + array index set", () => {
     assert.ok(html.includes("notify"), "should notify after indexed set");
   });
 });
+
+describe("v0.50: Dynamic text interpolation in each templates", () => {
+  it("{expr} resolves to template literal in each body", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let items = []\n  each items -> item, i {\n    p "Q {i + 1}: {item}"\n  }\n}');
+    assert.ok(html.includes("${i + 1}"), "should resolve {i + 1} to template literal");
+    assert.ok(html.includes("${item}"), "should resolve {item} to template literal");
+  });
+});
