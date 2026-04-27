@@ -5651,6 +5651,9 @@ async function __nyx_sse(url, body, onChunk, onDone) {
   private compileSingleAction(action: string): string {
     action = action.trim();
     if (!action) return '';
+    // v0.50: Normalize spaces around brackets and parens early
+    action = action.replace(/\s*\[\s*/g, "[").replace(/\s*\]\s*/g, "]");
+    action = action.replace(/\s*\(\s*/g, "(").replace(/\s*\)\s*/g, ")");
     
     // let temp = expr → local variable (NOT signal)
     if (action.startsWith('let ')) {
@@ -5745,8 +5748,6 @@ async function __nyx_sse(url, body, onChunk, onDone) {
     }
     // Normalize spaces around dots: "user . name" -> "user.name"
     action = action.replace(/\s*\.\s*/g, ".");
-    // v0.50: Normalize spaces around brackets: "items [ i ]" -> "items[i]"
-    action = action.replace(/\s*\[\s*/g, "[").replace(/\s*\]\s*/g, "]");
     // State mutations: count += 1, count -= 1, count++, count--, name = "new"
     // Handle compound operators: +=, -=, *=, /=, ++, --
     const compoundMatch = action.match(
