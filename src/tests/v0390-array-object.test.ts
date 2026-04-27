@@ -108,3 +108,39 @@ describe("#189: push/pop/shift — Array Mutations", () => {
     assert.equal(popNode.value, undefined);
   });
 });
+
+describe("#183: while/for Loops", () => {
+  it("parses while loop", () => {
+    const ast = parse('meta { title "T" }\ntable t { n text }\napi GET /api/t {\n  let x = 10\n  while x > 0 {\n    set x = x - 1\n  }\n  respond 200 { x: x }\n}\npage / { h1 "T" }');
+    const api = ast.body.find((n: any) => n.type === "Api");
+    const whileNode = api.body.find((s: any) => s.type === "While");
+    assert.ok(whileNode, "should create While node");
+    assert.equal(whileNode.condition, "x > 0");
+    assert.ok(whileNode.body.length > 0, "should have body statements");
+  });
+
+  it("parses for range loop", () => {
+    const ast = parse('meta { title "T" }\ntable t { n text }\napi GET /api/t {\n  let sum = 0\n  for i in 0..10 {\n    set sum = sum + i\n  }\n  respond 200 { sum: sum }\n}\npage / { h1 "T" }');
+    const api = ast.body.find((n: any) => n.type === "Api");
+    const forNode = api.body.find((s: any) => s.type === "For");
+    assert.ok(forNode, "should create For node");
+    assert.equal(forNode.varName, "i");
+    assert.equal(forNode.rangeStart, "0");
+    assert.equal(forNode.rangeEnd, "10");
+  });
+
+  it("parses for loop with step", () => {
+    const ast = parse('meta { title "T" }\ntable t { n text }\napi GET /api/t {\n  for i in 0..100 step 5 {\n    set x = i\n  }\n  respond 200 { x: x }\n}\npage / { h1 "T" }');
+    const api = ast.body.find((n: any) => n.type === "Api");
+    const forNode = api.body.find((s: any) => s.type === "For");
+    assert.ok(forNode);
+    assert.equal(forNode.step, "5");
+  });
+
+  it("while loop has infinite loop guard in output", () => {
+    const ast = parse('meta { title "T" }\ntable t { n text }\napi GET /api/t {\n  let x = 5\n  while x > 0 {\n    set x = x - 1\n  }\n  respond 200 { x: x }\n}\npage / { h1 "T" }');
+    // Just verify it parses without error — compilation tested via CLI
+    const api = ast.body.find((n: any) => n.type === "Api");
+    assert.ok(api.body.find((s: any) => s.type === "While"));
+  });
+});

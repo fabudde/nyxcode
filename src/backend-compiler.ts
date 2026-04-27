@@ -386,6 +386,30 @@ ${code}    } catch(e) { console.error('After hook error:', e.message); }
 });`;
   }
 }
+// #183: Compile loop body statements to JS
+function compileLoopBody(body: any[]): string {
+  let js = '';
+  for (const stmt of body) {
+    if ((stmt as any).type === 'Set') {
+      js += `      ${(stmt as any).target} = ${(stmt as any).expr};\n`;
+    } else if ((stmt as any).type === 'ArrayMutation') {
+      const s = stmt as any;
+      if (s.op === 'push') js += `      ${s.target}.push(${s.value});\n`;
+      else if (s.op === 'pop') js += `      ${s.target}.pop();\n`;
+      else if (s.op === 'shift') js += `      ${s.target}.shift();\n`;
+    } else if (stmt.type === 'Query') {
+      const sql = (stmt as any).sql.replace(/\$(\w+)/g, '?');
+      js += `      db.prepare(\`${sql}\`).run();\n`;
+    } else if (stmt.type === 'Let' || (stmt as any).type === 'State') {
+      const name = (stmt as any).name;
+      const init = (stmt as any).initialValue || (stmt as any).value?.expr || '""';
+      const val = typeof init === 'object' && init.type === 'NumberLiteral' ? init.value : typeof init === 'object' && init.type === 'StringLiteral' ? JSON.stringify(init.value) : init;
+      js += `      let ${name} = ${val};\n`;
+    }
+  }
+  return js;
+}
+
 function compileApiRoute(api: ApiNode): string {
   const method = api.method.toLowerCase();
   let middleware = '';
@@ -619,6 +643,27 @@ function compileApiRoute(api: ApiNode): string {
       if (s.op === 'push') handlerBody += `    ${s.target}.push(${s.value});\n`;
       else if (s.op === 'pop') handlerBody += `    ${s.target}.pop();\n`;
       else if (s.op === 'shift') handlerBody += `    ${s.target}.shift();\n`;
+      continue;
+    }
+    // #183: while loop (with infinite loop guard)
+    if ((stmt as any).type === 'While') {
+      const s = stmt as any;
+      const bodyJs = compileLoopBody(s.body);
+      handlerBody += `    let __guard_${s.line} = 0;\n`;
+      handlerBody += `    while (${s.condition}) {\n`;
+      handlerBody += `      if (++__guard_${s.line} > 10000) throw new Error('Infinite loop detected');\n`;
+      handlerBody += bodyJs;
+      handlerBody += `    }\n`;
+      continue;
+    }
+    // #183: for loop
+    if ((stmt as any).type === 'For') {
+      const s = stmt as any;
+      const bodyJs = compileLoopBody(s.body);
+      const step = s.step ? s.step : '1';
+      handlerBody += `    for (let ${s.varName} = ${s.rangeStart}; ${s.varName} < ${s.rangeEnd}; ${s.varName} += ${step}) {\n`;
+      handlerBody += bodyJs;
+      handlerBody += `    }\n`;
       continue;
     }
     const s = stmt as any;

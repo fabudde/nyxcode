@@ -3108,6 +3108,14 @@ export class Parser {
         if (this.peek().value === "set" && this.peekAt(1)?.type === TokenType.Identifier) {
           return this.parseSet();
         }
+        // #183: while loop
+        if (this.peek().value === "while") {
+          return this.parseWhile();
+        }
+        // #183: for loop (for i in 0..10)
+        if (this.peek().value === "for" && this.peekAt(1)?.type === TokenType.Identifier) {
+          return this.parseFor();
+        }
         // #189: push/pop/shift — array mutation
         if ((this.peek().value === "push" || this.peek().value === "pop" || this.peek().value === "shift") && this.peekAt(1)?.type === TokenType.Identifier) {
           return this.parseArrayMutation();
@@ -5357,7 +5365,62 @@ export class Parser {
   }
 
 
-  // #184: set variable = expression (variable reassignment)
+  // #183: while condition { body }
+  private parseWhile(): any {
+    const start = this.advance(); // consume 'while'
+    // Consume condition expression until {
+    let condition = '';
+    while (!this.isAtEnd() && !this.check(TokenType.LeftBrace)) {
+      if (this.check(TokenType.String)) {
+        condition += (condition ? ' ' : '') + JSON.stringify(this.advance().value);
+      } else {
+        condition += (condition ? ' ' : '') + this.advance().value;
+      }
+    }
+    this.consume(TokenType.LeftBrace);
+    const body = this.parseBody();
+    this.consume(TokenType.RightBrace);
+    return { type: 'While', condition: condition.trim(), body, line: start.line, col: start.col };
+  }
+
+  // #183: for varName in start..end [step N] { body }
+  private parseFor(): any {
+    const start = this.advance(); // consume 'for'
+    const varName = this.advance().value; // loop variable
+    // expect 'in'
+    if (this.peek().value === 'in' || (this.peek().type === TokenType.In)) this.advance();
+    // Parse range: could be "0..10" as single token or separate tokens
+    let rangeStart = '';
+    let rangeEnd = '';
+    let stepVal = '';
+    // Collect everything until { or step
+    let rangeExpr = '';
+    while (!this.isAtEnd() && !this.check(TokenType.LeftBrace)) {
+      if (this.peek().value === 'step') break;
+      rangeExpr += (rangeExpr ? ' ' : '') + this.advance().value;
+    }
+    // Check for .. in the collected expression
+    if (rangeExpr.includes('..')) {
+      const parts = rangeExpr.split('..');
+      rangeStart = parts[0].trim();
+      rangeEnd = parts[1].trim();
+    } else {
+      // No range — iterate over expression (each-style)
+      rangeStart = '0';
+      rangeEnd = rangeExpr.trim() + '.length';
+    }
+    // Optional step
+    if (this.peek()?.value === 'step') {
+      this.advance(); // consume 'step'
+      stepVal = this.advance().value;
+    }
+    this.consume(TokenType.LeftBrace);
+    const body = this.parseBody();
+    this.consume(TokenType.RightBrace);
+    return { type: 'For', varName, rangeStart: rangeStart.trim(), rangeEnd: rangeEnd.trim(), step: stepVal || undefined, body, line: start.line, col: start.col };
+  }
+
+    // #184: set variable = expression (variable reassignment)
   private parseSet(): any {
     const start = this.advance(); // consume 'set'
     let target = this.advance().value; // variable name
