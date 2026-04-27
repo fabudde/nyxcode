@@ -138,6 +138,7 @@ export class Compiler {
   private pageClass: string = "";
   private stateVars: Map<string, string> = new Map(); // name -> initial value
   private constVars: Map<string, string> = new Map(); // name -> value (non-reactive)
+  private currentLoopIndexVar: string | null = null; // v0.50: tracks current each-loop index var for template interpolation
   // v0.24.0 nav-burger: one CSS block per breakpoint, emitted once per build.
   private burgerBreakpointsEmitted: Set<string> = new Set();
   private computedVars: Map<string, string> = new Map(); // name -> expression
@@ -2584,14 +2585,17 @@ export class Compiler {
 
     private compileEach(each: EachStatement): string {
     const varName = each.alias || "item";
+    const idxVar = each.indexVar || '__idx';
     const containerId = this.nextId("list");
+    // v0.50: Track loop index var for template event handler interpolation
+    this.currentLoopIndexVar = each.indexVar || null;
 
     this.js.push(`
   // Each: ${each.collection}
   function render_${containerId}() {
     const container = document.getElementById('${containerId}');
     if (!container) return;
-    container.innerHTML = (__nyx.state['${each.collection}'] || ${each.collection} || []).map(${varName} => \`
+    container.innerHTML = (__nyx.state['${each.collection}'] || ${each.collection} || []).map((${varName}, ${idxVar}) => \`
       ${this.compileEachBody(each, varName)}
     \`).join('');
   }`);
@@ -2599,6 +2603,7 @@ export class Compiler {
     // #199: Subscribe to collection for reactive list re-rendering
     this.scripts.push(`__nyx.subscribe('${each.collection}', render_${containerId}); render_${containerId}();`);
 
+    this.currentLoopIndexVar = null;
     // #178: display:contents makes wrapper invisible to grid/flex layout
     return `${this.ind()}<div id="${containerId}" style="display:contents"></div>\n`;
   }
@@ -2891,7 +2896,16 @@ export class Compiler {
         if (a.name.startsWith('on') && a.name.length > 2 && a.name[2] === a.name[2].toUpperCase()) {
           const eventType = a.name.slice(2).toLowerCase();
           const action = typeof a.value === 'string' ? a.value : '';
-          const js = this.actionToJS(action).replace(/"/g, "'");
+          let js = this.actionToJS(action).replace(/"/g, "'");
+          // Inside template literal: loop index var needs ${} interpolation
+          // e.g. items[i] in onclick must become items[${i}] in the template
+          const loopIdx = this.currentLoopIndexVar;
+          if (loopIdx) {
+            // Replace [loopIdx] with [${loopIdx}] — only the exact index var
+            js = js.replace(new RegExp(`\\[${loopIdx}\\]`, 'g'), `[\${${loopIdx}}]`);
+            // Also handle bare loopIdx used as function arg: fn(i) → fn(${i})
+            js = js.replace(new RegExp(`\\(${loopIdx}\\)`, 'g'), `(\${${loopIdx}})`);
+          }
           return `on${eventType}="${js}"`;
         }
         if (typeof a.value === "string" && a.value !== "true") {
