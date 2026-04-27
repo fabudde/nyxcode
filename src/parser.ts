@@ -473,6 +473,10 @@ export class Parser {
         if (token.value === "middleware") return this.parseMiddleware();
         if (token.value === "meta") return this.parseMeta() as any;
         if (token.value === "footnotes") return this.parseFootnotes() as any;
+        // #187: socket /path { on connect/message/close { } }
+        if (token.value === "socket") return this.parseSocket();
+        // #188: route (SPA client-side routing)
+        if (token.value === "route") return this.parseRoute();
         throw this.error(
           `Unexpected identifier '${token.value}' at top level.`,
         );
@@ -3108,7 +3112,7 @@ export class Parser {
         if (this.peek().value === "set" && this.peekAt(1)?.type === TokenType.Identifier) {
           return this.parseSet();
         }
-        // #192: emit event (component events)
+// #192: emit event (component events)
         if (this.peek().value === "emit") {
           return this.parseEmit();
         }
@@ -5368,6 +5372,43 @@ export class Parser {
     return { type: "Expect", typeName, line: start.line, col: start.col };
   }
 
+
+  // #187: socket /path { on connect { } on message { } on close { } }
+  private parseSocket(): any {
+    const start = this.advance(); // consume 'socket'
+    const path = this.advance().value; // /ws/chat
+    this.consume(TokenType.LeftBrace);
+    const handlers: { event: string; body: any[] }[] = [];
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      if (this.peek().type === TokenType.On || (this.peek().type === TokenType.Identifier && this.peek().value === 'on')) {
+        this.advance(); // consume 'on'
+        const event = this.advance().value; // connect/message/close
+        this.consume(TokenType.LeftBrace);
+        const body = this.parseBody();
+        this.consume(TokenType.RightBrace);
+        handlers.push({ event, body });
+      } else {
+        this.advance(); // skip unknown tokens
+      }
+    }
+    this.consume(TokenType.RightBrace);
+    return { type: 'Socket', path, handlers, line: start.line, col: start.col };
+  }
+
+  // #188: route /path -> ComponentName
+  private parseRoute(): any {
+    const start = this.advance(); // consume 'route'
+    const path = this.advance().value;
+    let component = '';
+    // route /path -> Component OR route /path Component
+    if (this.peek()?.value === '->') {
+      this.advance(); // consume ->
+      component = this.advance().value;
+    } else {
+      component = this.advance().value;
+    }
+    return { type: 'Route', path, component, line: start.line, col: start.col };
+  }
 
   // #192: emit eventName [data]
   private parseEmit(): any {

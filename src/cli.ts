@@ -1021,7 +1021,29 @@ try {
       const useStmts = ast.body.filter((n: any) => n.type === 'Use' && n.packageMode) as any[];
       const pipes = ast.body.filter((n: any) => n.type === 'Pipe') as any[];
       const types = ast.body.filter((n: any) => n.type === 'Type') as any[];
+      const sockets = ast.body.filter((n: any) => n.type === 'Socket') as any[];
+      const routes = ast.body.filter((n: any) => n.type === 'Route') as any[];
       let serverCode = compileBackend(tables, apis, config, hooks, [], middlewares, everys, actions, envNode, onEvents, useStmts, pipes, types);
+      // #187: WebSocket support
+      if (sockets.length > 0) {
+        let wsCode = `\n// WebSocket (ws)\nconst { WebSocketServer } = require('ws');\n`;
+        for (const sock of sockets) {
+          wsCode += `const wss_${sock.path.replace(/\//g, '_').replace(/^_/, '')} = new WebSocketServer({ server, path: '${sock.path}' });\n`;
+          const wssVar = `wss_${sock.path.replace(/\//g, '_').replace(/^_/, '')}`;
+          wsCode += `${wssVar}.on('connection', (ws) => {\n`;
+          for (const h of sock.handlers) {
+            if (h.event === 'connect') {
+              wsCode += `  // on connect\n  ws.__id = Math.random().toString(36).slice(2);\n`;
+            } else if (h.event === 'message') {
+              wsCode += `  ws.on('message', (data) => {\n    const message = data.toString();\n    // broadcast to all clients\n    ${wssVar}.clients.forEach(client => {\n      if (client.readyState === 1) client.send(message);\n    });\n  });\n`;
+            } else if (h.event === 'close') {
+              wsCode += `  ws.on('close', () => { /* client disconnected */ });\n`;
+            }
+          }
+          wsCode += `});\n`;
+        }
+        serverCode += wsCode;
+      }
       if (security) {
         // Inject auth AFTER express.json() but BEFORE create tables
         const authCode = compileAuth(security, tables, config);

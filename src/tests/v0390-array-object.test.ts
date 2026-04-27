@@ -176,3 +176,36 @@ describe("#192: Component Events — emit", () => {
     assert.ok(html.includes("CustomEvent('myEvent'"), "should dispatch CustomEvent: " + html.substring(html.indexOf("onclick") || 0, (html.indexOf("onclick") || 0) + 100));
   });
 });
+
+describe("#187: WebSocket — socket block", () => {
+  it("parses socket block at top level", () => {
+    const ast = parse('meta { title "T" }\nsocket /ws/chat {\n  on connect {\n  }\n  on message {\n  }\n}\npage / { h1 "T" }');
+    const socket = ast.body.find((n: any) => n.type === "Socket");
+    assert.ok(socket, "should have Socket node");
+    assert.equal(socket.path, "/ws/chat");
+    assert.equal(socket.handlers.length, 2);
+    assert.equal(socket.handlers[0].event, "connect");
+    assert.equal(socket.handlers[1].event, "message");
+  });
+});
+
+describe("#188: SPA Routing — multi-page", () => {
+  it("multi-page compiles with client-side router", () => {
+    const html = compile('meta { title "T" }\npage / {\n  h1 "Home"\n}\npage /about {\n  h1 "About"\n}');
+    assert.ok(html.includes("nyx-route"), "should have route divs");
+    assert.ok(html.includes("__navigate"), "should have router script");
+    assert.ok(html.includes('data-route="/"'), "should have home route");
+    assert.ok(html.includes('data-route="/about"'), "should have about route");
+  });
+});
+
+describe("#190: HTTP Client — fetch in API blocks", () => {
+  it("parses fetch statement", () => {
+    const ast = parse('meta { title "T" }\ntable t { n text }\napi GET /api/t {\n  fetch "https://example.com/api" as result\n  respond 200 { data: result }\n}\npage / { h1 "T" }');
+    const api = ast.body.find((n: any) => n.type === "Api");
+    const fetchNode = api.body.find((s: any) => s.type === "ApiFetch");
+    assert.ok(fetchNode, "should have ApiFetch node");
+    assert.equal(fetchNode.url, "https://example.com/api");
+    assert.equal(fetchNode.asVar, "result");
+  });
+});
