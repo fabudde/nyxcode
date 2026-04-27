@@ -5682,6 +5682,21 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       const stateRef = this.resolveVarToState(arrName);
       return `${stateRef || '__nyx.state.' + arrName}.pop();__nyx.notify('${arrName}')`;
     }
+    // "shift arr" → arr.shift(); notify
+    if (action.startsWith("shift ")) {
+      const arrName = action.slice(6).trim();
+      const stateRef = this.resolveVarToState(arrName);
+      return `${stateRef || '__nyx.state.' + arrName}.shift();__nyx.notify('${arrName}')`;
+    }
+    // v0.50: "remove arr index" → arr.splice(index, 1); notify
+    if (action.startsWith("remove ")) {
+      const rest = action.slice(7).trim();
+      const parts = rest.split(/\s+/);
+      const arrName = parts[0];
+      const index = parts.length > 1 ? this.resolveStateRefs(parts.slice(1).join(' ')).replace(/"/g, "'") : '0';
+      const stateRef = this.resolveVarToState(arrName);
+      return `${stateRef || '__nyx.state.' + arrName}.splice(${index},1);__nyx.notify('${arrName}')`;
+    }
     // #192: "emit eventName [data]" → dispatch custom event
     if (action.startsWith("emit ")) {
       const rest = action.slice(5).trim();

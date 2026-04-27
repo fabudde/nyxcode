@@ -346,3 +346,17 @@ describe("v0.50: Client-Side Functions", () => {
     assert.ok(html.includes("return"), "should have return statement");
   });
 });
+
+describe("v0.50: Array Operations", () => {
+  it("remove generates splice + notify", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let items = []\n  button "Del" on:click { remove items 0 }\n}');
+    assert.ok(html.includes(".splice("), "should have splice");
+    assert.ok(html.includes("notify"), "should notify");
+  });
+
+  it("shift generates shift + notify", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let items = []\n  button "Del" on:click { shift items }\n}');
+    assert.ok(html.includes(".shift()"), "should have shift");
+    assert.ok(html.includes("notify"), "should notify");
+  });
+});
