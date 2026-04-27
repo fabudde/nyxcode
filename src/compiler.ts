@@ -5562,6 +5562,94 @@ async function __nyx_sse(url, body, onChunk, onDone) {
     if (action.startsWith("{") && action.endsWith("}")) {
       action = action.slice(1, -1).trim();
     }
+    // v0.50: Multi-statement handler support
+    // Split on statement keywords at top-level (not inside nested braces)
+    const multiStatements = this.splitHandlerStatements(action);
+    if (multiStatements.length > 1) {
+      return multiStatements.map(s => this.compileSingleAction(s)).filter(Boolean).join(';');
+    }
+    return this.compileSingleAction(action);
+  }
+
+  /** v0.50: Split handler body into individual statements by keyword boundaries */
+  private splitHandlerStatements(code: string): string[] {
+    const stmtKeywords = ['set ', 'push ', 'pop ', 'shift ', 'emit ', 'navigate ', 'toast ', 'toggle ', 'remove ', 'call ', 'let '];
+    const blockKeywords = ['if ', 'try ', 'each ', 'for ', 'while ', 'match '];
+    const allKeywords = [...stmtKeywords, ...blockKeywords];
+    const statements: string[] = [];
+    let current = '';
+    let depth = 0;
+    let inString = false;
+    let stringChar = '';
+    
+    for (let i = 0; i < code.length; i++) {
+      const ch = code[i];
+      if ((ch === '"' || ch === "'") && !inString) { inString = true; stringChar = ch; current += ch; continue; }
+      if (ch === stringChar && inString) { inString = false; current += ch; continue; }
+      if (inString) { current += ch; continue; }
+      if (ch === '{') { depth++; current += ch; continue; }
+      if (ch === '}') { depth--; current += ch; continue; }
+      
+      if (depth === 0) {
+        const rest = code.slice(i);
+        const matchedKw = allKeywords.find(k => rest.startsWith(k));
+        if (matchedKw && current.trim()) {
+          statements.push(current.trim());
+          current = '';
+        }
+      }
+      current += ch;
+    }
+    if (current.trim()) statements.push(current.trim());
+    return statements;
+  }
+
+  /** v0.50: Compile a single handler statement to JS */
+  private compileSingleAction(action: string): string {
+    action = action.trim();
+    if (!action) return '';
+    
+    // let temp = expr → local variable (NOT signal)
+    if (action.startsWith('let ')) {
+      const rest = action.slice(4);
+      const eqIdx = rest.indexOf('=');
+      if (eqIdx >= 0) {
+        const name = rest.slice(0, eqIdx).trim();
+        const expr = rest.slice(eqIdx + 1).trim();
+        return `let ${name}=${this.resolveStateRefs(expr).replace(/"/g, "'")}`;
+      }
+    }
+    
+    // if cond { body } else { body }
+    if (action.startsWith('if ')) {
+      return this.compileHandlerIf(action);
+    }
+    
+    // try { body } catch var { body }
+    if (action.startsWith('try ')) {
+      return this.compileHandlerTryCatch(action);
+    }
+    
+    // toast level "message"
+    if (action.startsWith('toast ')) {
+      const rest = action.slice(6).trim();
+      const spaceIdx = rest.indexOf(' ');
+      if (spaceIdx > 0) {
+        const level = rest.slice(0, spaceIdx);
+        let msg = rest.slice(spaceIdx + 1).trim();
+        msg = msg.replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+        const colors: Record<string, string> = { error: '#ef4444', success: '#22c55e', info: '#3b82f6', warning: '#f59e0b' };
+        const color = colors[level] || '#3b82f6';
+        return `(function(){var t=document.createElement('div');t.textContent='${msg}';t.style.cssText='position:fixed;top:1rem;right:1rem;padding:1rem 1.5rem;border-radius:8px;color:#fff;z-index:9999;animation:nyx-slide-in 0.3s;background:${color}';document.body.appendChild(t);setTimeout(function(){t.remove()},3000)})()`;
+      }
+    }
+    
+    // call fnName(args)
+    if (action.startsWith('call ')) {
+      const fnCall = action.slice(5).trim();
+      return this.resolveStateRefs(fnCall);
+    }
+    
     // #184/#185: Handle NyxCode-style mutations in event handlers
     // "set x = expr" → "x = expr"
     if (action.startsWith("set ")) {
@@ -5691,6 +5779,120 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       );
     }
     return result;
+  }
+
+  /** v0.50: Compile if/else in event handlers */
+  private compileHandlerIf(action: string): string {
+    // Parse: if cond { body } else { body }
+    // Find the condition (between 'if ' and first '{')
+    const braceIdx = action.indexOf('{');
+    if (braceIdx < 0) return '';
+    const condition = action.slice(3, braceIdx).trim();
+    const condJS = this.resolveStateRefs(condition).replace(/"/g, "'");
+    
+    // Find matching closing brace for if-body
+    let depth = 0;
+    let ifEnd = -1;
+    for (let i = braceIdx; i < action.length; i++) {
+      if (action[i] === '{') depth++;
+      if (action[i] === '}') { depth--; if (depth === 0) { ifEnd = i; break; } }
+    }
+    if (ifEnd < 0) return '';
+    
+    const ifBody = action.slice(braceIdx + 1, ifEnd).trim();
+    const ifJS = this.splitHandlerStatements(ifBody).map(s => this.compileSingleAction(s)).filter(Boolean).join(';');
+    
+    // Check for else
+    const afterIf = action.slice(ifEnd + 1).trim();
+    if (afterIf.startsWith('else')) {
+      const elseRest = afterIf.slice(4).trim();
+      if (elseRest.startsWith('if ')) {
+        // else if — recursive
+        const elseIfJS = this.compileHandlerIf(elseRest);
+        return `if(${condJS}){${ifJS}}else ${elseIfJS}`;
+      } else if (elseRest.startsWith('{')) {
+        // else { body }
+        let d2 = 0;
+        let elseEnd = -1;
+        for (let i = 0; i < elseRest.length; i++) {
+          if (elseRest[i] === '{') d2++;
+          if (elseRest[i] === '}') { d2--; if (d2 === 0) { elseEnd = i; break; } }
+        }
+        const elseBody = elseEnd >= 0 ? elseRest.slice(1, elseEnd).trim() : '';
+        const elseJS = this.splitHandlerStatements(elseBody).map(s => this.compileSingleAction(s)).filter(Boolean).join(';');
+        return `if(${condJS}){${ifJS}}else{${elseJS}}`;
+      }
+    }
+    
+    return `if(${condJS}){${ifJS}}`;
+  }
+
+  /** v0.50: Compile try/catch in event handlers */
+  private compileHandlerTryCatch(action: string): string {
+    // Parse: try { body } catch varName { body }
+    const tryBraceIdx = action.indexOf('{');
+    if (tryBraceIdx < 0) return '';
+    
+    let depth = 0;
+    let tryEnd = -1;
+    for (let i = tryBraceIdx; i < action.length; i++) {
+      if (action[i] === '{') depth++;
+      if (action[i] === '}') { depth--; if (depth === 0) { tryEnd = i; break; } }
+    }
+    if (tryEnd < 0) return '';
+    
+    const tryBody = action.slice(tryBraceIdx + 1, tryEnd).trim();
+    const tryJS = this.splitHandlerStatements(tryBody).map(s => this.compileSingleAction(s)).filter(Boolean).join(';');
+    
+    const afterTry = action.slice(tryEnd + 1).trim();
+    if (afterTry.startsWith('catch ')) {
+      const catchRest = afterTry.slice(6).trim();
+      const catchBraceIdx = catchRest.indexOf('{');
+      if (catchBraceIdx >= 0) {
+        const catchVar = catchRest.slice(0, catchBraceIdx).trim();
+        let d2 = 0;
+        let catchEnd = -1;
+        for (let i = catchBraceIdx; i < catchRest.length; i++) {
+          if (catchRest[i] === '{') d2++;
+          if (catchRest[i] === '}') { d2--; if (d2 === 0) { catchEnd = i; break; } }
+        }
+        const catchBody = catchEnd >= 0 ? catchRest.slice(catchBraceIdx + 1, catchEnd).trim() : '';
+        const catchJS = this.splitHandlerStatements(catchBody).map(s => this.compileSingleAction(s)).filter(Boolean).join(';');
+        return `try{${tryJS}}catch(${catchVar || 'e'}){${catchJS}}`;
+      }
+    }
+    
+    return `try{${tryJS}}catch(e){}`;
+  }
+
+  /** v0.50: Compile fetch in event handlers (async) */
+  private compileHandlerFetch(action: string): string {
+    // Parse: fetch METHOD "url" { body }
+    const parts = action.slice(6).trim().split(/\s+/);
+    const method = parts[0]?.toUpperCase() || 'GET';
+    let url = parts[1] || '/';
+    url = url.replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+    url = this.resolveStateRefs(url);
+    
+    // Check for body: { key: val }
+    const braceIdx = action.indexOf('{');
+    let bodyJS = 'null';
+    if (braceIdx >= 0 && method !== 'GET') {
+      let depth = 0;
+      let bodyEnd = -1;
+      for (let i = braceIdx; i < action.length; i++) {
+        if (action[i] === '{') depth++;
+        if (action[i] === '}') { depth--; if (depth === 0) { bodyEnd = i; break; } }
+      }
+      if (bodyEnd >= 0) {
+        const bodyStr = action.slice(braceIdx, bodyEnd + 1).trim();
+        bodyJS = `JSON.stringify(${this.resolveStateRefs(bodyStr).replace(/"/g, "'")})`;
+      }
+    }
+    
+    const headersJS = method === 'GET' ? '{}' : "{'Content-Type':'application/json'}";
+    const authJS = `var tk=localStorage.getItem('token');if(tk)h['Authorization']='Bearer '+tk;`;
+    return `(async function(){var h=${headersJS};${authJS}var r=await fetch('${url}',{method:'${method}',headers:h${method !== 'GET' ? ',body:' + bodyJS : ''}});return await r.json()})()`;
   }
 
   // #202: Convert condition expression to JS using __nyx.state references

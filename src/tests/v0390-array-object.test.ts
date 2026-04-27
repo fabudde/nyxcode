@@ -282,3 +282,53 @@ describe("#200: Multi-Step Wizard", () => {
     assert.ok(html.includes("Step 3"), "should have step 3 content");
   });
 });
+
+// ===== v0.50: Multi-Statement Event Handlers =====
+
+describe("v0.50: Multi-Statement Event Handlers", () => {
+  it("compiles two set statements in one handler", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let x = 0\n  let y = 0\n  button "Go" on:click { set x = 1 set y = 2 }\n}');
+    assert.ok(html.includes("__nyx.state.x"), "should reference state.x");
+    assert.ok(html.includes("__nyx.state.y"), "should reference state.y");
+  });
+
+  it("compiles set + push in one handler", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let count = 0\n  let items = []\n  button "Go" on:click { set count = count + 1 push items "new" }\n}');
+    assert.ok(html.includes("__nyx.state.count"), "should set count");
+    assert.ok(html.includes(".push("), "should push to items");
+  });
+
+  it("compiles if inside handler", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let count = 0\n  button "Go" on:click { if count > 10 { set count = 0 } }\n}');
+    assert.ok(html.includes("if("), "should have if condition");
+    assert.ok(html.includes("__nyx.state.count"), "should reference count");
+  });
+
+  it("compiles if/else inside handler", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let mode = "list"\n  button "Go" on:click { if mode == "list" { set mode = "edit" } else { set mode = "list" } }\n}');
+    assert.ok(html.includes("if("), "should have if");
+    assert.ok(html.includes("else"), "should have else");
+  });
+
+  it("compiles let (local) inside handler", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let count = 0\n  button "Go" on:click { let temp = count + 1 set count = temp }\n}');
+    assert.ok(html.includes("let temp="), "should have local let");
+  });
+
+  it("compiles toast in handler", () => {
+    const html = compile('meta { title "T" }\npage / {\n  button "Go" on:click { toast success "Saved!" }\n}');
+    assert.ok(html.includes("Saved!"), "should have toast message");
+    assert.ok(html.includes("#22c55e"), "should have success color");
+  });
+
+  it("compiles navigate in handler", () => {
+    const html = compile('meta { title "T" }\npage / {\n  button "Go" on:click { navigate "/dashboard" }\n}');
+    assert.ok(html.includes("/dashboard"), "should have navigate path");
+  });
+
+  it("compiles try/catch in handler", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let status = "idle"\n  button "Go" on:click { try { set status = "ok" } catch err { set status = "error" } }\n}');
+    assert.ok(html.includes("try{"), "should have try");
+    assert.ok(html.includes("catch(err)"), "should have catch with var");
+  });
+});
