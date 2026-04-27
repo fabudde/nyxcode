@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.38.3)
+# NYXCODE.md — AI Context File (v0.40.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -2649,4 +2649,148 @@ items | first | last | reverse | unique | take 5 | skip 10
 condition ? "yes" : "no"
 .active == true
 [1, 2, 3] | len
+```
+
+
+## v0.39.0 — Full Programming Language
+
+### Arrays & Objects (#189)
+```nyx
+let colors = ["red", "green", "blue"]
+let config = { theme: "dark", lang: "en" }
+```
+
+### Mutable Variables — `set` (#184)
+```nyx
+let count = 0
+button "+" on:click { set count = count + 1 }
+```
+
+### Array Mutations — `push`, `pop`, `shift` (#184)
+```nyx
+let items = []
+button "Add" on:click { push items "new item" }
+button "Remove" on:click { pop items }
+```
+
+### Loops — `while` and `for` (#183)
+```nyx
+while count < 10 { set count = count + 1 }
+for i in 0..5 { span "{i}" }
+for i in 0..100 step 10 { span "{i}" }
+```
+Frontend: `for` loops statically unroll. `while` has 10k iteration guard.
+
+### Client-Side Reactivity (#185)
+```nyx
+page / {
+  let count = 0
+  button "+" on:click { set count = count + 1 }
+  p "Count: {count}"
+  input value=".name"
+  p "Hello, {name}!"
+}
+```
+
+### Component Events — `emit` (#192)
+```nyx
+component Counter {
+  let count = 0
+  button "+" on:click { emit change count }
+}
+```
+
+### WebSocket (#187)
+```nyx
+socket /ws { on message -> data { respond "Echo: {data}" } }
+```
+
+### HTTP Client — `fetch` in API (#190)
+```nyx
+api /weather {
+  fn getWeather(city) {
+    fetch GET "https://api.weather.com/{city}" -> result
+    respond result
+  }
+}
+```
+
+### SPA Routing (#188)
+```nyx
+page / { h1 "Home" }
+page /about { h1 "About" }
+```
+
+### Route Handlers (#191)
+```nyx
+route /api/custom {
+  fn GET(req) { respond { status: "ok" } }
+  fn POST(req) { respond { created: true } }
+}
+```
+
+## v0.40.0 — NyxForms Feature Set (Frontend Complete)
+
+### Client-Side Conditionals — `when` in pages (#202)
+```nyx
+page / {
+  let showForm = false
+  button "Show" on:click { set showForm = true }
+  when .showForm {
+    div "Form visible!"
+  } else {
+    p "Click button to show"
+  }
+}
+```
+
+### Dynamic Data Fetching (#198)
+```nyx
+page /dashboard auth {
+  data forms = fetch GET /api/forms auth {
+    loading -> p "Loading..."
+    error -> p "Failed"
+    empty -> p "No forms yet"
+  }
+  each forms -> form { card { h3 "{form.title}" } }
+}
+```
+
+### Dynamic Lists (#199)
+```nyx
+let todos = ["Buy milk"]
+button "Add" on:click { push todos "New" }
+each todos -> todo { div "{todo}" }
+```
+
+### Auth-Protected Routes (#197)
+```nyx
+page / { h1 "Public" }
+page /dashboard auth { h1 "Protected" }
+page /login { h1 "Login" }
+```
+
+### Multi-Step Wizard (#200)
+```nyx
+wizard {
+  step { h2 "Name", input value=".name" }
+  step { h2 "Email", input type="email" value=".email" }
+  step { h2 "Done!", p "Thanks!" }
+}
+```
+Features: progress bar, slide animations, Enter to advance, back/next, auto-focus.
+
+### Rich Inputs (#201)
+```nyx
+rating max=5 value=".score"
+toggle value=".darkMode" "Dark Mode"
+choice options="TypeScript,Python,Rust,Go" value=".answer"
+```
+
+### Event Handlers — `on:click`
+```nyx
+button "Click" on:click { set count = count + 1 }
+button "Add" on:click { push items "new" }
+button "Remove" on:click { pop items }
+button "Fire" on:click { emit change data }
 ```
