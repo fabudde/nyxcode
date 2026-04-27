@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.38.0)
+# NYXCODE.md — AI Context File (v0.38.2)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -403,7 +403,8 @@ Property shorthands work in `style {}` blocks, `preset` definitions, inline styl
 | `obf` | object-fit | `obp` | object-position |
 | `bgi` | background-image | `bgs` | background-size |
 | `bgp` | background-position | `bgr` | background-repeat |
-| `bgc` | background-clip | `bdf` / `bf` | backdrop-filter |
+| `bgc` | background-color | `bgclip` | background-clip |
+| `bdf` / `bf` | backdrop-filter | | |
 | `fi` / `fil` | filter | `mix` | mix-blend-mode |
 | `tf` | transform | `tr` | transition |
 | `anim` | animation |  |  |

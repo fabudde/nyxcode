@@ -1,3 +1,23 @@
+# NyxCode v0.38.2 — Bugfixes: Vendor Prefix Parsing + JWT Persistence
+
+### Bug Fixes
+- **#181**: Fixed vendor prefix parsing (`-webkit-*`, `-moz-*`, `-ms-*`) in both style blocks and inline `style={}` attributes. Hyphenated property names after vendor prefix now parse correctly.
+- **#181**: Added `bgclip` shorthand → `background-clip` (with auto `-webkit-` prefix). Previously `bgc` was incorrectly documented as `background-clip` — it's `background-color`.
+- **#172**: JWT secret now persists across server restarts via `.nyx-data/.jwt-secret` file. Priority: env var `JWT_SECRET` > file > random.
+
+### Stats
+- 546 tests, 0 failures (+8 new tests)
+- Fixed docs: `bgc` = `background-color`, `bgclip` = `background-clip`
+
+---
+
+# NyxCode v0.38.1 — Repo Cleanup + Tailwind Demo
+
+- Cleaned up repository structure
+- Added Tailwind CSS demo/benchmark
+
+---
+
 # NyxCode v0.38.0 — Tailwind CSS Compatibility
 
 **Write Tailwind classes in NyxCode. Zero runtime. Zero config.**
