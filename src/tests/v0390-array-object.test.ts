@@ -270,3 +270,15 @@ describe("#201: Rich Input Components", () => {
     assert.ok(html.includes("Maybe"), "should have third option");
   });
 });
+
+describe("#200: Multi-Step Wizard", () => {
+  it("wizard generates steps with progress bar", () => {
+    const html = compile('meta { title "T" }\npage / {\n  wizard {\n    step { h2 "Step 1" }\n    step { h2 "Step 2" }\n    step { h2 "Step 3" }\n  }\n}');
+    assert.ok(html.includes("nyx-wizard"), "should have wizard container");
+    assert.ok(html.includes("nyx-wizard-step"), "should have step elements");
+    assert.ok(html.includes("nyx-wizard-dot"), "should have progress dots");
+    assert.ok(html.includes("nyx-wizard-nav"), "should have nav buttons");
+    assert.ok(html.includes("Step 1"), "should have step 1 content");
+    assert.ok(html.includes("Step 3"), "should have step 3 content");
+  });
+});

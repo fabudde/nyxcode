@@ -1052,6 +1052,9 @@ export class Compiler {
       };
     }
 
+    // ===== #200: Multi-Step Wizard =====
+    if (el.tag === 'wizard') return this.compileWizard(el);
+
     // ===== #201: Rich Input Components =====
     if (el.tag === 'rating') return this.compileRatingInput(el);
     if (el.tag === 'toggle') return this.compileToggleInput(el);
@@ -2423,6 +2426,57 @@ export class Compiler {
 
   // --- Each compilation ---
 
+
+  /** #200: wizard { step { ... } step { ... } } -> Multi-step wizard with progress + transitions */
+  private compileWizard(el: ElementNode): string {
+    const id = this.nextId('wizard');
+    const steps = el.children.filter(c => (c as any).tag === 'step');
+    const totalSteps = steps.length;
+    if (totalSteps === 0) return '';
+    let stepsHtml = '';
+    for (let i = 0; i < steps.length; i++) {
+      const stepEl = steps[i] as ElementNode;
+      let stepContent = '';
+      for (const child of stepEl.children) {
+        stepContent += this.compileStatement(child as any);
+      }
+      if (stepEl.content) {
+        const text = typeof stepEl.content === 'string' ? stepEl.content : (stepEl.content as any).value || '';
+        if (text) stepContent = this.escapeHtml(text) + stepContent;
+      }
+      stepsHtml += `<div class="nyx-wizard-step" data-step="${i}" style="display:${i === 0 ? '' : 'none'};animation:nyx-slide-in 0.3s ease">${stepContent}</div>`;
+    }
+    const navHtml = `<div class="nyx-wizard-nav" style="display:flex;justify-content:space-between;margin-top:1.5rem">` +
+      `<button type="button" class="nyx-wizard-back" style="padding:0.5rem 1.5rem;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer" disabled>\u2190 Back</button>` +
+      `<button type="button" class="nyx-wizard-next" style="padding:0.5rem 1.5rem;border:none;border-radius:6px;background:#3b82f6;color:#fff;cursor:pointer;font-weight:500">Next \u2192</button>` +
+      `</div>`;
+    const progressHtml = `<div class="nyx-wizard-progress" style="display:flex;gap:4px;margin-bottom:1.5rem">` +
+      Array.from({length: totalSteps}, (_, i) =>
+        `<div class="nyx-wizard-dot" style="flex:1;height:4px;border-radius:2px;background:${i === 0 ? '#3b82f6' : '#e5e7eb'};transition:background 0.3s"></div>`
+      ).join('') + `</div>`;
+    this.css.push(
+      `@keyframes nyx-slide-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}` +
+      `.nyx-wizard-back:disabled{opacity:0.3;cursor:not-allowed}`
+    );
+    this.scripts.push(
+      `(function(){` +
+      `var w=document.getElementById('${id}'),cur=0,total=${totalSteps};` +
+      `var steps=w.querySelectorAll('.nyx-wizard-step');` +
+      `var dots=w.querySelectorAll('.nyx-wizard-dot');` +
+      `var back=w.querySelector('.nyx-wizard-back');` +
+      `var next=w.querySelector('.nyx-wizard-next');` +
+      `function go(n){if(n<0||n>=total)return;steps[cur].style.display='none';cur=n;` +
+      `steps[cur].style.display='';steps[cur].style.animation='none';steps[cur].offsetHeight;steps[cur].style.animation='nyx-slide-in 0.3s ease';` +
+      `dots.forEach(function(d,i){d.style.background=i<=cur?'#3b82f6':'#e5e7eb'});` +
+      `back.disabled=cur===0;next.textContent=cur===total-1?'Submit \u2713':'Next \u2192';` +
+      `var inp=steps[cur].querySelector('input,textarea,select');if(inp)inp.focus();}` +
+      `back.onclick=function(){go(cur-1)};` +
+      `next.onclick=function(){if(cur===total-1){var form=w.closest('form');if(form)form.requestSubmit();return}go(cur+1)};` +
+      `w.addEventListener('keydown',function(e){if(e.key==='Enter'&&cur<total-1){e.preventDefault();go(cur+1)}});` +
+      `})();`
+    );
+    return `${this.ind()}<div id="${id}" class="nyx-wizard">${progressHtml}${stepsHtml}${navHtml}</div>\n`;
+  }
 
   // ===== #201: Rich Input Components =====
 
