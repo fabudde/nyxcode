@@ -1031,3 +1031,49 @@ export interface SseConsumer {
   line: number;
   col: number;
 }
+
+// ===== v0.50: Event Handler AST =====
+
+export type HandlerStatement =
+  | HandlerSet
+  | HandlerPush
+  | HandlerPop
+  | HandlerShift
+  | HandlerRemove
+  | HandlerEmit
+  | HandlerLet
+  | HandlerIf
+  | HandlerMatch
+  | HandlerFetch
+  | HandlerNavigate
+  | HandlerToast
+  | HandlerCall
+  | HandlerTryCatch
+  | HandlerEach
+  | HandlerFor
+  | HandlerRaw;  // fallback for backward compat
+
+export interface HandlerSet extends BaseNode { type: 'HandlerSet'; target: string; expr: string; }
+export interface HandlerPush extends BaseNode { type: 'HandlerPush'; target: string; value: string; }
+export interface HandlerPop extends BaseNode { type: 'HandlerPop'; target: string; }
+export interface HandlerShift extends BaseNode { type: 'HandlerShift'; target: string; }
+export interface HandlerRemove extends BaseNode { type: 'HandlerRemove'; target: string; index: string; }
+export interface HandlerEmit extends BaseNode { type: 'HandlerEmit'; event: string; data?: string; }
+export interface HandlerLet extends BaseNode { type: 'HandlerLet'; name: string; value: string; }
+export interface HandlerIf extends BaseNode { type: 'HandlerIf'; condition: string; body: HandlerStatement[]; elseBody?: HandlerStatement[]; }
+export interface HandlerMatch extends BaseNode { type: 'HandlerMatch'; expr: string; cases: { pattern: string; body: HandlerStatement[] }[]; }
+export interface HandlerFetch extends BaseNode { type: 'HandlerFetch'; method: string; url: string; body?: string; target?: string; }
+export interface HandlerNavigate extends BaseNode { type: 'HandlerNavigate'; path: string; }
+export interface HandlerToast extends BaseNode { type: 'HandlerToast'; level: string; message: string; }
+export interface HandlerCall extends BaseNode { type: 'HandlerCall'; fn: string; args: string[]; }
+export interface HandlerTryCatch extends BaseNode { type: 'HandlerTryCatch'; tryBody: HandlerStatement[]; catchVar: string; catchBody: HandlerStatement[]; }
+export interface HandlerEach extends BaseNode { type: 'HandlerEach'; collection: string; item: string; body: HandlerStatement[]; }
+export interface HandlerFor extends BaseNode { type: 'HandlerFor'; variable: string; start: string; end: string; step?: string; body: HandlerStatement[]; }
+export interface HandlerRaw extends BaseNode { type: 'HandlerRaw'; code: string; }
+
+export interface EventHandlerNode extends BaseNode {
+  type: 'EventHandler';
+  event: string;
+  modifiers: string[];
+  body: HandlerStatement[];
+}
