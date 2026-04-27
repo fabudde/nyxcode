@@ -1,70 +1,99 @@
 /**
  * NyxCode Auth Compiler
- * 
+ *
  * Transforms SecurityNode into JWT auth code (register, login, middleware).
  * Dependencies: bcryptjs, jsonwebtoken
  */
 
-import { SecurityNode, TableNode, ColumnDef } from './ast.js';
+import { SecurityNode, TableNode, ColumnDef } from "./ast.js";
 
-export function compileAuth(security: SecurityNode, tables: TableNode[], config?: any): string {
-  const configHasJwtDefault = config?.envVars?.some((e: any) => e.name === 'JWT_SECRET' && e.defaultValue) || false;
+export function compileAuth(
+  security: SecurityNode,
+  tables: TableNode[],
+  config?: any,
+): string {
+  const configHasJwtDefault =
+    config?.envVars?.some(
+      (e: any) => e.name === "JWT_SECRET" && e.defaultValue,
+    ) || false;
   // Extract rules
   const rules: Record<string, string> = {};
   for (const rule of security.rules) {
     rules[rule.name] = rule.value;
   }
 
-  const userTable = rules['table'] || 'users';
-  const loginFields = (rules['login'] || 'email password').split(' ').filter(Boolean);
-  const identityField = loginFields[0] || 'email'; // first field = identity
-  const passwordField = loginFields[loginFields.length - 1] || 'password'; // last = password
-  const tokenType = rules['token'] || 'jwt';
+  const userTable = rules["table"] || "users";
+  const loginFields = (rules["login"] || "email password")
+    .split(" ")
+    .filter(Boolean);
+  const identityField = loginFields[0] || "email"; // first field = identity
+  const passwordField = loginFields[loginFields.length - 1] || "password"; // last = password
+  const tokenType = rules["token"] || "jwt";
   const protectedPaths = Object.entries(rules)
-    .filter(([k]) => k === 'protect')
+    .filter(([k]) => k === "protect")
     .map(([, v]) => v);
 
   // Find user table columns for register (exclude id + auto columns)
-  const table = tables.find(t => t.name === userTable);
-  const registerFields = table 
-    ? table.columns.filter(c => c.type !== 'auto' && c.name !== 'id')
-    : [{ name: 'email', type: 'email', constraints: [] }, { name: 'password', type: 'text', constraints: [] }];
+  const table = tables.find((t) => t.name === userTable);
+  const registerFields = table
+    ? table.columns.filter((c) => c.type !== "auto" && c.name !== "id")
+    : [
+        { name: "email", type: "email", constraints: [] },
+        { name: "password", type: "text", constraints: [] },
+      ];
 
   // Generate validation code for register fields
   const valChecks: string[] = [];
   for (const col of registerFields) {
     for (const cn of col.constraints) {
-      if (cn === 'required') {
-        valChecks.push(`  if (!req.body.${col.name} && req.body.${col.name} !== 0) return res.status(400).json({ error: '${col.name} is required' });`);
-      } else if (cn.startsWith('min=')) {
-        const v = cn.split('=')[1];
-        if (['number','int','float'].includes(col.type)) {
-          valChecks.push(`  if (req.body.${col.name} !== undefined && req.body.${col.name} < ${v}) return res.status(400).json({ error: '${col.name} must be at least ${v}' });`);
+      if (cn === "required") {
+        valChecks.push(
+          `  if (!req.body.${col.name} && req.body.${col.name} !== 0) return res.status(400).json({ error: '${col.name} is required' });`,
+        );
+      } else if (cn.startsWith("min=")) {
+        const v = cn.split("=")[1];
+        if (["number", "int", "float"].includes(col.type)) {
+          valChecks.push(
+            `  if (req.body.${col.name} !== undefined && req.body.${col.name} < ${v}) return res.status(400).json({ error: '${col.name} must be at least ${v}' });`,
+          );
         } else {
-          valChecks.push(`  if (req.body.${col.name} && req.body.${col.name}.length < ${v}) return res.status(400).json({ error: '${col.name} must be at least ${v} characters' });`);
+          valChecks.push(
+            `  if (req.body.${col.name} && req.body.${col.name}.length < ${v}) return res.status(400).json({ error: '${col.name} must be at least ${v} characters' });`,
+          );
         }
-      } else if (cn.startsWith('max=')) {
-        const v = cn.split('=')[1];
-        if (['number','int','float'].includes(col.type)) {
-          valChecks.push(`  if (req.body.${col.name} !== undefined && req.body.${col.name} > ${v}) return res.status(400).json({ error: '${col.name} must be at most ${v}' });`);
+      } else if (cn.startsWith("max=")) {
+        const v = cn.split("=")[1];
+        if (["number", "int", "float"].includes(col.type)) {
+          valChecks.push(
+            `  if (req.body.${col.name} !== undefined && req.body.${col.name} > ${v}) return res.status(400).json({ error: '${col.name} must be at most ${v}' });`,
+          );
         } else {
-          valChecks.push(`  if (req.body.${col.name} && req.body.${col.name}.length > ${v}) return res.status(400).json({ error: '${col.name} must be at most ${v} characters' });`);
+          valChecks.push(
+            `  if (req.body.${col.name} && req.body.${col.name}.length > ${v}) return res.status(400).json({ error: '${col.name} must be at most ${v} characters' });`,
+          );
         }
-      } else if (cn.startsWith('format=')) {
-        const fmt = cn.split('=')[1];
-        if (fmt === 'email') valChecks.push(`  if (req.body.${col.name} && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(req.body.${col.name})) return res.status(400).json({ error: '${col.name} must be a valid email' });`);
+      } else if (cn.startsWith("format=")) {
+        const fmt = cn.split("=")[1];
+        if (fmt === "email")
+          valChecks.push(
+            `  if (req.body.${col.name} && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(req.body.${col.name})) return res.status(400).json({ error: '${col.name} must be a valid email' });`,
+          );
       }
     }
   }
-  const registerValidation = valChecks.length ? valChecks.join('\n') + '\n' : '';
+  const registerValidation = valChecks.length
+    ? valChecks.join("\n") + "\n"
+    : "";
 
-  const nonPasswordFields = registerFields.filter(c => c.name !== passwordField);
-  const allFieldNames = registerFields.map(c => c.name);
-  const insertCols = allFieldNames.join(', ');
-  const insertPlaceholders = allFieldNames.map(() => '?').join(', ');
-  const insertValues = allFieldNames.map(f => 
-    f === passwordField ? 'hash' : f
-  ).join(', ');
+  const nonPasswordFields = registerFields.filter(
+    (c) => c.name !== passwordField,
+  );
+  const allFieldNames = registerFields.map((c) => c.name);
+  const insertCols = allFieldNames.join(", ");
+  const insertPlaceholders = allFieldNames.map(() => "?").join(", ");
+  const insertValues = allFieldNames
+    .map((f) => (f === passwordField ? "hash" : f))
+    .join(", ");
 
   let code = `
 // ── Auth (bcryptjs + jsonwebtoken + rate-limit) ─────────────────────
@@ -74,13 +103,26 @@ const jwt = require('jsonwebtoken');
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: 'Too many attempts, try again later' } });
 app.use('/api/auth', authLimiter);
 
-${configHasJwtDefault ? `const JWT_SECRET = process.env.JWT_SECRET;` : `const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { console.error('\u274c FATAL: JWT_SECRET not set in production!'); process.exit(1); })() : 'nyx-dev-' + require('crypto').randomBytes(8).toString('hex'));
-if (!process.env.JWT_SECRET && process.env.NODE_ENV !== 'production') console.warn('\u26a0\ufe0f  No JWT_SECRET set \u2014 using random dev secret (tokens expire on restart)');`}
+${
+  configHasJwtDefault
+    ? `const JWT_SECRET = process.env.JWT_SECRET;`
+    : `// #172: Persist JWT secret across restarts (.nyx-data/.jwt-secret)
+const __jwtSecretPath = require('path').resolve(__dirname, '..', '.nyx-data', '.jwt-secret');
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  try { JWT_SECRET = require('fs').readFileSync(__jwtSecretPath, 'utf8').trim(); }
+  catch {
+    JWT_SECRET = require('crypto').randomBytes(32).toString('hex');
+    try { require('fs').mkdirSync(require('path').resolve(__dirname, '..', '.nyx-data'), { recursive: true }); require('fs').writeFileSync(__jwtSecretPath, JWT_SECRET); } catch {}
+    console.log('[NyxCode] Generated persistent JWT secret in .nyx-data/.jwt-secret');
+  }
+}`
+}
 
 
 // Register
 app.post('/api/auth/register', (req, res) => {
-  const { ${allFieldNames.join(', ')} } = req.body;
+  const { ${allFieldNames.join(", ")} } = req.body;
   if (!${identityField} || !${passwordField}) return res.status(400).json({ error: '${identityField} and ${passwordField} required' });
 ${registerValidation}  const hash = bcrypt.hashSync(${passwordField}, 10);
   try {
