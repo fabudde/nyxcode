@@ -410,6 +410,8 @@ function compileApiRoute(api: ApiNode): string {
     if (stmt.type === 'Validate') validates.push(stmt as ValidateStatement);
     if (stmt.type === 'Respond') responds.push(stmt as RespondStatement);
     if (stmt.type === 'Let') lets.push(stmt);
+    // #189: State nodes (array/object/value literals) also work as backend lets
+    if (stmt.type === 'State') lets.push({ type: 'Let', name: (stmt as any).name, value: { kind: 'literal', expr: (stmt as any).initialValue }, line: (stmt as any).line, col: (stmt as any).col });
     if (stmt.type === 'Email') emails.push(stmt);
     if (stmt.type === 'ActionCall') actionCalls.push(stmt);
     if (stmt.type === 'RateLimit') rateLimits.push(stmt);
@@ -520,6 +522,10 @@ function compileApiRoute(api: ApiNode): string {
       opts += ' }';
       handlerBody += `    const __fetch_${l.name} = await fetch(${url}, ${opts});\n`;
       handlerBody += `    const ${l.name} = await __fetch_${l.name}.json();\n`;
+    } else if (l.value.kind === 'literal') {
+      // #189: Array/object/value literals
+      const expr = typeof l.value.expr === 'string' ? l.value.expr : JSON.stringify(l.value.expr);
+      handlerBody += `    const ${l.name} = ${expr};\n`;
     }
   }
 

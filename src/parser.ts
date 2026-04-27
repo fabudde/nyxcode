@@ -5824,7 +5824,12 @@ export class Parser {
       const t = this.advance();
       if (t.type === TokenType.LeftBracket) depth++;
       else if (t.type === TokenType.RightBracket) depth--;
-      result += t.value;
+      // #189: Preserve string quotes in array literals
+      if (t.type === TokenType.String) {
+        result += JSON.stringify(t.value);
+      } else {
+        result += t.value;
+      }
       if (depth > 0 && t.type === TokenType.Comma) result += " ";
     }
     return result;
@@ -5838,7 +5843,14 @@ export class Parser {
       const t = this.advance();
       if (t.type === TokenType.LeftBrace) depth++;
       else if (t.type === TokenType.RightBrace) depth--;
-      if (depth > 0) result += t.value + " ";
+      if (depth > 0) {
+        // #189: Preserve string quotes in object literals
+        if (t.type === TokenType.String) {
+          result += JSON.stringify(t.value) + " ";
+        } else {
+          result += t.value + " ";
+        }
+      }
     }
     result += "}";
     return result;
