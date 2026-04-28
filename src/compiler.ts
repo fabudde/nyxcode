@@ -2367,9 +2367,9 @@ export class Compiler {
       this.js.push(`
   // Data: ${name}
   ${paramGuardJs}
-  let ${name} = [];
-  let ${name}__loading = true;
-  let ${name}__error = null;
+  var ${name} = [];
+  var ${name}__loading = true;
+  var ${name}__error = null;
   // #198: Initialize data as reactive state
   if (typeof __nyx !== 'undefined' && __nyx.createState) {
     if (!__nyx.subscribers.has('${name}')) __nyx.createState('${name}', []);
@@ -2417,9 +2417,9 @@ export class Compiler {
       const tableName = url.split("/").pop() || name;
       this.js.push(`
   // Live Data: ${name} (WebSocket)
-  let ${name} = [];
-  let ${name}__loading = true;
-  let ${name}__error = null;
+  var ${name} = [];
+  var ${name}__loading = true;
+  var ${name}__error = null;
   async function load_${name}() {
     ${name}__loading = true;
     try {
@@ -4518,7 +4518,7 @@ export class Compiler {
 
     let runtime = `
   // === NyxCode Reactive Runtime v0.2 ===
-  const __nyx = {
+  var __nyx = {
     state: {},
     subscribers: new Map(),
     batch: false,
@@ -4600,7 +4600,7 @@ export class Compiler {
     // Create convenience accessors (so users can write `count` not `__nyx.state.count`)
     runtime += `\n  // Convenience accessors\n`;
     for (const [name] of this.stateVars) {
-      runtime += `  let ${name} = { get value() { return __nyx.state.${name}; }, set value(v) { __nyx.state.${name} = v; } };\n`;
+      runtime += `  var ${name} = { get value() { return __nyx.state.${name}; }, set value(v) { __nyx.state.${name} = v; } };\n`;
     }
 
     // Store initialization — global reactive state objects
