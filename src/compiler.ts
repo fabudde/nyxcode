@@ -136,6 +136,7 @@ export class Compiler {
   private componentId: number = 0;
   private indent: number = 0;
   private pageClass: string = "";
+  private currentPagePath: string = "/";
   private stateVars: Map<string, string> = new Map(); // name -> initial value
   private dataVars: Set<string> = new Set(); // data block variable names
   private constVars: Map<string, string> = new Map(); // name -> value (non-reactive)
@@ -563,6 +564,7 @@ export class Compiler {
 
   private compilePage(page: PageNode): string {
     let content = "";
+    this.currentPagePath = page.path;
 
     // v0.27.0 — page auth: inject token check + redirect
     if ((page as any).auth) {
@@ -594,6 +596,7 @@ export class Compiler {
    */
   private compilePageStatic(page: PageNode): string {
     let content = "";
+    this.currentPagePath = page.path;
 
     // v0.27.0 — page auth: inject token check + redirect
     if ((page as any).auth) {
@@ -2345,6 +2348,21 @@ export class Compiler {
     if (source.kind === "get" || source.kind === "query") {
       let url =
         source.kind === "query" ? `/api/__generated/${name}` : source.value;
+      // v0.50: :param route parameters — extract from URL path
+      const routeParamMatches = url.match(/:(\w+)/g);
+      let routeParamJs = "";
+      if (routeParamMatches) {
+        const pagePath = this.currentPagePath || '/';
+        const pageSegments = pagePath.split('/').filter(Boolean);
+        for (const match of routeParamMatches) {
+          const paramName = match.substring(1);
+          const segIdx = pageSegments.indexOf(':' + paramName);
+          if (segIdx >= 0) {
+            routeParamJs += `var _rp_${paramName}=window.location.pathname.split('/').filter(Boolean)[${segIdx}]||'';\n`;
+            url = url.replace(match, `'+_rp_${paramName}+'`);
+          }
+        }
+      }
       // v0.27.0 — $param.X: replace with URL query parameter
       const paramMatches = url.match(/\$param\.([\w]+)/g);
       let paramGuardJs = "";
@@ -2366,7 +2384,7 @@ export class Compiler {
       }
       this.js.push(`
   // Data: ${name}
-  ${paramGuardJs}
+  ${routeParamJs}${paramGuardJs}
   var ${name} = [];
   var ${name}__loading = true;
   var ${name}__error = null;
