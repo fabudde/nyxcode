@@ -5990,11 +5990,19 @@ async function __nyx_sse(url, body, onChunk, onDone) {
   /** Replace state var names in an expression with __nyx.state.name */
   private resolveStateRefs(expr: string): string {
     let result = expr;
+    // v0.50: val(#id) → document.getElementById('id').value (combined shorthand)
+    result = result.replace(/val\(#([a-zA-Z][a-zA-Z0-9_-]*)\)/g, (_, id) => {
+      return `document.getElementById('${id}').value`;
+    });
     // v0.50: val("id") → document.getElementById('id').value
     result = result.replace(/val\(["']([^"']+)["']\)/g, (_, id) => {
       return `document.getElementById('${id}').value`;
     });
-    // v0.50: #id → document.getElementById('id').value (shorthand)
+    // v0.50: #id.method() → document.getElementById('id').method() (method call)
+    result = result.replace(/#([a-zA-Z][a-zA-Z0-9_-]*)\.([a-zA-Z]+\([^)]*\))/g, (_, id, method) => {
+      return `document.getElementById('${id}').${method}`;
+    });
+    // v0.50: #id → document.getElementById('id').value (standalone)
     result = result.replace(/#([a-zA-Z][a-zA-Z0-9_-]*)/g, (_, id) => {
       return `document.getElementById('${id}').value`;
     });
@@ -6017,8 +6025,9 @@ async function __nyx_sse(url, body, onChunk, onDone) {
     }
     for (const [name] of this.stateVars) {
       // Replace standalone occurrences (not inside other words)
+      // v0.50 fix: Don't replace when preceded by '.' (property access like .value)
       result = result.replace(
-        new RegExp(`\\b${name}\\b`, "g"),
+        new RegExp(`(?<!\\.)\\b${name}\\b`, "g"),
         `__nyx.state.${name}`,
       );
     }
