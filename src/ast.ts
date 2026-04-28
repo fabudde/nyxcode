@@ -524,6 +524,7 @@ export interface PropDef {
   name: string;
   optional: boolean;
   defaultValue?: string;
+  propType?: string; // v0.50: type annotation (string, number, boolean, array, object)
 }
 
 export interface ColumnDef {

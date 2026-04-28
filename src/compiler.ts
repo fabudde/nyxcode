@@ -4046,11 +4046,22 @@ export class Compiler {
       }
     }
 
-    // Compile children passed to this component (for slot substitution)
+    // v0.50: Compile children passed to this component (for slot substitution)
+    // Named slots: children with slot="name" go to named slots, rest to default
     let slotHtml = "";
+    const namedSlots: Record<string, string> = {};
     if (el.children.length > 0) {
       for (const child of el.children) {
-        slotHtml += this.compileStatement(child);
+        const slotAttr = child.type === 'Element' 
+          ? (child as any).attributes?.find((a: any) => a.name === 'slot')
+          : null;
+        if (slotAttr && typeof slotAttr.value === 'string') {
+          const slotName = slotAttr.value;
+          if (!namedSlots[slotName]) namedSlots[slotName] = '';
+          namedSlots[slotName] += this.compileStatement(child);
+        } else {
+          slotHtml += this.compileStatement(child);
+        }
       }
     }
 
@@ -4066,9 +4077,20 @@ export class Compiler {
     for (const stmt of comp.body) {
       if (stmt.type === "Style") continue; // Already handled
       // Slot: replace with children from parent invocation
+      // v0.50: Named slots — slot name="header" matches children with slot="header"
       if (stmt.type === "Element" && (stmt as ElementNode).tag === "slot") {
-        if (slotHtml) {
+        const slotEl = stmt as ElementNode;
+        const nameAttr = slotEl.attributes.find(a => a.name === 'name');
+        const slotName = nameAttr && typeof nameAttr.value === 'string' ? nameAttr.value : null;
+        if (slotName && namedSlots[slotName]) {
+          html += namedSlots[slotName];
+        } else if (!slotName && slotHtml) {
           html += slotHtml;
+        } else {
+          // Render slot's default children if no content provided
+          for (const defaultChild of slotEl.children) {
+            html += this.compileStatement(defaultChild);
+          }
         }
         continue;
       }
@@ -4090,6 +4112,7 @@ export class Compiler {
           stmt as ElementNode,
           props,
           slotHtml,
+          namedSlots,
         );
       } else {
         html += this.compileStatement(stmt);
@@ -4112,10 +4135,24 @@ export class Compiler {
     el: ElementNode,
     props: Record<string, string>,
     slotHtml?: string,
+    namedSlots?: Record<string, string>,
   ): string {
-    // Slot substitution: if this element IS a slot, return the slot content
-    if (el.tag === "slot" && slotHtml) {
-      return slotHtml;
+    // v0.50: Named slot substitution
+    if (el.tag === "slot") {
+      const nameAttr = el.attributes.find(a => a.name === 'name');
+      const slotName = nameAttr && typeof nameAttr.value === 'string' ? nameAttr.value : null;
+      if (slotName && namedSlots?.[slotName]) {
+        return namedSlots[slotName];
+      } else if (!slotName && slotHtml) {
+        return slotHtml;
+      } else {
+        // Render slot's default children
+        let defaultHtml = '';
+        for (const child of el.children) {
+          defaultHtml += this.compileStatement(child);
+        }
+        return defaultHtml;
+      }
     }
     const tag = this.mapTag(el.tag);
 
@@ -4139,6 +4176,11 @@ export class Compiler {
       return undefined;
     };
     const interpolate = (s: string): string => {
+      // v0.50: Also resolve single-brace {propName} for component props
+      s = s.replace(/\{([a-zA-Z_][\w]*)\}/g, (match, name) => {
+        if (name in props) return props[name];
+        return match; // not a prop, leave for reactive runtime
+      });
       return s.replace(/\$\{([^}]+)\}/g, (match, raw) => {
         const expr = raw.trim();
         // Simple identifier lookup (props first, built-ins second)
@@ -4341,6 +4383,7 @@ export class Compiler {
             c as ElementNode,
             props,
             slotHtml,
+            namedSlots,
           );
         return this.compileStatement(c);
       })

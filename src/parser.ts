@@ -1576,9 +1576,15 @@ export class Parser {
         const pname = this.consumeIdentifier();
         let optional = false;
         let defaultValue: string | undefined;
+        let propType: string | undefined;
         if (this.check(TokenType.Question)) {
           this.advance();
           optional = true;
+        }
+        // v0.50: Type annotation — component Button(label: string, count: number = 0)
+        if (this.check(TokenType.Colon)) {
+          this.advance(); // consume :
+          propType = this.consumeIdentifier(); // string, number, boolean, array, object
         }
         if (this.check(TokenType.Equals)) {
           this.advance();
@@ -1588,7 +1594,7 @@ export class Parser {
           else defaultValue = this.advance().value;
           optional = true;
         }
-        props.push({ name: pname, optional, defaultValue });
+        props.push({ name: pname, optional, defaultValue, propType });
         if (this.check(TokenType.Comma)) this.advance();
       }
       this.consume(TokenType.RightParen);
