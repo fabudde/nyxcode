@@ -4675,7 +4675,7 @@ export class Compiler {
             // v0.50: Support {current + 1}, {form.fields.length} etc.
             try {
               // Resolve all state.x.y.z chains first
-              let resolved = expr.trim().replace(/(?:state|computed)\.([a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)*)/g, (m, path) => {
+              let resolved = expr.trim().replace(/(?:state|computed)\\.([a-zA-Z_]\\w*(?:\\.[a-zA-Z_]\\w*)*)/g, (m, path) => {
                 const parts = path.split('.');
                 const root = parts[0];
                 if (parts.length === 1) {
@@ -4686,7 +4686,7 @@ export class Compiler {
                 return JSON.stringify(val ?? 0);
               });
               // Safe eval for simple arithmetic (+, -, *, /, %, ternary, comparison)
-              if (/^[\d\s+\-*/%.(),"'<>=!?:]+$/.test(resolved) || /^[\d\s+\-*/%.(),"']+$/.test(resolved)) {
+              if (/^[\\d\\s+\\-*/%.(),"'<>=!?:]+$/.test(resolved) || /^[\\d\\s+\\-*/%.(),"']+$/.test(resolved)) {
                 return Function('"use strict";return (' + resolved + ')')() ?? '';
               }
               // If not safe, try property chain fallback
