@@ -457,3 +457,16 @@ describe("v0.50: expression interpolation in text", () => {
     assert.ok(html.includes("state.items.length"), "should resolve data var as state");
   });
 });
+
+describe("v0.50: reactive style binding", () => {
+  it("style with {stateVar} gets data-nyx-style-tpl", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let progress = 50\n  div style="width: {progress}%" { p "bar" }\n}');
+    assert.ok(html.includes("data-nyx-style-tpl"), "should have style template attr");
+    assert.ok(html.includes("{{state.progress}}"), "should have reactive ref");
+  });
+
+  it("style without interpolation has no data-nyx-style-tpl", () => {
+    const html = compile('meta { title "T" }\npage / {\n  div style="width: 50%" { p "bar" }\n}');
+    assert.ok(!html.includes("data-nyx-style-tpl"), "should NOT have style template");
+  });
+});

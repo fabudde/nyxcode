@@ -137,6 +137,7 @@ export class Compiler {
   private indent: number = 0;
   private pageClass: string = "";
   private stateVars: Map<string, string> = new Map(); // name -> initial value
+  private dataVars: Set<string> = new Set(); // data block variable names
   private constVars: Map<string, string> = new Map(); // name -> value (non-reactive)
   private currentLoopIndexVar: string | null = null; // v0.50: tracks current each-loop index var for template interpolation
   // v0.24.0 nav-burger: one CSS block per breakpoint, emitted once per build.
@@ -2163,7 +2164,29 @@ export class Compiler {
       } else if (attr.name === "style") {
         // Inline style with shorthand expansion
         const expandedStyle = this.expandInlineShorthands(attr.value as string);
-        parts.push(`style="${expandedStyle}"`);
+        // v0.50: Check for {stateVar} interpolation in style → reactive style binding
+        const interpolationRx = /\{([a-zA-Z_][a-zA-Z0-9_.]+)\}/g;
+        let match2: RegExpExecArray | null;
+        const styleBindings: Array<{full: string, expr: string}> = [];
+        while ((match2 = interpolationRx.exec(expandedStyle)) !== null) {
+          const ref = match2[1];
+          const rootPart = ref.split('.')[0];
+          if (this.stateVars.has(rootPart) || this.computedVars.has(rootPart) || this.stores.has(rootPart)) {
+            const prefix = this.computedVars.has(rootPart) ? 'computed' : 'state';
+            styleBindings.push({ full: match2[0], expr: `${prefix}.${ref}` });
+          }
+
+        }
+        if (styleBindings.length > 0) {
+          this.hasReactivity = true;
+          let styleTpl = expandedStyle;
+          for (const b of styleBindings) {
+            styleTpl = styleTpl.replace(b.full, `{{${b.expr}}}`);
+          }
+          parts.push(`style="${expandedStyle}" data-nyx-style-tpl="${styleTpl}"`);
+        } else {
+          parts.push(`style="${expandedStyle}"`);
+        }
       } else if (attr.name === "href") {
         const safe = this.sanitizeUrlAttr("href", attr.value as string);
         if (safe !== null) parts.push(`href="${safe}"`);
@@ -4687,6 +4710,27 @@ export class Compiler {
         }
       }
       update(); // Initial render
+    });
+
+    // v0.50: Bind style templates with data-nyx-style-tpl (reactive inline styles)
+    document.querySelectorAll('[data-nyx-style-tpl]').forEach(el => {
+      const tpl = el.getAttribute('data-nyx-style-tpl');
+      const updateStyle = () => {
+        try {
+          el.setAttribute('style', tpl.replace(/\{\{(.+?)\}\}/g, (_, expr) => {
+            const chain = expr.trim().split('.');
+            let val = chain[0] === 'state' ? __nyx.state : chain[0] === 'computed' ? __nyx.computed : null;
+            for (let ci = 1; ci < chain.length && val != null; ci++) val = val[chain[ci]];
+            return val ?? 0;
+          }));
+        } catch(e) {}
+      };
+      for (const [name] of __nyx.subscribers) {
+        if (tpl.includes('state.' + name) || tpl.includes(name)) {
+          __nyx.subscribe(name, updateStyle);
+        }
+      }
+      updateStyle();
     });
 
     // Bind inputs with data-nyx-model (two-way binding)
