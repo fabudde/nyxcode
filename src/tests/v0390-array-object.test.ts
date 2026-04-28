@@ -406,3 +406,19 @@ describe("v0.50: set indexed path in fn body", () => {
     assert.ok(html.includes("notify"), "should notify");
   });
 });
+
+describe("v0.50: fetch POST in handlers", () => {
+  it("fetch POST with body and then navigate", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let items = []\n  button "Save" on:click { fetch POST "/api/save" { items: items } then navigate "/done" }\n}');
+    assert.ok(html.includes("async function"), "should be async");
+    assert.ok(html.includes("method:'POST'"), "should use POST");
+    assert.ok(html.includes("/api/save"), "should have URL");
+    assert.ok(html.includes("JSON.stringify"), "should stringify body");
+    assert.ok(html.includes("window.location.href='/done'"), "should navigate after");
+  });
+
+  it("val() reads DOM input values", () => {
+    const html = compile('meta { title "T" }\npage / {\n  input id="name"\n  button "Go" on:click { fetch POST "/api" { name: val("name") } }\n}');
+    assert.ok(html.includes("document.getElementById('name').value"), "should read input value");
+  });
+});

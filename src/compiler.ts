@@ -5658,7 +5658,8 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       if (depth === 0) {
         const rest = code.slice(i);
         const matchedKw = allKeywords.find(k => rest.startsWith(k));
-        if (matchedKw && current.trim()) {
+        // v0.50: Don't split if keyword follows 'then ' (it belongs to the fetch)
+        if (matchedKw && current.trim() && !current.trimEnd().endsWith('then')) {
           statements.push(current.trim());
           current = '';
         }
@@ -5712,6 +5713,18 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       }
     }
     
+    // v0.50: fetch METHOD "url" { body } then action
+    if (action.startsWith('fetch ')) {
+      return this.compileHandlerFetch(action);
+    }
+
+    // v0.50: navigate "/path"
+    if (action.startsWith('navigate ')) {
+      let path = action.slice(9).trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+      path = this.resolveStateRefs(path);
+      return `window.location.href='${path}'`;
+    }
+
     // call fnName(args)
     if (action.startsWith('call ')) {
       const fnCall = action.slice(5).trim();
@@ -5847,6 +5860,10 @@ async function __nyx_sse(url, body, onChunk, onDone) {
   /** Replace state var names in an expression with __nyx.state.name */
   private resolveStateRefs(expr: string): string {
     let result = expr;
+    // v0.50: val("id") → document.getElementById('id').value
+    result = result.replace(/val\(["']([^"']+)["']\)/g, (_, id) => {
+      return `document.getElementById('${id}').value`;
+    });
     // Resolve store field access: user.name -> __nyx.state['user.name']
     for (const [storeName, store] of this.stores) {
       for (const field of store.fields) {
@@ -6038,7 +6055,7 @@ async function __nyx_sse(url, body, onChunk, onDone) {
 
   /** v0.50: Compile fetch in event handlers (async) */
   private compileHandlerFetch(action: string): string {
-    // Parse: fetch METHOD "url" { body }
+    // Parse: fetch METHOD "url" { body } then action
     const parts = action.slice(6).trim().split(/\s+/);
     const method = parts[0]?.toUpperCase() || 'GET';
     let url = parts[1] || '/';
@@ -6048,6 +6065,7 @@ async function __nyx_sse(url, body, onChunk, onDone) {
     // Check for body: { key: val }
     const braceIdx = action.indexOf('{');
     let bodyJS = 'null';
+    let thenAction = '';
     if (braceIdx >= 0 && method !== 'GET') {
       let depth = 0;
       let bodyEnd = -1;
@@ -6057,13 +6075,33 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       }
       if (bodyEnd >= 0) {
         const bodyStr = action.slice(braceIdx, bodyEnd + 1).trim();
-        bodyJS = `JSON.stringify(${this.resolveStateRefs(bodyStr).replace(/"/g, "'")})`;
+        bodyJS = `JSON.stringify(${this.resolveStateRefs(bodyStr).replace(/"/g, "'")})`;  
+        // Check for 'then' after the body
+        const afterBody = action.slice(bodyEnd + 1).trim();
+        if (afterBody.startsWith('then ')) {
+          thenAction = afterBody.slice(5).trim();
+        }
       }
     }
     
+    // Also check for 'then' in GET requests (no braces)
+    if (!thenAction) {
+      const thenIdx = action.indexOf(' then ');
+      if (thenIdx >= 0) {
+        thenAction = action.slice(thenIdx + 6).trim();
+      }
+    }
+
     const headersJS = method === 'GET' ? '{}' : "{'Content-Type':'application/json'}";
     const authJS = `var tk=localStorage.getItem('token');if(tk)h['Authorization']='Bearer '+tk;`;
-    return `(async function(){var h=${headersJS};${authJS}var r=await fetch('${url}',{method:'${method}',headers:h${method !== 'GET' ? ',body:' + bodyJS : ''}});return await r.json()})()`;
+    
+    // Compile the 'then' action if present
+    let thenJS = '';
+    if (thenAction) {
+      thenJS = ';' + this.compileSingleAction(thenAction);
+    }
+    
+    return `(async function(){var h=${headersJS};${authJS}var r=await fetch('${url}',{method:'${method}',headers:h${method !== 'GET' ? ',body:' + bodyJS : ''}});var d=await r.json()${thenJS}})()`;
   }
 
   // #202: Convert condition expression to JS using __nyx.state references
