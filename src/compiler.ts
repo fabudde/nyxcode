@@ -2335,6 +2335,8 @@ export class Compiler {
     const { name, source } = data;
     // v0.50: Register data name as state var so {form.fields.length} resolves reactively
     if (!this.stateVars.has(name)) this.stateVars.set(name, '[]');
+    // v0.50: data declarations need the reactive runtime for __nyx.state
+    this.hasReactivity = true;
     const hasStates = data.loadingBlock || data.errorBlock || data.emptyBlock;
     const loadingId = hasStates ? this.nextId("dl") : "";
     const errorId = hasStates ? this.nextId("de") : "";
