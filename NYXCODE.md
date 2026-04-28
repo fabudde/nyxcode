@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.40.0)
+# NYXCODE.md — AI Context File (v0.50.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -2793,4 +2793,139 @@ button "Click" on:click { set count = count + 1 }
 button "Add" on:click { push items "new" }
 button "Remove" on:click { pop items }
 button "Fire" on:click { emit change data }
+```
+
+## v0.50.0 — Component System v2 + Reactive Runtime + StdLib
+
+### Reactive State (Signals)
+
+Page-level `let` declarations are now **reactive signals** (SolidJS-style fine-grained reactivity):
+
+```nyx
+page / {
+  let count = 0
+
+  button on:click { set count = count + 1 } "Clicked: {count}"
+}
+```
+
+- `let` in `page {}` = reactive signal (auto-updates DOM on change)
+- `let` in handlers = local variable (not reactive)
+- `const` = always static (never reactive)
+- `data` in components = reactive state scoped to component instance
+
+### Multi-Statement Event Handlers
+
+Handlers now support multiple statements, conditionals, and complex logic:
+
+```nyx
+page / {
+  let items = []
+  let input = ""
+
+  input bind="input" placeholder="Add item"
+  button on:click {
+    push items input
+    set input = ""
+    call #input.focus()
+  } "Add"
+
+  each items -> item {
+    li {
+      span "{item}"
+      button on:click { remove items item } "x"
+    }
+  }
+}
+```
+
+**Handler statements:** `set`, `push`, `pop`, `shift`, `remove`, `call`, `fetch`, `navigate`, `emit`
+
+### Typed Props (Component System v2)
+
+Components now support type annotations and default values:
+
+```nyx
+component Counter(label: string, count: number = 0, active: boolean = true) {
+  div "{label}: {count}"
+}
+
+page / {
+  Counter label="Clicks" count="5"
+  Counter label="Score"  // count defaults to 0
+}
+```
+
+**Supported types:** `string`, `number`, `boolean`, `array`, `object`
+**Runtime coercion:** `number` props auto-converted via Number(), `boolean` via truthy/falsy
+
+### Named Slots
+
+Components can define multiple slot insertion points:
+
+```nyx
+component Card {
+  header { slot name="header" }
+  main { slot }
+  footer { slot name="footer" }
+}
+
+page / {
+  Card {
+    div slot="header" "My Title"
+    p "Main content goes here"
+    div slot="footer" "Footer info"
+  }
+}
+```
+
+**Slot default content:** If no children match a named slot, the slot's own children render as fallback.
+
+### Event Forwarding (emit)
+
+```nyx
+component Button(label: string) {
+  button on:click { emit click } "{label}"
+}
+```
+
+### Single-Brace Prop Interpolation
+
+Inside component bodies, `{propName}` resolves to the prop value at compile time:
+
+```nyx
+component Badge(text: string, color: string = "blue") {
+  span class="badge-{color}" "{text}"
+}
+```
+
+### Standard Library
+
+```nyx
+use "stdlib"           // loads all: Toggle, Rating, Choice, Wizard, BurgerNav
+use "stdlib/toggle"    // loads only Toggle
+```
+
+**Available:** Toggle, Rating, Choice, Wizard, BurgerNav
+
+### Line Comments
+
+```nyx
+// This is a comment (only at line start / after whitespace)
+```
+
+### DOM Access + fetch + navigate in Handlers
+
+```nyx
+call #elementId.focus()       // DOM access via #id
+set value = val(#input)       // get input value
+fetch POST "/api/x" { body { key: val } }
+navigate "/other-page"
+```
+
+### Reactive Style Bindings
+
+```nyx
+let size = 16
+p style="font-size: {size}px" "Dynamic size"
 ```
