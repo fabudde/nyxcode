@@ -444,3 +444,16 @@ describe("v0.50: fetch POST in fn body", () => {
     assert.ok(html.includes("getElementById('my-input').value"), "should resolve #id");
   });
 });
+
+describe("v0.50: expression interpolation in text", () => {
+  it("{current + 1} becomes reactive template expression", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let n = 3\n  p "Value: {n + 1}"\n}');
+    assert.ok(html.includes("state.n + 1"), "should contain state.n + 1");
+    assert.ok(html.includes("data-nyx-tpl"), "should be reactive template");
+  });
+
+  it("{form.fields.length} works with data block dot-access", () => {
+    const html = compile('meta { title "T" }\npage / {\n  data items = get /api/items\n  p "Total: {items.length}"\n}');
+    assert.ok(html.includes("state.items.length"), "should resolve data var as state");
+  });
+});

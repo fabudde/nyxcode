@@ -1779,14 +1779,20 @@ export class Compiler {
             parts.push({ expr: exprStr, full: rawValue.slice(i, j + 1) });
             lastIdx = j + 1;
             i = j;
-          } else if (rawValue[i] === "{" && /^\w/.test(rawValue.slice(i + 1))) {
-            // Also handle {varName} (without $)
-            const m = rawValue.slice(i).match(/^\{(\w+(?:\.\w+)?)\}/);
-            if (m) {
+          } else if (rawValue[i] === "{" && rawValue[i - 1] !== '$' && /[\w#.]/.test(rawValue.slice(i + 1))) {
+            // v0.50: Handle {expr} (without $) — balanced brace matching for expressions
+            let depth = 1, j = i + 1;
+            while (j < rawValue.length && depth > 0) {
+              if (rawValue[j] === "{") depth++;
+              else if (rawValue[j] === "}") depth--;
+              if (depth > 0) j++;
+            }
+            if (depth === 0) {
+              const exprStr = rawValue.slice(i + 1, j);
               if (i > lastIdx) parts.push({ text: rawValue.slice(lastIdx, i) });
-              parts.push({ expr: m[1], full: m[0] });
-              lastIdx = i + m[0].length;
-              i = lastIdx - 1;
+              parts.push({ expr: exprStr, full: rawValue.slice(i, j + 1) });
+              lastIdx = j + 1;
+              i = j;
             }
           }
         }
@@ -2304,6 +2310,8 @@ export class Compiler {
 
   private compileData(data: DataStatement): string {
     const { name, source } = data;
+    // v0.50: Register data name as state var so {form.fields.length} resolves reactively
+    if (!this.stateVars.has(name)) this.stateVars.set(name, '[]');
     const hasStates = data.loadingBlock || data.errorBlock || data.emptyBlock;
     const loadingId = hasStates ? this.nextId("dl") : "";
     const errorId = hasStates ? this.nextId("de") : "";
@@ -4640,9 +4648,25 @@ export class Compiler {
             if (/^state\\.[a-zA-Z_]\\w*\\.[a-zA-Z_]\\w*$/.test(expr.trim())) {
               return __nyx.state[parts[1]+'.'+parts[2]] ?? '';
             }
-            // #193: Complex expressions handled safely without new Function()
-            // Try simple property chain: state.x.y.z
+            // #193: Complex expressions — resolve variable refs then evaluate
+            // v0.50: Support {current + 1}, {form.fields.length} etc.
             try {
+              // Resolve all state.x.y.z chains first
+              let resolved = expr.trim().replace(/(?:state|computed)\.([a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)*)/g, (m, path) => {
+                const parts = path.split('.');
+                const root = parts[0];
+                if (parts.length === 1) {
+                  return JSON.stringify(__nyx.state[root] ?? __nyx.computed?.[root] ?? 0);
+                }
+                let val = __nyx.state[root];
+                for (let ci = 1; ci < parts.length && val != null; ci++) val = val[parts[ci]];
+                return JSON.stringify(val ?? 0);
+              });
+              // Safe eval for simple arithmetic (+, -, *, /, %, ternary, comparison)
+              if (/^[\d\s+\-*/%.(),"'<>=!?:]+$/.test(resolved) || /^[\d\s+\-*/%.(),"']+$/.test(resolved)) {
+                return Function('"use strict";return (' + resolved + ')')() ?? '';
+              }
+              // If not safe, try property chain fallback
               const chain = expr.trim().split('.');
               let val = chain[0] === 'state' ? __nyx.state : chain[0] === 'computed' ? __nyx.computed : null;
               for (let ci = 1; ci < chain.length && val != null; ci++) val = val[chain[ci]];
