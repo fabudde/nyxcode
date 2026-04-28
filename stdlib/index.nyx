@@ -1,0 +1,10 @@
+// NyxCode Standard Library
+// These components replace the built-in compiler elements.
+// Import with: use stdlib
+
+// Components:
+// - Toggle(value, label) — On/off switch
+// - Rating(max, value) — Star rating input
+// - Choice(options, value) — Choice button group
+// - Wizard — Multi-step form wizard
+// - BurgerNav — Responsive burger navigation

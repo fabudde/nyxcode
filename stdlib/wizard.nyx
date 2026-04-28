@@ -1,0 +1,80 @@
+// NyxCode StdLib: Multi-Step Wizard
+// Replaces built-in wizard compiler element
+// Usage: Wizard { step { ... } step { ... } step { ... } }
+
+component Wizard {
+  data current = 0
+  data total = 0
+
+  div .nyx-wizard {
+    div .nyx-wizard-progress {
+      each 0..{total} -> i {
+        div .nyx-wizard-dot class="{i <= current ? 'active' : ''}"
+      }
+    }
+    slot
+    div .nyx-wizard-nav {
+      button .nyx-wizard-back type="button"
+        disabled="{current == 0}"
+        on:click { set current = current - 1 }
+        "← Back"
+      button .nyx-wizard-next type="button"
+        on:click {
+          when current == total - 1 {
+            emit submit
+          }
+          when current < total - 1 {
+            set current = current + 1
+          }
+        }
+        "{current == total - 1 ? 'Submit ✓' : 'Next →'}"
+    }
+  }
+
+  style {
+    .nyx-wizard-progress {
+      display: flex
+      gap: 4px
+      margin-bottom: 1.5rem
+    }
+    .nyx-wizard-dot {
+      flex: 1
+      height: 4px
+      border-radius: 2px
+      background: #e5e7eb
+      transition: background 0.3s
+    }
+    .nyx-wizard-dot.active {
+      background: #3b82f6
+    }
+    .nyx-wizard-nav {
+      display: flex
+      justify-content: space-between
+      margin-top: 1.5rem
+    }
+    .nyx-wizard-back {
+      padding: 0.5rem 1.5rem
+      border: 1px solid #d1d5db
+      border-radius: 6px
+      background: #fff
+      cursor: pointer
+    }
+    .nyx-wizard-back:disabled {
+      opacity: 0.3
+      cursor: not-allowed
+    }
+    .nyx-wizard-next {
+      padding: 0.5rem 1.5rem
+      border: none
+      border-radius: 6px
+      background: #3b82f6
+      color: #fff
+      cursor: pointer
+      font-weight: 500
+    }
+    @keyframes nyx-slide-in {
+      from { opacity: 0; transform: translateX(20px) }
+      to { opacity: 1; transform: translateX(0) }
+    }
+  }
+}

@@ -1,0 +1,61 @@
+// NyxCode StdLib: Choice Buttons
+// Replaces built-in choice compiler element
+// Usage: Choice options="Yes,No,Maybe" value="answer"
+
+component Choice(options: string, value: string = "") {
+  data selected = ""
+
+  div .nyx-choice {
+    each options | split "," -> option {
+      button .nyx-choice-btn type="button"
+        class="{option == selected ? 'selected' : ''}"
+        on:click {
+          set selected = option
+          emit change selected
+        } {
+        span .nyx-choice-letter "{__idx + 1}"
+        span "{option}"
+      }
+    }
+  }
+
+  style {
+    .nyx-choice {
+      display: flex
+      flex-direction: column
+      gap: 0.5rem
+    }
+    .nyx-choice-btn {
+      display: flex
+      align-items: center
+      gap: 0.75rem
+      padding: 0.75rem 1rem
+      border: 2px solid #e5e7eb
+      border-radius: 8px
+      background: #fff
+      cursor: pointer
+      width: 100%
+      text-align: left
+      transition: all 0.15s
+    }
+    .nyx-choice-btn:hover {
+      border-color: #3b82f6
+      background: #eff6ff
+    }
+    .nyx-choice-btn.selected {
+      border-color: #3b82f6
+      background: #dbeafe
+    }
+    .nyx-choice-letter {
+      display: inline-flex
+      align-items: center
+      justify-content: center
+      width: 28px
+      height: 28px
+      border-radius: 6px
+      background: #f3f4f6
+      font-weight: 600
+      font-size: 0.8rem
+    }
+  }
+}

@@ -1,0 +1,39 @@
+// NyxCode StdLib: Star Rating
+// Replaces built-in rating compiler element
+// Usage: Rating max="5" value="score"
+
+component Rating(max: number = 5, value: string = "") {
+  data score = 0
+  data hover = 0
+
+  div .nyx-rating on:mouseleave {
+    set hover = 0
+  } {
+    each 1..{max} -> i {
+      span .nyx-star 
+        on:click { set score = i; emit change score }
+        on:mouseenter { set hover = i }
+        class="{i <= (hover > 0 ? hover : score) ? 'active' : ''}"
+        "★"
+    }
+  }
+
+  style {
+    .nyx-rating {
+      display: inline-flex
+      gap: 2px
+    }
+    .nyx-star {
+      cursor: pointer
+      font-size: 1.5rem
+      color: #ddd
+      transition: color 0.15s
+    }
+    .nyx-star.active {
+      color: #f59e0b
+    }
+    .nyx-star:hover {
+      color: #fbbf24
+    }
+  }
+}

@@ -1,0 +1,67 @@
+// NyxCode StdLib: Burger Navigation
+// Replaces built-in nav burger compiler element
+// Usage: BurgerNav { a href="/" "Home"; a href="/about" "About" }
+
+component BurgerNav {
+  data open = false
+
+  nav .nyx-burger-nav {
+    button .nyx-burger-btn type="button"
+      aria-label="Menu"
+      on:click { set open = !open } {
+      span .nyx-burger-line
+      span .nyx-burger-line
+      span .nyx-burger-line
+    }
+    div .nyx-burger-menu class="{open ? 'open' : ''}" {
+      slot
+    }
+  }
+
+  style {
+    .nyx-burger-nav {
+      position: relative
+    }
+    .nyx-burger-btn {
+      display: none
+      flex-direction: column
+      gap: 4px
+      padding: 8px
+      border: none
+      background: transparent
+      cursor: pointer
+    }
+    .nyx-burger-line {
+      width: 24px
+      height: 3px
+      background: currentColor
+      border-radius: 2px
+      transition: transform 0.3s, opacity 0.3s
+    }
+    .nyx-burger-menu {
+      display: flex
+      gap: 1rem
+      align-items: center
+    }
+    @media (max-width: 768px) {
+      .nyx-burger-btn {
+        display: flex
+      }
+      .nyx-burger-menu {
+        display: none
+        position: absolute
+        top: 100%
+        left: 0
+        right: 0
+        flex-direction: column
+        background: #fff
+        padding: 1rem
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1)
+        border-radius: 8px
+      }
+      .nyx-burger-menu.open {
+        display: flex
+      }
+    }
+  }
+}
