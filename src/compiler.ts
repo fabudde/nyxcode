@@ -713,7 +713,7 @@ export class Compiler {
       .filter(Boolean)
       .join("\n    ");
 
-    const scriptContent = [js, reactiveRuntime].filter(Boolean).join("\n");
+    const scriptContent = [reactiveRuntime, js].filter(Boolean).join("\n");
     const hasScript = scriptContent.trim().length > 0 || renderCalls.length > 0;
 
     // Issue #97: dedupe singleton meta tags so page-level `meta {}` overrides site-level.
@@ -769,6 +769,9 @@ export class Compiler {
         ? `
   <script>
 ` +
+          reactiveRuntime +
+          `
+` +
           js +
           (renderCalls
             ? `
@@ -777,9 +780,6 @@ export class Compiler {
     ${renderCalls}
   }`
             : "") +
-          `
-` +
-          reactiveRuntime +
           `
   </script>`
         : "") +
@@ -5010,7 +5010,7 @@ export class Compiler {
       .filter(Boolean)
       .join("\n    ");
 
-    const scriptContent = [js, reactiveRuntime].filter(Boolean).join("\n");
+    const scriptContent = [reactiveRuntime, js].filter(Boolean).join("\n");
     const hasScript = scriptContent.trim().length > 0 || renderCalls.length > 0;
 
     // Issue #97: dedupe singleton meta tags so page-level `meta {}` overrides site-level.
@@ -5049,6 +5049,7 @@ ${body}${
       hasScript
         ? `
   <script>
+${reactiveRuntime}
 ${js}${
             renderCalls
               ? `
@@ -5058,7 +5059,6 @@ ${js}${
   }`
               : ""
           }
-${reactiveRuntime}
   </script>`
         : ""
     }
