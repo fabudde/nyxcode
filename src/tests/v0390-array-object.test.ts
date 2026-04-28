@@ -422,3 +422,25 @@ describe("v0.50: fetch POST in handlers", () => {
     assert.ok(html.includes("document.getElementById('name').value"), "should read input value");
   });
 });
+
+describe("v0.50: fetch POST in fn body", () => {
+  it("fetch POST with #id refs compiles to async fetch", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let items = []\n  fn publish() {\n    fetch POST "/api/data" { title: #my-title, items: items }\n  }\n  p "test"\n}');
+    assert.ok(html.includes("function publish()"), "should have fn");
+    assert.ok(html.includes("fetch("), "should have fetch call");
+    assert.ok(html.includes("POST"), "should be POST method");
+    assert.ok(html.includes("getElementById"), "should resolve #id");
+    assert.ok(html.includes("JSON.stringify"), "should stringify body");
+  });
+
+  it("fetch POST in on:click handler works", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let items = []\n  button "Save" on:click { fetch POST "/api/save" { data: items } }\n}');
+    assert.ok(html.includes("fetch("), "should have fetch");
+    assert.ok(html.includes("POST"), "should be POST");
+  });
+
+  it("#id shorthand resolves to getElementById", () => {
+    const html = compile('meta { title "T" }\npage / {\n  let x = 0\n  fn save() {\n    set x = #my-input\n  }\n  p "test"\n}');
+    assert.ok(html.includes("getElementById('my-input').value"), "should resolve #id");
+  });
+});

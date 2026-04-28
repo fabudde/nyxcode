@@ -5638,7 +5638,7 @@ async function __nyx_sse(url, body, onChunk, onDone) {
 
   /** v0.50: Split handler body into individual statements by keyword boundaries */
   private splitHandlerStatements(code: string): string[] {
-    const stmtKeywords = ['set ', 'push ', 'pop ', 'shift ', 'emit ', 'navigate ', 'toast ', 'toggle ', 'remove ', 'call ', 'let '];
+    const stmtKeywords = ['set ', 'push ', 'pop ', 'shift ', 'emit ', 'navigate ', 'toast ', 'toggle ', 'remove ', 'call ', 'let ', 'fetch '];
     const blockKeywords = ['if ', 'try ', 'each ', 'for ', 'while ', 'match '];
     const allKeywords = [...stmtKeywords, ...blockKeywords];
     const statements: string[] = [];
@@ -5864,6 +5864,10 @@ async function __nyx_sse(url, body, onChunk, onDone) {
     result = result.replace(/val\(["']([^"']+)["']\)/g, (_, id) => {
       return `document.getElementById('${id}').value`;
     });
+    // v0.50: #id → document.getElementById('id').value (shorthand)
+    result = result.replace(/#([a-zA-Z][a-zA-Z0-9_-]*)/g, (_, id) => {
+      return `document.getElementById('${id}').value`;
+    });
     // Resolve store field access: user.name -> __nyx.state['user.name']
     for (const [storeName, store] of this.stores) {
       for (const field of store.fields) {
@@ -5936,6 +5940,10 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       case 'FnCall': {
         const callExpr = this.resolveStateRefs(stmt.expr || '');
         return callExpr;
+      }
+      case 'FnFetch': {
+        // v0.50: fetch in fn body — delegate to compileHandlerFetch
+        return this.compileHandlerFetch(stmt.raw || '');
       }
       case 'FnWhen': {
         const cond = this.resolveStateRefs(stmt.condition || '');

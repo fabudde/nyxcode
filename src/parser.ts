@@ -7586,6 +7586,36 @@ export class Parser {
         this.advance();
         const callExpr = this.consumeFnExpression();
         stmts.push({ type: 'FnCall', expr: callExpr, line: token.line, col: token.col } as any);
+      } else if (token.type === TokenType.Identifier && token.value === 'fetch') {
+        // v0.50: fetch METHOD "url" { body } then action
+        // Must track brace depth because fetch body uses { }
+        this.advance(); // consume 'fetch'
+        let fetchStr = '';
+        let fetchBraceDepth = 0;
+        while (!this.isAtEnd()) {
+          const tok = this.peek();
+          if (tok.type === TokenType.LeftBrace) fetchBraceDepth++;
+          if (tok.type === TokenType.RightBrace) {
+            if (fetchBraceDepth > 0) {
+              fetchBraceDepth--;
+              fetchStr += (fetchStr ? ' ' : '') + tok.value;
+              this.advance();
+              continue;
+            } else {
+              break; // fn body closing brace
+            }
+          }
+          if (fetchBraceDepth === 0 && fetchStr) {
+            if (tok.type === TokenType.Identifier &&
+                (tok.value === 'set' || tok.value === 'push' || tok.value === 'pop' ||
+                 tok.value === 'shift' || tok.value === 'remove' || tok.value === 'call' ||
+                 tok.value === 'let' || tok.value === 'fetch')) break;
+            if (tok.type === TokenType.Return) break;
+          }
+          fetchStr += (fetchStr ? ' ' : '') + tok.value;
+          this.advance();
+        }
+        stmts.push({ type: 'FnFetch', raw: ('fetch ' + fetchStr).trim(), line: token.line, col: token.col } as any);
       } else {
         const expr = this.consumeFnExpression();
         if (expr)
@@ -7797,7 +7827,7 @@ export class Parser {
           break;
         if (
           tok.type === TokenType.Identifier &&
-          (tok.value === "set" || tok.value === "defer" || tok.value === "push" || tok.value === "pop" || tok.value === "shift" || tok.value === "remove" || tok.value === "call")
+          (tok.value === "set" || tok.value === "defer" || tok.value === "push" || tok.value === "pop" || tok.value === "shift" || tok.value === "remove" || tok.value === "call" || tok.value === "fetch")
         )
           break;
         // Stop at top-level keywords (short-form fn expressions must end here)
