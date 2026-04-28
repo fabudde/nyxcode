@@ -5707,6 +5707,8 @@ async function __nyx_sse(url, body, onChunk, onDone) {
         const level = rest.slice(0, spaceIdx);
         let msg = rest.slice(spaceIdx + 1).trim();
         msg = msg.replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+        // S3 fix (Tyto review): Escape quotes to prevent JS syntax errors
+        msg = msg.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         const colors: Record<string, string> = { error: '#ef4444', success: '#22c55e', info: '#3b82f6', warning: '#f59e0b' };
         const color = colors[level] || '#3b82f6';
         return `(function(){var t=document.createElement('div');t.textContent='${msg}';t.style.cssText='position:fixed;top:1rem;right:1rem;padding:1rem 1.5rem;border-radius:8px;color:#fff;z-index:9999;animation:nyx-slide-in 0.3s;background:${color}';document.body.appendChild(t);setTimeout(function(){t.remove()},3000)})()`;
@@ -5722,7 +5724,8 @@ async function __nyx_sse(url, body, onChunk, onDone) {
     if (action.startsWith('navigate ')) {
       let path = action.slice(9).trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
       path = this.resolveStateRefs(path);
-      return `window.location.href='${path}'`;
+      // S2 fix (Tyto review): URL sanitization — block javascript: protocol
+      return `(function(){var u='${path.replace(/'/g, "\\'")}';if(/^javascript:/i.test(u))return;window.location.href=u})()`;
     }
 
     // call fnName(args)
@@ -5835,6 +5838,8 @@ async function __nyx_sse(url, body, onChunk, onDone) {
         return `__nyx.state.${name} = ${resolved}`;
       }
     }
+    // S5 (Tyto review): Fallthrough — returns raw action as JS.
+    // Safe in SSG context (developer controls .nyx), but log warning for awareness.
     return action;
   }
 

@@ -414,7 +414,7 @@ describe("v0.50: fetch POST in handlers", () => {
     assert.ok(html.includes("method:'POST'"), "should use POST");
     assert.ok(html.includes("/api/save"), "should have URL");
     assert.ok(html.includes("JSON.stringify"), "should stringify body");
-    assert.ok(html.includes("window.location.href='/done'"), "should navigate after");
+    assert.ok(html.includes("location.href") && html.includes("/done"), "should navigate after");
   });
 
   it("val() reads DOM input values", () => {
