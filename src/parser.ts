@@ -6288,6 +6288,7 @@ export class Parser {
                 if (t.type === TokenType.String) action += ' "' + t.value + '"';
                 else action += " " + t.value;
               }
+              break; // v0.50 fix: handler block complete, don't consume element text
             } else {
               const tok = this.advance();
               if (tok.type === TokenType.String)
