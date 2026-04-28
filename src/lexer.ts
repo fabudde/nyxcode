@@ -529,7 +529,23 @@ export class Lexer {
       case '?': this.emit(TokenType.Question, ch, startCol); break;
       case '&': this.emit(TokenType.Ampersand, ch, startCol); break;
       case '|': this.emit(TokenType.Pipe, ch, startCol); break;
-      case '/': this.emit(TokenType.Slash, ch, startCol); break;
+      case '/':
+        // v0.50: // line comments — only at start of line or after whitespace
+        if (this.pos < this.source.length && this.source[this.pos] === '/') {
+          // Check that // is at column 1 or preceded by whitespace only
+          const beforeSlash = this.source.substring(
+            this.source.lastIndexOf('\n', this.pos - 2) + 1,
+            this.pos - 1
+          );
+          if (beforeSlash.trim() === '') {
+            this.pos++; // consume second /
+            while (this.pos < this.source.length && this.source[this.pos] !== '\n') {
+              this.pos++;
+            }
+            break; // discard comment
+          }
+        }
+        this.emit(TokenType.Slash, ch, startCol); break;
       case '+': this.emit(TokenType.Plus, ch, startCol); break;
       case '*': this.emit(TokenType.Star, ch, startCol); break;
       case '%': this.emit(TokenType.Percent, ch, startCol); break;

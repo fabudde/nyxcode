@@ -2613,6 +2613,18 @@ export class Parser {
       };
     }
 
+    // Form 1d: `use stdlib` or `use stdlib/toggle` — v0.50 standard library
+    if (this.check(TokenType.Identifier) && this.peek().value === 'stdlib') {
+      this.advance(); // consume 'stdlib'
+      let path = 'stdlib';
+      if (this.check(TokenType.Slash)) {
+        this.advance(); // consume '/'
+        const subName = this.consume(TokenType.Identifier).value;
+        path = `stdlib/${subName}`;
+      }
+      return { type: 'Use', path, line: start.line, col: start.col };
+    }
+
     // Form 1c: `use stripe` — Tier 1 built-in adapter (v0.30)
     const TIER1_PACKAGES = [
       "stripe",

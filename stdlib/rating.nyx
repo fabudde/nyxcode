@@ -1,21 +1,16 @@
 // NyxCode StdLib: Star Rating
-// Replaces built-in rating compiler element
-// Usage: Rating max="5" value="score"
+// Usage: use "stdlib/rating"
+//        Rating max="5"
 
-component Rating(max: number = 5, value: string = "") {
+component Rating(max: number = 5) {
   data score = 0
-  data hover = 0
 
-  div .nyx-rating on:mouseleave {
-    set hover = 0
-  } {
-    each 1..{max} -> i {
-      span .nyx-star 
-        on:click { set score = i; emit change score }
-        on:mouseenter { set hover = i }
-        class="{i <= (hover > 0 ? hover : score) ? 'active' : ''}"
-        "★"
-    }
+  div .nyx-rating {
+    span .nyx-star data-value="1" on:click { set score = 1 } "★"
+    span .nyx-star data-value="2" on:click { set score = 2 } "★"
+    span .nyx-star data-value="3" on:click { set score = 3 } "★"
+    span .nyx-star data-value="4" on:click { set score = 4 } "★"
+    span .nyx-star data-value="5" on:click { set score = 5 } "★"
   }
 
   style {
@@ -31,9 +26,6 @@ component Rating(max: number = 5, value: string = "") {
     }
     .nyx-star.active {
       color: #f59e0b
-    }
-    .nyx-star:hover {
-      color: #fbbf24
     }
   }
 }

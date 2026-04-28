@@ -233,7 +233,23 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
       return null;
     }
     let resolved: string;
-    if (rawPath.startsWith('@/')) {
+    if (rawPath === 'stdlib' || rawPath.startsWith('stdlib/')) {
+      // v0.50: Resolve stdlib imports from the package's stdlib/ directory
+      const stdlibRoot = resolve(new URL('../stdlib', import.meta.url).pathname);
+      if (rawPath === 'stdlib') {
+        // `use stdlib` → load all stdlib components
+        const stdlibFiles = ['toggle', 'rating', 'choice', 'wizard', 'burger-nav'];
+        for (const f of stdlibFiles) {
+          const stdFile = join(stdlibRoot, `${f}.nyx`);
+          loadFile(stdFile, fromFile, `stdlib/${f}`);
+        }
+        return null; // already loaded all files
+      } else {
+        // `use stdlib/toggle` → load specific component
+        const subPath = rawPath.slice('stdlib/'.length);
+        resolved = join(stdlibRoot, `${subPath}.nyx`);
+      }
+    } else if (rawPath.startsWith('@/')) {
       resolved = resolve(projectRoot, rawPath.slice(2));
     } else if (isAbsolute(rawPath)) {
       // Allow absolute only if within projectRoot
@@ -245,9 +261,11 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
     // against BOTH projectRoot and projectRootReal because `fromFile` may have
     // been realpath'd by safeLoad (v0.24.1) and therefore live under
     // projectRootReal rather than projectRoot.
+    // v0.50: stdlib paths are always allowed (they're inside the package)
+    const isStdlib = rawPath.startsWith('stdlib/');
     const rel = relative(projectRoot, resolved);
     const relReal = relative(projectRootReal, resolved);
-    const escapes = (rel.startsWith('..') || isAbsolute(rel)) &&
+    const escapes = !isStdlib && (rel.startsWith('..') || isAbsolute(rel)) &&
                     (relReal.startsWith('..') || isAbsolute(relReal));
     if (escapes) {
       errors.push(`[${relative(process.cwd(), fromFile)}] import path escapes project root: "${rawPath}"`);
@@ -269,6 +287,21 @@ function resolveAllImports(entryPath: string): ImportResolveResult {
       return;
     }
     if (loaded.kind === 'escape') {
+      // v0.50: stdlib paths are allowed to be outside project root — read directly
+      if (rawPath.startsWith('stdlib/') || rawPath === 'stdlib') {
+        try {
+          const stdlibContent = readFileSync(absPath, 'utf8');
+          visited.add(absPath);
+          sourceFiles.push(absPath);
+          const stdlibAst = parse(stdlibContent);
+          for (const node of stdlibAst.body) {
+            mergedBody.push(node);
+          }
+        } catch (e: any) {
+          errors.push(`[${relative(process.cwd(), fromFile)}] stdlib load error: "${rawPath}" (${e.message})`);
+        }
+        return;
+      }
       errors.push(`[${relative(process.cwd(), fromFile)}] import path escapes project root via symlink: "${rawPath}" (resolved: ${loaded.realPath})`);
       return;
     }
