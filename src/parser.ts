@@ -3410,7 +3410,12 @@ export class Parser {
 
   private parseEach(): EachStatement {
     const start = this.consume(TokenType.Each);
-    const collection = this.consumeIdentifier();
+    // v0.50: Support dot-access: each form.fields -> field { }
+    let collection = this.consumeIdentifier();
+    while (this.check(TokenType.Dot)) {
+      this.advance(); // consume .
+      collection += '.' + this.consumeIdentifier();
+    }
 
     let alias: string | undefined;
     if (this.peek().value === "as") {

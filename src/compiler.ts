@@ -2600,7 +2600,7 @@ export class Compiler {
     container.querySelectorAll('input,textarea,select').forEach((el, idx) => {
       __inputs[idx] = { value: el.value, selStart: el.selectionStart, selEnd: el.selectionEnd };
     });
-    container.innerHTML = (__nyx.state['${each.collection}'] || ${each.collection} || []).map((${varName}, ${idxVar}) => \`
+    container.innerHTML = (${this.resolveCollectionRef(each.collection)}).map((${varName}, ${idxVar}) => \`
       ${this.compileEachBody(each, varName)}
     \`).join('');
     // v0.50: Restore input values after re-render
@@ -2613,13 +2613,25 @@ export class Compiler {
   }`);
 
     // #199: Subscribe to collection for reactive list re-rendering
-    this.scripts.push(`__nyx.subscribe('${each.collection}', render_${containerId}); render_${containerId}();`);
+    // v0.50: Subscribe to root state var (form.fields → subscribe to 'form')
+    const rootCollection = each.collection.includes('.') ? each.collection.split('.')[0] : each.collection;
+    this.scripts.push(`__nyx.subscribe('${rootCollection}', render_${containerId}); render_${containerId}();`);
 
     this.currentLoopIndexVar = null;
     // #178: display:contents makes wrapper invisible to grid/flex layout
     return `${this.ind()}<div id="${containerId}" style="display:contents"></div>\n`;
   }
 
+  // v0.50: Resolve collection reference for each loops
+  private resolveCollectionRef(collection: string): string {
+    if (collection.includes(".")) {
+      const parts = collection.split(".");
+      const root = parts[0];
+      const path = parts.slice(1).join(".");
+      return `(__nyx.state['${root}'] || ${root} || {}).${path} || []`;
+    }
+    return `__nyx.state['${collection}'] || ${collection} || []`;
+  }
   private compileEachBody(each: EachStatement, varName: string): string {
     // If body has a single component, don't wrap in extra tag
     const children = each.body
