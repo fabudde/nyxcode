@@ -2390,7 +2390,7 @@ export class Compiler {
   var ${name}__error = null;
   // #198: Initialize data as reactive state
   if (typeof __nyx !== 'undefined' && __nyx.createState) {
-    if (!__nyx.subscribers.has('${name}')) __nyx.createState('${name}', []);
+    if (!__nyx.subscribers.has('${name}')) __nyx.createState('${name}', null);
     if (!__nyx.subscribers.has('${name}__loading')) __nyx.createState('${name}__loading', true);
     if (!__nyx.subscribers.has('${name}__error')) __nyx.createState('${name}__error', null);
   }

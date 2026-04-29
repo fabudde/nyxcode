@@ -2929,3 +2929,78 @@ navigate "/other-page"
 let size = 16
 p style="font-size: {size}px" "Dynamic size"
 ```
+
+### Route Parameters in Data Fetch URLs
+
+Use `:paramName` in page paths and data fetch URLs. The compiler extracts the parameter from the URL at runtime:
+
+```nyx
+page /f/:slug {
+  data form = get /api/forms/by-slug/:slug
+
+  h1 "{form.title}"
+  p "{form.description}"
+}
+```
+
+`:slug` is automatically extracted from `window.location.pathname` at the correct segment index. Works in both `data` fetch URLs and `fn` body fetch URLs:
+
+```nyx
+page /f/:slug {
+  data form = get /api/forms/by-slug/:slug
+
+  fn submitForm() {
+    fetch POST /api/forms/:slug/respond { answers: answers } then navigate "/thanks"
+  }
+
+  button on:click { call submitForm() } "Submit"
+}
+```
+
+**Combined with query params:** `:param` (route) and `$param.x` (query) can coexist.
+
+### Fetch Body in Handlers
+
+`fetch` in event handlers supports JSON body with `{ key: value }` syntax:
+
+```nyx
+page /create {
+  let title = ""
+
+  fn publish() {
+    fetch POST /api/forms { title: title, slug: slug } then navigate "/dashboard"
+  }
+
+  input bind="title" placeholder="Form title"
+  button on:click { call publish() } "Publish"
+}
+```
+
+**Keys are preserved as strings**, values are resolved to reactive state. `{ answers: answers }` compiles to `{ answers: __nyx.state.answers }` (not `{ __nyx.state.answers: __nyx.state.answers }`).
+
+### Data Fetch Returns Raw Response
+
+`data` blocks pass the API response through without modification:
+
+```nyx
+data form = get /api/forms/1    // form = {id:1, title:"..."}  (object)
+data posts = get /api/posts     // posts = [{...}, {...}]      (array)
+```
+
+The response is stored exactly as the API returns it. Use `each` for arrays, dot-access for objects.
+
+### Reactive Text Bindings
+
+Use **single curly braces** `{expression}` for reactive text:
+
+```nyx
+page / {
+  let name = "World"
+
+  h1 "Hello, {name}!"                    // Simple variable
+  p "Step {current + 1} of {total}"      // Expressions
+  p "{form.title}"                        // Dot-access
+}
+```
+
+**⚠️ Important:** Use `{var}`, NOT `${var}`. Dollar-sign template literals are NOT NyxCode syntax and will render as literal text.
