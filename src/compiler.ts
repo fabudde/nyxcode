@@ -2683,6 +2683,37 @@ export class Compiler {
   }
 
   // v0.50: Resolve collection reference for each loops
+  // v0.50: Convert condition in each body to JS using loop variable
+  private eachConditionToJS(expr: any, varName: string): string {
+    if (!expr) return 'false';
+    switch (expr.type) {
+      case 'BinaryExpression': {
+        const op = expr.operator === 'and' ? '&&' : expr.operator === 'or' ? '||' : expr.operator;
+        return `(${this.eachConditionToJS(expr.left, varName)} ${op} ${this.eachConditionToJS(expr.right, varName)})`;
+      }
+      case 'UnaryExpression':
+        return `(${expr.operator}${this.eachConditionToJS(expr.operand, varName)})`;
+      case 'MemberExpression': {
+        const obj = this.eachConditionToJS(expr.object, varName);
+        return `${obj}.${expr.property}`;
+      }
+      case 'Identifier':
+        // If the identifier is the loop variable, use it directly
+        if (expr.name === varName) return varName;
+        // Otherwise check if it's a state variable
+        if (this.stateVars.has(expr.name)) return `__nyx.state.${expr.name}`;
+        return expr.name;
+      case 'StringLiteral':
+        return `'${expr.value}'`;
+      case 'NumberLiteral':
+        return String(expr.value);
+      case 'BooleanLiteral':
+        return String(expr.value);
+      default:
+        return this.expressionToJS(expr);
+    }
+  }
+
   private resolveCollectionRef(collection: string): string {
     if (collection.includes(".")) {
       const parts = collection.split(".");
@@ -2702,6 +2733,23 @@ export class Compiler {
         if (stmt.type === "Form") {
           return this.compileFormTemplate(stmt as FormStatement, varName);
         }
+        // v0.50: when-inside-each — inline JS conditional in template
+        if (stmt.type === "When") {
+          const when = stmt as any;
+          const cond = this.eachConditionToJS(when.condition, varName);
+          const body = when.body.map((s: any) => {
+            if (s.type === 'Element') return this.compileElementTemplate(s, varName);
+            return '';
+          }).join('');
+          const elseBody = when.elseBody ? when.elseBody.map((s: any) => {
+            if (s.type === 'Element') return this.compileElementTemplate(s, varName);
+            return '';
+          }).join('') : '';
+          if (elseBody) {
+            return `\${${cond} ? \`${body}\` : \`${elseBody}\`}`;
+          }
+          return `\${${cond} ? \`${body}\` : ''}`;
+        }
         return "";
       })
       .join("");
@@ -2715,7 +2763,10 @@ export class Compiler {
       return children;
     }
 
-    const tag = this.mapTag(each.element);
+    // v0.50: If body is only When blocks, don't use alias as wrapper tag
+    const hasOnlyWhens = each.body.every((s: any) => s.type === 'When');
+    const rawTag = each.element;
+    const tag = (hasOnlyWhens && !this.isHtmlTag(rawTag)) ? 'div' : this.mapTag(rawTag);
     // #136: Apply attributes (preset, flex, style, etc.) to wrapper element
     let attrStr = "";
     if (each.attributes && each.attributes.length > 0) {
@@ -6653,6 +6704,11 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       });
     }
     return result;
+  }
+
+  private isHtmlTag(tag: string): boolean {
+    const htmlTags = new Set(['div','span','p','a','ul','ol','li','h1','h2','h3','h4','h5','h6','section','article','nav','header','footer','main','aside','button','input','form','table','tr','td','th','thead','tbody','img','video','audio','canvas','pre','code','blockquote','hr','br','select','option','textarea','label','fieldset','legend','details','summary','dialog','template','slot']);
+    return htmlTags.has(tag);
   }
 
   private isVoidElement(tag: string): boolean {
