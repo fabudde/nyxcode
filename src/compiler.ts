@@ -2405,7 +2405,7 @@ export class Compiler {
       const res = await fetch('${url}', { headers });
       if(!res.ok){var _e=new Error('HTTP '+res.status);_e.status=res.status;throw _e;}
       var _d = await res.json();
-      ${name} = Array.isArray(_d) ? _d : [_d];
+      ${name} = _d;
       // #198: Push fetched data into reactive state
       if (typeof __nyx !== 'undefined' && __nyx.createState) {
         if (!__nyx.subscribers.has('${name}')) __nyx.createState('${name}', ${name});
@@ -2415,7 +2415,7 @@ export class Compiler {
       }
       ${name}__loading = false;
       ${hasStates ? `if(document.getElementById('${loadingId}'))document.getElementById('${loadingId}').style.display='none';` : ""}
-      ${hasStates ? `if(document.getElementById('${emptyId}'))document.getElementById('${emptyId}').style.display=${name}.length===0?'':'none';` : ""}
+      ${hasStates ? `if(document.getElementById('${emptyId}'))document.getElementById('${emptyId}').style.display=(Array.isArray(${name})?${name}.length===0:!${name})?'':'none';` : ""}
       render();
     } catch(e) {
       ${name}__loading = false;
