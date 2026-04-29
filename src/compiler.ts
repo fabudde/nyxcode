@@ -2666,7 +2666,16 @@ export class Compiler {
     // #199: Subscribe to collection for reactive list re-rendering
     // v0.50: Subscribe to root state var (form.fields → subscribe to 'form')
     const rootCollection = each.collection.includes('.') ? each.collection.split('.')[0] : each.collection;
-    this.scripts.push(`__nyx.subscribe('${rootCollection}', render_${containerId}); render_${containerId}();`);
+    const subs = new Set([rootCollection]);
+    // v0.50: Scan each body for state variable references → auto-subscribe
+    const bodyStr = JSON.stringify(each.body);
+    for (const [name] of this.stateVars) {
+      if (name !== rootCollection && bodyStr.includes(name)) {
+        subs.add(name);
+      }
+    }
+    const subScript = Array.from(subs).map(s => `__nyx.subscribe('${s}', render_${containerId})`).join('; ');
+    this.scripts.push(`${subScript}; render_${containerId}();`);
 
     this.currentLoopIndexVar = null;
     // #178: display:contents makes wrapper invisible to grid/flex layout

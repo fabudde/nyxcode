@@ -3103,7 +3103,7 @@ component TopNav {
 page /dashboard auth {
   data forms = get /api/forms auth
 
-  use TopNav {
+  TopNav {
     a href="/create" "Create New +"
   }
 
@@ -3138,7 +3138,7 @@ page /create auth {
     } then navigate "/dashboard"
   }
 
-  use TopNav
+  TopNav
 
   h1 "Create Form"
   input id="form-title" placeholder="Form Title"
