@@ -1682,6 +1682,9 @@ const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+// Auto-serialize objects/arrays for SQLite (v0.50.1)
+function __dbSafe(v) { return (v !== null && typeof v === 'object') ? JSON.stringify(v) : v; }
+
 // ── Auto-Migration ─────────────────────────────────────────────
 
 db.exec(\`CREATE TABLE IF NOT EXISTS _migrations (
