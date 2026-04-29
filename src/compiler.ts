@@ -1325,14 +1325,26 @@ export class Compiler {
       nonPresetAttrs.push({ name: "loading", value: "lazy" });
     }
 
+    // v0.50.1: Extract On nodes from children and convert to event attributes
+    for (const child of el.children) {
+      if (child.type === "On") {
+        const onNode = child as any;
+        const evtName = 'on' + onNode.event.charAt(0).toUpperCase() + onNode.event.slice(1);
+        // Only add if not already present as attribute
+        if (!nonPresetAttrs.some((a: any) => a.name.toLowerCase() === evtName.toLowerCase())) {
+          nonPresetAttrs.push({ name: evtName, value: onNode.action });
+        }
+      }
+    }
+
     let attrs = this.compileAttributes(nonPresetAttrs);
     const classes = [scopeClass, presetClass].filter(Boolean).join(" ");
     if (classes) {
       attrs = ` class="${classes}"${attrs}`;
     }
 
-    // Filter out style blocks from children rendering
-    const nonStyleChildren = el.children.filter((c) => c.type !== "Style");
+    // Filter out style blocks and On nodes from children rendering
+    const nonStyleChildren = el.children.filter((c) => c.type !== "Style" && c.type !== "On");
     const children = nonStyleChildren
       .map((c) => this.compileStatement(c))
       .join("");
@@ -3069,8 +3081,9 @@ export class Compiler {
       );
       // v0.50: Resolve {expr} interpolation in each templates
       // {item} → ${item}, {i + 1} → ${i + 1}, {item.name} → ${item.name}
+      // v0.50.1: Skip if preceded by $ (already a JS template interpolation)
       val = val.replace(
-        /\{([^}]+)\}/g,
+        /(?<!\$)\{([^}]+)\}/g,
         (_: string, expr: string) => {
           // If expr starts with a dot, it's already handled above
           if (expr.trim().startsWith('.')) return `\${${varName}${expr.trim()}}`;
@@ -5918,6 +5931,12 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       if (ch === '}') { depth--; current += ch; continue; }
       
       if (depth === 0) {
+        // v0.50.1: Split on semicolons (explicit statement separator)
+        if (ch === ';') {
+          if (current.trim()) statements.push(current.trim());
+          current = '';
+          continue;
+        }
         const rest = code.slice(i);
         const matchedKw = allKeywords.find(k => rest.startsWith(k));
         // v0.50: Don't split if keyword follows 'then ' (it belongs to the fetch)
