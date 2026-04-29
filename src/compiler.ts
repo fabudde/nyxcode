@@ -138,7 +138,8 @@ export class Compiler {
   private pageClass: string = "";
   private currentPagePath: string = "/";
   private stateVars: Map<string, string> = new Map(); // name -> initial value
-  private dataVars: Set<string> = new Set(); // data block variable names
+  private dataVars: Set<string> = new Set(); // v0.50: track data variable names
+  private deferredDataInits: Array<{stateName: string, dataName: string, field: string}> = []; // v0.50: let x = dataVar.field
   private constVars: Map<string, string> = new Map(); // name -> value (non-reactive)
   private currentLoopIndexVar: string | null = null; // v0.50: tracks current each-loop index var for template interpolation
   // v0.24.0 nav-burger: one CSS block per breakpoint, emitted once per build.
@@ -367,6 +368,8 @@ export class Compiler {
       this.indent = 0;
       this.pageClass = "";
       this.stateVars = new Map();
+      this.dataVars = new Set();
+      this.deferredDataInits = [];
       this.constVars = new Map();
       this.computedVars = new Map();
       this.effects = [];
@@ -580,6 +583,18 @@ export class Compiler {
     if (pageStyle) {
       this.compileStyleWithClass(pageStyle, "nyx-page");
       this.pageClass = "nyx-page";
+    }
+
+    // v0.50: Pre-scan for let x = dataVar.field dependencies
+    // Must happen before compileData runs so deferred inits are ready
+    const dataNames = new Set(page.body.filter((s: any) => s.type === 'Data').map((s: any) => s.name));
+    for (const stmt of page.body) {
+      if (stmt.type === 'Let' as any) {
+        const val = (stmt as any).value;
+        if (val && val.kind === 'call' && dataNames.has(val.target)) {
+          this.deferredDataInits.push({ stateName: (stmt as any).name, dataName: val.target, field: val.method });
+        }
+      }
     }
 
     for (const stmt of page.body) {
@@ -912,6 +927,25 @@ export class Compiler {
         return ""; // Events compiled with their parent element
       case "State":
         return this.compileState(stmt as StateStatement);
+      case "Let": {
+        // v0.50: Let in page context with data ref → deferred state init
+        const letStmt = stmt as any;
+        const val = letStmt.value;
+        if (val && val.kind === 'call' && this.dataVars.has(val.target)) {
+          // let x = dataVar.field → create state as [], defer init after data loads
+          this.hasReactivity = true;
+          const defaultVal = '[]';
+          this.stateVars.set(letStmt.name, defaultVal);
+          if (!this.deferredDataInits) this.deferredDataInits = [];
+          this.deferredDataInits.push({ stateName: letStmt.name, dataName: val.target, field: val.method });
+        } else {
+          // Regular let → treat as state
+          this.hasReactivity = true;
+          const initVal = val?.expr || val?.value || '""';
+          this.stateVars.set(letStmt.name, String(initVal));
+        }
+        return '';
+      }
       case "Const":
         return this.compileConst(stmt as any);
       case "Effect":
@@ -2336,6 +2370,8 @@ export class Compiler {
 
   private compileData(data: DataStatement): string {
     const { name, source } = data;
+    // v0.50: Register data variable name for deferred init detection
+    this.dataVars.add(name);
     // v0.50: Register data name as state var so {form.fields.length} resolves reactively
     if (!this.stateVars.has(name)) this.stateVars.set(name, '[]');
     // v0.50: data declarations need the reactive runtime for __nyx.state
@@ -2416,6 +2452,7 @@ export class Compiler {
       ${name}__loading = false;
       ${hasStates ? `if(document.getElementById('${loadingId}'))document.getElementById('${loadingId}').style.display='none';` : ""}
       ${hasStates ? `if(document.getElementById('${emptyId}'))document.getElementById('${emptyId}').style.display=(Array.isArray(${name})?${name}.length===0:!${name})?'':'none';` : ""}
+      ${this.getDeferredInits(name)}
       render();
     } catch(e) {
       ${name}__loading = false;
@@ -2684,6 +2721,16 @@ export class Compiler {
 
   // v0.50: Resolve collection reference for each loops
   // v0.50: Convert condition in each body to JS using loop variable
+  // v0.50: Generate deferred state init code for let x = dataVar.field
+  private getDeferredInits(dataName: string): string {
+    const inits = this.deferredDataInits.filter(d => d.dataName === dataName);
+    if (inits.length === 0) return '';
+    return inits.map(init => {
+      const parsedField = init.field ? `.${init.field}` : '';
+      return `if (typeof __nyx !== 'undefined') { __nyx.state['${init.stateName}'] = ${dataName}${parsedField} || []; }`;
+    }).join('\n      ');
+  }
+
   private eachConditionToJS(expr: any, varName: string): string {
     if (!expr) return 'false';
     switch (expr.type) {

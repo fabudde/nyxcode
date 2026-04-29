@@ -578,6 +578,8 @@ function compileApiRoute(api: ApiNode): string {
   // Generate query execution
   if (queries.length > 0) {
     const pathParams = [...api.path.matchAll(/:(\w+)/g)].map((m: any) => m[1]);
+    // v0.50: Collect query aliases for local variable resolution
+    const queryAliases = new Set(queries.filter((q: any) => q.alias).map((q: any) => q.alias));
     const paramSrc = (p: string) => {
       if (p.startsWith('req.')) return '';
       return pathParams.includes(p) ? 'req.params' : (method === 'get' ? 'req.query' : 'req.body');
@@ -588,19 +590,21 @@ function compileApiRoute(api: ApiNode): string {
       const q = queries[0];
       const sql = q.sql;
       const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
-      const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; if (p.startsWith('body.')) return `req.body.${p.slice(5)}`; if (p.startsWith('params.')) return `req.params.${p.slice(7)}`; if (p.startsWith('env.')) return `process.env.${p.slice(4)}`; return `${paramSrc(p)}.${p}`; }).join(', ');
+      const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; if (p.startsWith('body.')) return `req.body.${p.slice(5)}`; if (p.startsWith('params.')) return `req.params.${p.slice(7)}`; if (p.startsWith('env.')) return `process.env.${p.slice(4)}`; const root = p.split('.')[0]; if (queryAliases.has(root)) return p; return `${paramSrc(p)}.${p}`; }).join(', ');
       const safeSql = sql.replace(/\$([\w.]+)/g, '?');
       const sqlLower = safeSql.toLowerCase();
-      const isSingleRow = /\blimit\s+1\b/.test(sqlLower) || /\b(count|sum|avg|min|max)\s*\(/.test(sqlLower);
+      // v0.50: query alias -> use alias as variable name
+      const getAlias = (q as any).alias;
+      const isSingleRow = /\blimit\s+1\b/.test(sqlLower) || /\b(count|sum|avg|min|max)\s*\(/.test(sqlLower) || !!getAlias;
       if (isSingleRow) {
-        handlerBody += `    const row = db.prepare(\`${safeSql}\`).get(${paramList});\n`;
-        handlerBody += `    if (!row) return res.status(404).json({ error: 'Not found' });\n`;
-        // #180: Skip auto-response if explicit respond statements exist
-        if (responds.length === 0) handlerBody += `    res.json(row);\n`;
+        const varName = getAlias || 'row';
+        handlerBody += `    const ${varName} = db.prepare(\`${safeSql}\`).get(${paramList});\n`;
+        handlerBody += `    if (!${varName}) return res.status(404).json({ error: 'Not found' });\n`;
+        if (responds.length === 0) handlerBody += `    res.json(${varName});\n`;
       } else {
-        handlerBody += `    const rows = db.prepare(\`${safeSql}\`).all(${paramList});\n`;
-        // #180: Skip auto-response if explicit respond statements exist
-        if (responds.length === 0) handlerBody += `    res.json(rows);\n`;
+        const varName = getAlias || 'rows';
+        handlerBody += `    const ${varName} = db.prepare(\`${safeSql}\`).all(${paramList});\n`;
+        if (responds.length === 0) handlerBody += `    res.json(${varName});\n`;
       }
     } else {
       // POST/PUT/DELETE: execute ALL queries sequentially, respond after last
@@ -608,18 +612,22 @@ function compileApiRoute(api: ApiNode): string {
         const q = queries[i];
         const sql = q.sql;
         const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
-        const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; if (p.startsWith('body.')) return `req.body.${p.slice(5)}`; if (p.startsWith('params.')) return `req.params.${p.slice(7)}`; if (p.startsWith('env.')) return `process.env.${p.slice(4)}`; return `${paramSrc(p)}.${p}`; }).join(', ');
+        const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; if (p.startsWith('body.')) return `req.body.${p.slice(5)}`; if (p.startsWith('params.')) return `req.params.${p.slice(7)}`; if (p.startsWith('env.')) return `process.env.${p.slice(4)}`; const root = p.split('.')[0]; if (queryAliases.has(root)) return p; return `${paramSrc(p)}.${p}`; }).join(', ');
         const safeSql = sql.replace(/\$([\w.]+)/g, '?');
         const isLast = i === queries.length - 1;
         
-        if (isLast) {
+        // v0.50: query alias → SELECT with .get() to save result
+        const postAlias = (q as any).alias;
+        if (postAlias) {
+          // SELECT query with alias → save result to variable
+          handlerBody += `    const ${postAlias} = db.prepare(\`${safeSql}\`).get(${paramList});\n`;
+          handlerBody += `    if (!${postAlias}) return res.status(404).json({ error: 'Not found' });\n`;
+        } else if (isLast) {
           if (safeSql.toLowerCase().startsWith('insert')) {
             handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${paramList});\n`;
-            // #180: Skip auto-response if explicit respond statements exist
             if (responds.length === 0) handlerBody += `    res.status(201).json({ id: info.lastInsertRowid, ...req.body });\n`;
           } else {
             handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${paramList});\n`;
-            // #180: Skip auto-response if explicit respond statements exist
             if (responds.length === 0) handlerBody += `    res.json({ changes: info.changes });\n`;
           }
         } else {

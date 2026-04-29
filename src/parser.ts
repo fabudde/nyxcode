@@ -5279,7 +5279,11 @@ export class Parser {
 
   private parseRespond(): RespondStatement {
     const start = this.consume(TokenType.Respond);
-    const status = parseInt(this.consume(TokenType.Number).value);
+    // v0.50: Allow 'respond variable' without status code (defaults to 200)
+    let status = 200;
+    if (this.check(TokenType.Number) && !this.peek().value.includes('..')) {
+      status = parseInt(this.consume(TokenType.Number).value);
+    }
 
     let body:
       | Record<string, string | { value: string; isRef: boolean }>
@@ -5335,6 +5339,14 @@ export class Parser {
       body = { __varRef: ref } as any;
     } else if (this.check(TokenType.Dot)) {
       body = this.advance().value + this.consumeIdentifier();
+    } else if (this.check(TokenType.Identifier)) {
+      // v0.50: respond variableName — forward variable directly (no $ needed)
+      let ref = this.consumeIdentifier();
+      while (this.check(TokenType.Dot)) {
+        this.advance();
+        ref += "." + this.consumeIdentifier();
+      }
+      body = { __varRef: ref } as any;
     }
 
     return { type: "Respond", status, body, line: start.line, col: start.col };
@@ -5926,7 +5938,13 @@ export class Parser {
   private parseQuery(): QueryStatement {
     const start = this.consume(TokenType.Query);
     const sql = this.consume(TokenType.String).value;
-    return { type: "Query", sql, line: start.line, col: start.col };
+    // v0.50: query "SQL" -> alias (save result to variable)
+    let alias: string | undefined;
+    if (this.check(TokenType.Arrow)) {
+      this.advance(); // consume ->
+      alias = this.consumeIdentifier();
+    }
+    return { type: "Query", sql, alias, line: start.line, col: start.col } as any;
   }
 
   /**
