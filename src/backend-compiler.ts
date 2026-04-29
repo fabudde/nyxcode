@@ -1757,6 +1757,9 @@ app.use((err, req, res, next) => {
 
 
 
+// ── Dynamic Page Routes (pages with :param) ────────────────────
+${(pagePaths || []).filter(p => typeof p === 'string').map(p => `app.get('${p}', (req, res) => { res.sendFile(path.join(__dirname, '${p.replace(/:\w+/g, m => m)}', 'index.html')); });`).join('\n')}
+
 // ── Static File Serving ─────────────────────────────────────────
 const distDir = path.join(__dirname, '.');
 app.use(express.static(distDir));

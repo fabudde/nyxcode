@@ -1056,7 +1056,8 @@ try {
       const types = ast.body.filter((n: any) => n.type === 'Type') as any[];
       const sockets = ast.body.filter((n: any) => n.type === 'Socket') as any[];
       const routes = ast.body.filter((n: any) => n.type === 'Route') as any[];
-      let serverCode = compileBackend(tables, apis, config, hooks, [], middlewares, everys, actions, envNode, onEvents, useStmts, pipes, types);
+      const pagePaths = pages.map((p: any) => p.path).filter((p: string) => p.includes(':'));
+      let serverCode = compileBackend(tables, apis, config, hooks, pagePaths, middlewares, everys, actions, envNode, onEvents, useStmts, pipes, types);
       // #187: WebSocket support
       if (sockets.length > 0) {
         let wsCode = `\n// WebSocket (ws)\nconst { WebSocketServer } = require('ws');\n`;
