@@ -623,7 +623,7 @@ function compileApiRoute(api: ApiNode): string {
         const postAlias = (q as any).alias;
         if (postAlias) {
           // SELECT query with alias → save result to variable
-          handlerBody += `    const ${postAlias} = db.prepare(\`${safeSql}\`).get(${paramList});\n`;
+          handlerBody += `    const ${postAlias} = db.prepare(\`${safeSql}\`).get(${safeParamList});\n`;
           handlerBody += `    if (!${postAlias}) return res.status(404).json({ error: 'Not found' });\n`;
         } else if (isLast) {
           if (safeSql.toLowerCase().startsWith('insert')) {

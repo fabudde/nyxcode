@@ -24,7 +24,7 @@ api POST /api/forms/:slug/respond {
     const output = compileBackend(tables as any, apis as any);
     
     // SELECT (.get) should NOT have __dbSafe
-    assert.ok(output.includes('.get(req.params.slug)'), 'SELECT params should be raw');
+    assert.ok(output.includes('.get(__dbSafe(req.params.slug))'), 'SELECT params should use __dbSafe for consistency');
     
     // INSERT (.run) SHOULD have __dbSafe
     assert.ok(output.includes('__dbSafe(found.id)'), 'INSERT params should be wrapped');
