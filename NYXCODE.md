@@ -3004,3 +3004,420 @@ page / {
 ```
 
 **⚠️ Important:** Use `{var}`, NOT `${var}`. Dollar-sign template literals are NOT NyxCode syntax and will render as literal text.
+
+---
+
+## ⚠️ Common Mistakes & Gotchas
+
+**These are the most frequent errors when writing NyxCode. Read this FIRST.**
+
+### ❌ `${var}` vs ✅ `{var}`
+
+```nyx
+// WRONG — renders as literal text "${name}"
+p "${name}"
+
+// RIGHT — reactive binding, updates when name changes
+p "{name}"
+```
+
+NyxCode uses **single curly braces** `{expression}` for reactive text. Dollar-sign `${}` is JavaScript template literal syntax and is NOT recognized by NyxCode.
+
+### ❌ `.my-class` shorthand vs ✅ `class="my-class"`
+
+```nyx
+// WRONG — Pug/Emmet shorthand does NOT work
+div.card { ... }
+
+// RIGHT — use explicit class attribute
+div class="card" { ... }
+```
+
+### ❌ `.property` outside `each` vs ✅ `{data.property}`
+
+```nyx
+// WRONG — .property shorthand only works inside each templates
+p .title    // renders as literal "${data.title}"
+
+// RIGHT — use reactive binding
+p "{form.title}"
+```
+
+### ❌ `fn x(y) = expr` in pages vs ✅ `fn x(y) { ... }`
+
+```nyx
+// WRONG in pages — short-form fn consumes too much
+fn submit() = fetch POST /api/submit { data: data }
+
+// RIGHT — use block form in pages
+fn submit() {
+  fetch POST /api/submit { data: data } then navigate "/done"
+}
+```
+
+Short-form `fn x(y) = expr` works in API blocks but causes parser ambiguity in pages. Always use block form `fn x(y) { ... }` inside pages.
+
+### ❌ `let` in handlers vs ✅ `let` at page level
+
+```nyx
+page / {
+  let count = 0     // ← REACTIVE signal (page-level)
+
+  button on:click {
+    let temp = 5    // ← LOCAL variable (not reactive)
+    set count = count + temp
+  } "Add 5"
+}
+```
+
+Only page-level `let` creates reactive signals. `let` inside handlers is always local.
+
+---
+
+## 📖 Complete Full-Stack Example: Form Builder
+
+This example shows `data`, `let`, `each`, `when`, `fn`, `auth`, and `:param` working together:
+
+```nyx
+table forms {
+  title text
+  description text
+  fields text
+  slug text unique
+}
+
+table responses {
+  form_id integer
+  answers text
+  submitted_at text
+}
+
+component TopNav {
+  nav class="topnav" {
+    a href="/" "NyxForms"
+    slot default
+  }
+}
+
+// Dashboard — shows all forms with edit/view links
+page /dashboard auth {
+  data forms = get /api/forms auth
+
+  use TopNav {
+    a href="/create" "Create New +"
+  }
+
+  h1 "My Forms"
+
+  each forms -> form {
+    div class="card" {
+      h3 "{form.title}"
+      p "{form.description}"
+      a href="/f/{form.slug}" "Fill →"
+      a href="/edit/{form.id}" "Edit ✏️"
+    }
+  }
+}
+
+// Create — reactive form builder
+page /create auth {
+  let questions = []
+  let qcount = 0
+
+  fn addQuestion() {
+    push questions { text: "", type: "text" }
+    set qcount = qcount + 1
+  }
+
+  fn publishForm() {
+    fetch POST /api/forms {
+      title: val(#form-title),
+      description: val(#form-desc),
+      slug: val(#form-slug),
+      fields: questions
+    } then navigate "/dashboard"
+  }
+
+  use TopNav
+
+  h1 "Create Form"
+  input id="form-title" placeholder="Form Title"
+  input id="form-desc" placeholder="Description"
+  input id="form-slug" placeholder="URL Slug"
+
+  button on:click { call addQuestion() } "Add Question +"
+
+  each questions -> q {
+    div class="question-row" {
+      input placeholder="Question text" value="{q.text}"
+      select {
+        option value="text" "Text"
+        option value="email" "Email"
+        option value="rating" "Rating"
+        option value="choice" "Choice"
+      }
+    }
+  }
+
+  when qcount > 0 {
+    button on:click { call publishForm() } "Publish ✨"
+  }
+}
+
+// Fill form — public, uses :slug route parameter
+page /f/:slug {
+  data form = get /api/forms/by-slug/:slug
+  let current = 0
+  let answers = []
+
+  fn goNext() {
+    set current = current + 1
+  }
+
+  fn submitForm() {
+    fetch POST /api/forms/:slug/respond { answers: answers } then navigate "/thanks"
+  }
+
+  h1 "{form.title}"
+  p "Question {current + 1}"
+
+  when current < form.fields.length - 1 {
+    button on:click { call goNext() } "Next →"
+  }
+
+  when current == form.fields.length - 1 {
+    button on:click { call submitForm() } "Submit ✨"
+  }
+}
+
+page /thanks {
+  h1 "Thank you! 🎉"
+  a href="/" "Back to Home"
+}
+```
+
+---
+
+## 🔐 Auth System
+
+### Protected Pages
+
+Add `auth` after the path to require JWT authentication:
+
+```nyx
+page /dashboard auth {
+  // Only accessible with valid JWT token in localStorage
+  // Redirects to /login if no token found
+}
+```
+
+The generated server checks `localStorage.getItem('token')` on the client side and shows/hides elements with `data-visible="auth"` / `data-visible="guest"`.
+
+### Authenticated Data Fetching
+
+Add `auth` after the URL to send the JWT token with the request:
+
+```nyx
+data forms = get /api/forms auth
+```
+
+This adds `Authorization: Bearer <token>` header to the fetch request. The token is read from `localStorage.getItem('token')`.
+
+### Auth Endpoints (Auto-Generated)
+
+`nyx build` auto-generates these auth endpoints when any page uses `auth`:
+
+| Endpoint | Method | Body | Description |
+|----------|--------|------|-------------|
+| `/api/auth/register` | POST | `{username, password}` | Create account, returns `{token}` |
+| `/api/auth/login` | POST | `{username, password}` | Login, returns `{token}` |
+| `/api/auth/me` | GET | — | Get current user (needs Bearer token) |
+
+Passwords are hashed with bcrypt. Tokens are JWT (24h expiry).
+
+---
+
+## 🔄 Reactivity Deep Dive
+
+### `data` vs `let`
+
+| Feature | `data` | `let` |
+|---------|--------|-------|
+| **Source** | Fetched from API (async) | Declared in page (sync) |
+| **Timing** | Loads after page render | Available immediately |
+| **Reactivity** | Updates DOM when fetch completes | Updates DOM on every `set` |
+| **Use for** | API data, server state | UI state, counters, inputs |
+| **Initial value** | `null` until fetch completes | Whatever you assign |
+
+```nyx
+page / {
+  data posts = get /api/posts      // async — null → [...] when loaded
+  let filter = "all"               // sync — "all" immediately
+
+  // "Loading..." shows while data is null
+  // DOM updates when posts arrive AND when filter changes
+}
+```
+
+### `each` Loop Subscriptions
+
+`each` loops automatically re-render when their collection changes (push/pop/shift/remove/set):
+
+```nyx
+let items = ["a", "b"]
+
+each items -> item {
+  p "{item}"
+}
+
+button on:click { push items "c" } "Add"  // each re-renders automatically
+```
+
+**Important:** If the each body reads OTHER state variables (not just the collection), you may need to ensure those state changes also trigger a re-render. The compiler subscribes each-renders to the collection variable, not to every variable used inside the template.
+
+### `when` / `else` Conditionals
+
+Reactive conditionals that show/hide content based on state:
+
+```nyx
+page / {
+  let count = 0
+
+  when count > 0 {
+    p "Count is positive: {count}"
+  }
+
+  when count == 0 {
+    p "Count is zero"
+  } else {
+    p "Count is non-zero"
+  }
+
+  button on:click { set count = count + 1 } "Increment"
+}
+```
+
+`when` blocks automatically re-evaluate when referenced state variables change. The condition can use `==`, `!=`, `>`, `<`, `>=`, `<=`, `and`, `or`, `not`.
+
+---
+
+## 🖥️ What `nyx build` Generates
+
+Running `nyx build app.nyx -o dist/` creates:
+
+```
+dist/
+├── index.html              # Homepage
+├── login/index.html        # Login page
+├── dashboard/index.html    # Dashboard page
+├── f/:slug/index.html      # Dynamic route (served by Express)
+├── server.js               # Express server with:
+│   ├── SQLite database (auto-migrating tables)
+│   ├── CRUD API endpoints (GET/POST/PUT/DELETE per table)
+│   ├── JWT authentication (register/login/me)
+│   ├── Rate limiting
+│   └── Static file serving
+├── data.db                 # SQLite database (created on first run)
+└── package.json            # Dependencies (express, better-sqlite3, etc.)
+```
+
+### Auto-Generated API Endpoints
+
+For each `table` in your .nyx file, the compiler generates:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{table}` | GET | List all rows (supports filtering) |
+| `/api/{table}` | POST | Create new row |
+| `/api/{table}/:id` | GET | Get single row |
+| `/api/{table}/:id` | PUT | Update row |
+| `/api/{table}/:id` | DELETE | Delete row |
+
+### Custom API Routes
+
+The compiler generates standard CRUD endpoints. For custom routes (e.g., `/api/forms/by-slug/:slug`), you currently need to append them to `server.js` after build. This is a known limitation — custom API routes in `.nyx` syntax are planned for v0.51.
+
+### Running the Generated Server
+
+```bash
+cd dist/
+npm install          # Install express, better-sqlite3, etc.
+node server.js       # Starts on PORT env var or 3000
+```
+
+---
+
+## 💻 CLI Reference
+
+### `nyx build <file> [options]`
+
+Compiles a `.nyx` file into a deployable application.
+
+```bash
+nyx build app.nyx                    # Build to ./dist-site/
+nyx build app.nyx -o ./my-output/    # Custom output directory
+nyx build app.nyx --standalone       # Single HTML file (no server)
+```
+
+### `nyx dev <file>`
+
+Starts a development server with hot reload.
+
+```bash
+nyx dev app.nyx                      # Dev server on port 3000
+```
+
+### `nyx test <file>`
+
+Runs `test` blocks defined in the .nyx file.
+
+```bash
+nyx test app.nyx
+```
+
+---
+
+## 🚀 Deployment Guide
+
+### 1. Build
+
+```bash
+nyx build app.nyx -o /var/www/myapp/
+cd /var/www/myapp/ && npm install
+```
+
+### 2. Systemd Service
+
+```ini
+[Unit]
+Description=My NyxCode App
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/myapp
+Environment=PORT=4800
+Environment=JWT_SECRET=your-secret-here
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 3. Reverse Proxy (Caddy)
+
+```
+myapp.example.com {
+    reverse_proxy localhost:4800
+}
+```
+
+### 4. Start
+
+```bash
+systemctl enable --now myapp
+```
+
+That's it. Your NyxCode app is live. 🦞
