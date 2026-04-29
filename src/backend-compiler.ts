@@ -221,7 +221,7 @@ function crudForTable(table: TableNode, allTables: TableNode[], onEvents: any[] 
   const fields = Object.keys(req.body).filter(k => k !== 'id' && validCols.has(k));
   if (!fields.length) return res.status(400).json({ error: 'No valid fields to update' });
   const sets = fields.map(f => f + ' = ?').join(', ');
-  const vals = fields.map(f => req.body[f]);
+  const vals = fields.map(f => __dbSafe(req.body[f]));
   vals.push(req.params.id);
   const info = db.prepare('UPDATE ${n} SET ' + sets + ' WHERE id = ?').run(...vals);
   if (!info.changes) return res.status(404).json({ error: 'Not found' });
@@ -322,7 +322,7 @@ ${validationCode}    const { ${bodyColList} } = req.body;
 ${hasUploadCols ? uploadCols.map(uc => `    const ${uc.name} = req.files?.['${uc.name}']?.[0]?.filename || null;`).join('\n') : ''}
     ${autoUserCols}const info = db.prepare(
       'INSERT INTO ${n} (${colList}) VALUES (${placeholders})'
-    ).run(${colNames.join(', ')});${createdHook}
+    ).run(${colNames.map(c => `__dbSafe(${c})`).join(', ')});${createdHook}
     ${postResponse}
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -612,7 +612,10 @@ function compileApiRoute(api: ApiNode): string {
         const q = queries[i];
         const sql = q.sql;
         const params = [...sql.matchAll(/\$([\w.]+)/g)].map(m => m[1]);
-        const paramList = params.map(p => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; if (p.startsWith('body.')) return `req.body.${p.slice(5)}`; if (p.startsWith('params.')) return `req.params.${p.slice(7)}`; if (p.startsWith('env.')) return `process.env.${p.slice(4)}`; const root = p.split('.')[0]; if (queryAliases.has(root)) return p; return `${paramSrc(p)}.${p}`; }).join(', ');
+        const __resolve = (p: string): string => { if (p.startsWith('req.')) return p; if (p.startsWith('auth.')) return `req.user.${p.slice(5)}`; if (p === 'auth') return 'req.user'; if (p.startsWith('body.')) return `req.body.${p.slice(5)}`; if (p.startsWith('params.')) return `req.params.${p.slice(7)}`; if (p.startsWith('env.')) return `process.env.${p.slice(4)}`; const root = p.split('.')[0]; if (queryAliases.has(root)) return p; return `${paramSrc(p)}.${p}`; };
+        const paramList = params.map(__resolve).join(', ');
+        // v0.50.0: Auto-stringify objects/arrays for SQLite .run() calls
+        const safeParamList = params.map(p => `__dbSafe(${__resolve(p)})`).join(', ');
         const safeSql = sql.replace(/\$([\w.]+)/g, '?');
         const isLast = i === queries.length - 1;
         
@@ -624,14 +627,14 @@ function compileApiRoute(api: ApiNode): string {
           handlerBody += `    if (!${postAlias}) return res.status(404).json({ error: 'Not found' });\n`;
         } else if (isLast) {
           if (safeSql.toLowerCase().startsWith('insert')) {
-            handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${paramList});\n`;
+            handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${safeParamList});\n`;
             if (responds.length === 0) handlerBody += `    res.status(201).json({ id: info.lastInsertRowid, ...req.body });\n`;
           } else {
-            handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${paramList});\n`;
+            handlerBody += `    const info = db.prepare(\`${safeSql}\`).run(${safeParamList});\n`;
             if (responds.length === 0) handlerBody += `    res.json({ changes: info.changes });\n`;
           }
         } else {
-          handlerBody += `    db.prepare(\`${safeSql}\`).run(${paramList});\n`;
+          handlerBody += `    db.prepare(\`${safeSql}\`).run(${safeParamList});\n`;
         }
       }
     }
