@@ -1,3 +1,15 @@
+## v0.50.0 — "Zero Patches" (2026-04-29)
+
+NyxCode is now a complete full-stack programming language. One `.nyx` file = production app with ZERO post-build patches.
+
+**New:** SolidJS-style reactivity, custom API routes (`api GET/POST/PUT`), query aliases (`query "SQL" -> var`), when-inside-each, each auto-subscribe, each loop aliases, data→state deferred init, dynamic page routes, route params in fetch, multi-statement handlers, generic components, stdlib imports.
+
+**Fixed:** State var "value" clobber, text-after-handler leak, runtime ordering, let/var declarations, data fetch array-wrapping, each wrapper tags, deferred init multi-page, component usage syntax.
+
+**Docs:** NYXCODE.md now 3,400+ lines — 9 new sections.
+
+**Stats:** 616 tests, 0 failures. 22 commits since v0.40.1. NyxForms (460 lines) compiles with zero manual patches.
+
 # NyxCode v0.39.0 — "The Language Release II" 🔥
 
 **NyxCode is now a full programming language.** All 10 language feature issues (#183-#192) closed in a single session.
