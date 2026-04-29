@@ -6006,6 +6006,26 @@ async function __nyx_sse(url, body, onChunk, onDone) {
   }
 
   /** Replace state var names in an expression with __nyx.state.name */
+  // v0.50: Resolve object body { key: val } preserving keys as strings
+  private resolveObjectBody(bodyStr: string): string {
+    // Remove outer braces
+    const inner = bodyStr.slice(1, -1).trim();
+    if (!inner) return '{}';
+    // Split by comma, resolve values but keep keys as-is
+    const pairs = inner.split(',').map(pair => {
+      const colonIdx = pair.indexOf(':');
+      if (colonIdx >= 0) {
+        const key = pair.slice(0, colonIdx).trim();
+        const val = pair.slice(colonIdx + 1).trim();
+        return `${key}: ${this.resolveStateRefs(val)}`;
+      }
+      // Shorthand: { answers } → { answers: __nyx.state.answers }
+      const trimmed = pair.trim();
+      return `${trimmed}: ${this.resolveStateRefs(trimmed)}`;
+    });
+    return `{${pairs.join(', ')}}`;
+  }
+
   private resolveStateRefs(expr: string): string {
     let result = expr;
     // v0.50: val(#id) → document.getElementById('id').value (combined shorthand)
@@ -6225,6 +6245,10 @@ async function __nyx_sse(url, body, onChunk, onDone) {
     const method = parts[0]?.toUpperCase() || 'GET';
     let url = parts[1] || '/';
     url = url.replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+    // v0.50: Replace :param route parameters in fn fetch URLs
+    url = url.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, (_, paramName) => {
+      return `'+(_rp_${paramName}||'')+'`;
+    });
     url = this.resolveStateRefs(url);
     
     // Check for body: { key: val }
@@ -6240,7 +6264,8 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       }
       if (bodyEnd >= 0) {
         const bodyStr = action.slice(braceIdx, bodyEnd + 1).trim();
-        bodyJS = `JSON.stringify(${this.resolveStateRefs(bodyStr).replace(/"/g, "'")})`;  
+        // v0.50: Resolve body values but preserve keys as string literals
+        bodyJS = `JSON.stringify(${this.resolveObjectBody(bodyStr)})`;  
         // Check for 'then' after the body
         const afterBody = action.slice(bodyEnd + 1).trim();
         if (afterBody.startsWith('then ')) {
