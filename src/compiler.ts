@@ -629,6 +629,17 @@ export class Compiler {
       this.pageClass = "nyx-page";
     }
 
+    // v0.50: Pre-scan for let x = dataVar.field dependencies
+    const dataNames = new Set(page.body.filter((s: any) => s.type === 'Data').map((s: any) => s.name));
+    for (const stmt of page.body) {
+      if (stmt.type === 'Let' as any) {
+        const val = (stmt as any).value;
+        if (val && val.kind === 'call' && dataNames.has(val.target)) {
+          this.deferredDataInits.push({ stateName: (stmt as any).name, dataName: val.target, field: val.method });
+        }
+      }
+    }
+
     // Temporarily set static mode to suppress data-navigate on links
     this.staticMode = true;
     for (const stmt of page.body) {
@@ -2672,7 +2683,8 @@ export class Compiler {
   }
 
     private compileEach(each: EachStatement): string {
-    const varName = each.alias || "item";
+    // v0.50: If element is not an HTML tag, it's a loop variable alias
+    const varName = each.alias || (each.element && !this.isHtmlTag(each.element) ? each.element : null) || "item";
     const idxVar = each.indexVar || '__idx';
     const containerId = this.nextId("list");
     // v0.50: Track loop index var for template event handler interpolation
