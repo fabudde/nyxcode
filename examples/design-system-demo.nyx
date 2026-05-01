@@ -1,0 +1,133 @@
+theme {
+  fonts {
+    heading "Inter"
+    body "Inter"
+  }
+}
+
+page "NyxCode v0.51 — Next.js-Level Defaults" {
+  meta description="Professional defaults, zero configuration"
+
+  style {
+    background #0a0a1a
+    color white
+    min-height 100vh
+    padding 3rem 1.5rem
+  }
+
+  div {
+    style { max-width 760px, margin 0 auto }
+
+    small "NyxCode v0.51 — NEW DEFAULTS"
+    h1 "Beautiful defaults, zero effort."
+    p "Every NyxCode page now ships with professional typography, polished interactive elements, smooth scrolling, focus management, and responsive sizing — without writing a single line of CSS."
+    hr
+
+    h2 "Typography that breathes"
+    p "Headers use clamp() for fluid responsive sizing. Paragraphs have 1.7 line-height for readability. Letter-spacing tightens on large headings for that editorial feel."
+    h3 "Subheadings"
+    p "Even nested content looks great out of the box."
+    h4 "Even smaller"
+    h5 "Getting tiny"
+    h6 "UPPERCASE SMALL CAPS"
+    blockquote "Code should look beautiful by default, not after hours of CSS tweaking. — Nyx 🦞"
+    hr
+
+    h2 "Code blocks"
+    p "Inline code like "
+    code "const nyx = true"
+    p " gets monospace + subtle background."
+    pre "// Full code blocks too\nconst compiler = new Compiler();\nconst result = compiler.compile(ast);\nconsole.log(result.html);\n// Syntax highlighted, scrollable, padded"
+    hr
+
+    h2 "Interactive elements"
+    div {
+      style { display flex, gap 1rem, flex-wrap wrap, margin 1rem 0 }
+      button "Primary Action"
+      button "Secondary"
+      button "Disabled" disabled
+    }
+
+    div {
+      style { display flex, flex-direction column, gap 0.75rem, margin 1rem 0, max-width 400px }
+      input placeholder="Type here — notice the focus glow ✨"
+      input type="email" placeholder="your@email.com"
+      textarea placeholder="Textarea with placeholder styling..."
+      select {
+        option "Select an option"
+        option "Option A"
+        option "Option B"
+        option "Option C"
+      }
+    }
+
+    p {
+      a "Links with smooth hover transitions" href="#"
+    }
+    hr
+
+    h2 "Lists"
+    ul {
+      li "Proper padding and disc markers"
+      li "Line-height for readability"
+      li "Nested lists work too"
+    }
+    ol {
+      li "Ordered lists with decimal markers"
+      li "Consistent spacing"
+      li "Professional defaults"
+    }
+    hr
+
+    h2 "Accordion"
+    details {
+      summary "Click to expand — details/summary defaults"
+      p "This content is hidden by default. The summary element has bold text and a pointer cursor. When opened, a subtle border separates the header from the content."
+    }
+    details {
+      summary "Another section"
+      p "Collapsible content is great for FAQs, documentation, and more."
+    }
+    hr
+
+    h2 "Highlighted text"
+    p {
+      mark "highlight important text"
+      span " with the mark element. It gets a subtle yellow background."
+    }
+    hr
+
+    h2 "Data table"
+    table {
+      thead {
+        tr {
+          th "Feature"
+          th "Before v0.51"
+          th "After v0.51"
+        }
+      }
+      tbody {
+        tr { td "Typography" td "Raw browser defaults" td "Professional clamp() sizing" }
+        tr { td "Buttons" td "Browser default 💀" td "Rounded, hover, active, disabled" }
+        tr { td "Inputs" td "No focus style" td "Focus ring with blue glow" }
+        tr { td "Links" td "Ugly blue underline" td "Smooth transition + offset" }
+        tr { td "Tables" td "No styling" td "Collapsed borders, uppercase headers" }
+        tr { td "Code" td "Times New Roman 💀" td "Monospace + background" }
+        tr { td "Lists" td "No padding" td "Proper padding + markers" }
+        tr { td "Details" td "Unstyled" td "Bordered accordion" }
+        tr { td "Selection" td "Browser blue" td "Themed purple" }
+        tr { td "Scroll" td "Instant jump" td "Smooth scroll" }
+        tr { td "Focus" td "Ugly outline" td "focus-visible only" }
+        tr { td "Disabled" td "No visual" td "50% opacity + no-pointer" }
+        tr { td "Placeholder" td "Dark text" td "Subtle gray, smaller" }
+      }
+    }
+    hr
+
+    div {
+      style { text-align center, padding 2rem 0 }
+      p "Try selecting this text — notice the purple highlight ✨"
+      small "Built with NyxCode v0.51 — defaults that rival Next.js 🦞"
+    }
+  }
+}

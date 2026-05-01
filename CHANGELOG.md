@@ -1,3 +1,25 @@
+## v0.51.0 — "Beautiful Defaults" (2026-05-01)
+
+Every NyxCode page now ships with professional, zero-config defaults. No CSS required for great-looking pages.
+
+**New:**
+- Auto-injected typography defaults: fluid `clamp()` headings, 1.7 line-height, monospace code blocks, styled blockquotes/hr/tables
+- Auto-injected interactive element defaults: buttons with hover/active/disabled, inputs/select/textarea with focus glow, links with smooth transitions
+- Select dropdown fix: `color-scheme: light dark` + `Canvas`/`CanvasText` system colors — options readable on any background (light or dark)
+- Placeholder styling: subtle gray, slightly smaller font
+- Focus management: `:focus-visible` only — no ugly outlines on mouse click
+- Smooth scrolling, styled `details`/`summary` accordion, themed `::selection`
+- All defaults tree-shaken — only elements you actually use get CSS injected
+- All defaults use `:where()` — zero specificity, your styles always win
+
+**Docs:**
+- README.md completely rewritten — cleaner structure, v0.51 defaults section, updated benchmarks
+- NYXCODE.md updated with "Auto-Injected Defaults" section documenting all new defaults
+
+**Demo:** [demo.nyxcode.io](https://demo.nyxcode.io)
+
+---
+
 ## v0.50.0 — "Zero Patches" (2026-04-29)
 
 NyxCode is now a complete full-stack programming language. One `.nyx` file = production app with ZERO post-build patches.

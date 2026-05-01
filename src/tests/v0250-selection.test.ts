@@ -121,7 +121,9 @@ page "/" { h1 "x" }
     const { html } = compile(src);
     assert.match(html, /:root\s*\{[^}]*--colors-primary:\s*#667eea/);
     assert.match(html, /body\s*\{[^}]*background:\s*#000/);
-    assert.doesNotMatch(html, /::selection/);
+    // v0.51: NyxCode now injects a default ::selection for all pages
+    // The default uses rgba(102,126,234,0.3) — check it's the DEFAULT not a custom one
+    assert.match(html, /::selection.*rgba\(102,126,234/);
   });
 
   test('theme color reference in selection → resolves to var()', () => {

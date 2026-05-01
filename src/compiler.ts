@@ -166,6 +166,7 @@ export class Compiler {
   private globalHeadInjections: string[] = []; // From top-level `meta {}` or `head "..."` blocks — shared across all pages
   private themeVars: Map<string, string> = new Map();
   private themeDefaultElements: Set<string> = new Set();
+  private hasUserSelection: boolean = false;
   private _hasVisibleDirective = false;
   private darkThemeVars: Map<string, string> = new Map(); // dark mode overrides
   // v0.23.0 — registry of named base themes: `@theme as "name" { ... }`
@@ -780,7 +781,7 @@ export class Compiler {
       `
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    :where(body) { font-family: system-ui, -apple-system, sans-serif; }` +
+    :where(body) { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }` +
       animCSS +
       elementDefaults +
       `
@@ -3852,6 +3853,7 @@ export class Compiler {
     // v0.25.0 (#111): native `theme { selection { ... } }` block emits a real `::selection { }` CSS rule.
     // Goes AFTER :root + body so theme vars are available and page styles can still override.
     if (theme.selection && theme.selection.length > 0) {
+      this.hasUserSelection = true;
       const selProps = theme.selection
         .flatMap((s: any) => {
           const prop = this.mapCSSProperty(s.name);
@@ -5190,7 +5192,7 @@ export class Compiler {
   ${headExtra.includes("<title>") ? "" : "<title>NyxCode App</title>"}${headExtra}
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    :where(body) { font-family: system-ui, -apple-system, sans-serif; }${animCSS}${elementDefaults}
+    :where(body) { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }${animCSS}${elementDefaults}
 ${css ? "    " + css.split("\n").join("\n    ") : ""}
   </style>
 </head>
@@ -5796,17 +5798,65 @@ async function __nyx_sse(url, body, onChunk, onDone) {
    * Lower specificity than scoped styles, so user styles override automatically.
    */
   private buildElementDefaults(): string {
-    if (this.usedInteractiveElements.size === 0) return "";
-
     let css = "\n    /* NyxCode Element Defaults */\n";
+
+    // --- Typography defaults (always injected, :where for zero specificity) ---
+    css += "    :where(h1) { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 800; line-height: 1.1; letter-spacing: -0.025em; }\n";
+    css += "    :where(h2) { font-size: clamp(1.5rem, 3.5vw, 2.25rem); font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }\n";
+    css += "    :where(h3) { font-size: clamp(1.25rem, 2.5vw, 1.75rem); font-weight: 600; line-height: 1.3; }\n";
+    css += "    :where(h4) { font-size: clamp(1.1rem, 2vw, 1.35rem); font-weight: 600; line-height: 1.4; }\n";
+    css += "    :where(h5) { font-size: 1.1rem; font-weight: 600; line-height: 1.4; }\n";
+    css += "    :where(h6) { font-size: 0.95rem; font-weight: 600; line-height: 1.5; text-transform: uppercase; letter-spacing: 0.05em; }\n";
+    css += "    :where(p) { line-height: 1.7; }\n";
+    css += "    :where(li) { line-height: 1.6; }\n";
+    css += "    :where(small) { font-size: 0.875rem; }\n";
+    css += "    :where(code) { font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace; font-size: 0.9em; padding: 0.15em 0.4em; border-radius: 4px; background: rgba(127,127,127,0.1); }\n";
+    css += "    :where(pre) { font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace; font-size: 0.9em; padding: 1.25rem; border-radius: 8px; background: rgba(0,0,0,0.05); overflow-x: auto; line-height: 1.6; }\n";
+    css += "    :where(blockquote) { border-left: 3px solid currentColor; padding-left: 1rem; opacity: 0.85; font-style: italic; }\n";
+    css += "    :where(hr) { border: none; border-top: 1px solid rgba(127,127,127,0.2); margin: 2rem 0; }\n";
+    css += "    :where(img, video, svg) { max-width: 100%; height: auto; display: block; }\n";
+    css += "    :where(table) { border-collapse: collapse; width: 100%; }\n";
+    css += "    :where(th, td) { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid rgba(127,127,127,0.15); }\n";
+    css += "    :where(th) { font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }\n";
+
+    // --- Smooth scroll & selection ---
+    css += "    :where(html) { scroll-behavior: smooth; }\n";
+    if (!this.hasUserSelection) css += "    ::selection { background: rgba(102,126,234,0.3); color: inherit; }\n";
+
+    // --- Lists ---
+    css += "    :where(ul, ol) { padding-left: 1.5rem; }\n";
+    css += "    :where(ul) { list-style-type: disc; }\n";
+    css += "    :where(ol) { list-style-type: decimal; }\n";
+
+    // --- Mark / highlight ---
+    css += "    :where(mark) { background: rgba(250,204,21,0.3); color: inherit; padding: 0.1em 0.3em; border-radius: 3px; }\n";
+
+    // --- Details / Summary (accordion) ---
+    css += "    :where(summary) { cursor: pointer; font-weight: 600; padding: 0.5rem 0; }\n";
+    css += "    :where(details) { border: 1px solid rgba(127,127,127,0.15); border-radius: 8px; padding: 0.5rem 1rem; }\n";
+    css += "    :where(details[open] summary) { margin-bottom: 0.5rem; border-bottom: 1px solid rgba(127,127,127,0.1); padding-bottom: 0.5rem; }\n";
+
+    // --- Placeholder styling ---
+    css += "    ::placeholder { color: rgba(127,127,127,0.5); font-size: 0.95em; }\n";
+
+    // --- Focus-visible (keyboard vs mouse) ---
+    css += "    :where(:focus-visible) { outline: 2px solid #667eea; outline-offset: 2px; }\n";
+    css += "    :where(:focus:not(:focus-visible)) { outline: none; }\n";
+
+    // --- Disabled states ---
+    css += "    :where(button:disabled, input:disabled, select:disabled, textarea:disabled) { opacity: 0.5; cursor: not-allowed; pointer-events: none; }\n";
+
+    // --- Interactive element defaults ---
+    if (this.usedInteractiveElements.size === 0) return css;
 
     if (
       this.usedInteractiveElements.has("button") &&
       !this.themeDefaultElements.has("button")
     ) {
       css +=
-        "    :where(button) { font-family: inherit; font-size: inherit; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #1a1a2e; color: inherit; cursor: pointer; transition: opacity 0.15s; }\n";
-      css += "    :where(button):hover { opacity: 0.85; }\n";
+        "    :where(button) { font-family: inherit; font-size: inherit; font-weight: 500; padding: 0.6rem 1.25rem; border-radius: 8px; border: 1px solid rgba(127,127,127,0.2); background: transparent; color: inherit; cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }\n";
+      css += "    :where(button):hover { background: rgba(127,127,127,0.08); }\n";
+      css += "    :where(button):active { transform: scale(0.98); }\n";
     }
     if (
       this.usedInteractiveElements.has("input") ||
@@ -5830,15 +5880,24 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       )
         selectors.push(":where(textarea)");
       if (selectors.length > 0) {
-        css += `    ${selectors.join(", ")} { font-family: inherit; font-size: inherit; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #0d0d1a; color: inherit; }\n`;
+        css += `    ${selectors.join(", ")} { font-family: inherit; font-size: inherit; padding: 0.6rem 0.85rem; border-radius: 8px; border: 1px solid rgba(127,127,127,0.25); background: transparent; color: inherit; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease; }\n`;
+        // Select needs explicit color-scheme so native dropdown renders readable options
+        if (this.usedInteractiveElements.has("select") && !this.themeDefaultElements.has("select")) {
+          css += "    :where(select) { color-scheme: light dark; }\n";
+        }
+        css += `    ${selectors.join(":focus, ")}:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }\n`;
+        // Select option elements need explicit colors (native dropdown ignores transparent bg)
+        if (this.usedInteractiveElements.has("select") && !this.themeDefaultElements.has("select")) {
+          css += "    :where(select option) { background: Canvas; color: CanvasText; }\n";
+        }
       }
     }
     if (
       this.usedInteractiveElements.has("a") &&
       !this.themeDefaultElements.has("a")
     ) {
-      css += "    :where(a) { color: #667eea; text-decoration: none; }\n";
-      css += "    :where(a):hover { text-decoration: underline; }\n";
+      css += "    :where(a) { color: #667eea; text-decoration: none; transition: color 0.15s ease; }\n";
+      css += "    :where(a):hover { color: #5a6fd6; text-decoration: underline; text-underline-offset: 2px; }\n";
     }
 
     return css;

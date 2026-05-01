@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.50.0)
+# NYXCODE.md — AI Context File (v0.51.0)
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
@@ -717,6 +717,35 @@ theme {
 Emits: `:where(a) { color: #9b8ec4; text-decoration: none; }` etc.
 
 Because `:where()` has zero specificity, any local `style {}` on an element will override defaults without `!important`.
+
+### Auto-Injected Defaults (v0.51.0)
+
+NyxCode automatically injects professional defaults for elements used on the page — **tree-shaken** (only elements you actually use get CSS). No configuration needed.
+
+**Typography:**
+- `h1`–`h6`: Fluid `clamp()` sizing, tightened letter-spacing, proper line-height
+- `p`: 1.7 line-height
+- `code`/`pre`: Monospace font stack (`ui-monospace, Cascadia Code, Fira Code`), background, padding
+- `blockquote`: Left border, italic, reduced opacity
+- `hr`: Subtle border, 2rem margin
+- `table`/`th`/`td`: Collapsed borders, uppercase headers, consistent padding
+
+**Interactive elements (only injected when used):**
+- `button`: Rounded, hover/active/disabled states, flex layout, smooth transitions
+- `input`/`select`/`textarea`: Border, padding, focus glow (`#667eea`), placeholder styling
+- `select option`: Explicit `Canvas`/`CanvasText` system colors + `color-scheme: light dark` — readable on any background
+- `a`: Themed color, smooth hover transition, underline-offset
+
+**Global:**
+- `::selection`: Purple highlight
+- `:focus-visible`: Blue outline (keyboard only — no ugly outlines on click)
+- `::placeholder`: Subtle gray, slightly smaller
+- Disabled states: 50% opacity + `pointer-events: none`
+- Smooth scrolling, proper list padding, styled `details`/`summary` accordion
+
+**Demo:** [demo.nyxcode.io](https://demo.nyxcode.io)
+
+All defaults use `:where()` — your styles always override without specificity fights.
 
 ### Selection Styles (v0.25.0)
 

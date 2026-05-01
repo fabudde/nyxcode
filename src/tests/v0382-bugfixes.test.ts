@@ -136,7 +136,9 @@ test('#182: inline style with explicit colons (bg: red)', () => {
   const src = 'meta { title "Test" }\npage / {\n  div style={ bg: red } { p "A" }\n}';
   const html = compile(src);
   assert.ok(html.includes('style="background:red"'), 'should have single colon: ' + html);
-  assert.ok(!html.includes('::'), 'should NOT have double colons: ' + html);
+  // Exclude CSS pseudo-elements (::selection, ::placeholder) from check
+  const cleaned = html.replace(/::(selection|placeholder|before|after|first-line|first-letter|marker|backdrop|file-selector-button|focus-visible)/g, '__PS__');
+  assert.ok(!cleaned.includes('::'), 'should NOT have double colons in inline styles: ' + html);
 });
 
 test('#182: inline style with semicolon separators', () => {
@@ -145,7 +147,8 @@ test('#182: inline style with semicolon separators', () => {
   assert.ok(html.includes('background:blue'), 'bg should work: ' + html);
   assert.ok(html.includes('padding:1rem'), 'padding should work: ' + html);
   assert.ok(!html.includes(';;'), 'should NOT have double semicolons: ' + html);
-  assert.ok(!html.includes('::'), 'should NOT have double colons: ' + html);
+  const cleaned2 = html.replace(/::(selection|placeholder|before|after|first-line|first-letter|marker|backdrop|file-selector-button|focus-visible)/g, '__PS__');
+  assert.ok(!cleaned2.includes('::'), 'should NOT have double colons in inline styles: ' + html);
 });
 
 test('#182: vendor prefix with colon syntax', () => {

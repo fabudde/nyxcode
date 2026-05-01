@@ -3,16 +3,16 @@
 **The AI-native programming language. One `.nyx` file = full-stack app.**
 
 [![npm](https://img.shields.io/npm/v/@fabudde/nyxcode)](https://www.npmjs.com/package/@fabudde/nyxcode)
-[![Tests](https://img.shields.io/badge/tests-452-brightgreen)](#)
+[![Tests](https://img.shields.io/badge/tests-616-brightgreen)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-🌐 **[nyxcode.io](https://nyxcode.io)** · 📊 **[NyxStatus.com](https://nyxstatus.com)** (built in 378 lines of NyxCode)
+🌐 **[nyxcode.io](https://nyxcode.io)** · 🎨 **[demo.nyxcode.io](https://demo.nyxcode.io)** · 📊 **[NyxStatus.com](https://nyxstatus.com)** (378 lines of NyxCode)
 
 ---
 
 ## Why NyxCode?
 
-AI writes most code in 2026 — but still thinks in React, Vue, and raw HTML. Every token costs money, time, and context window.
+AI writes most code in 2026. But it still thinks in React, Vue, and raw HTML — languages designed for humans in the '90s. Every token costs money, time, and context window.
 
 **NyxCode: 3.5x fewer tokens than Next.js. 71% cheaper AI generation.**
 
@@ -40,7 +40,7 @@ nyx add stripe                    # Add package + npm install
 ```nyx
 table posts { title text required, body text, created auto }
 security { table users, login email password, token jwt, protect /api/posts write }
-theme { colors { primary #667eea, bg #0a0a12, card #1a1a2e } }
+theme { colors { primary #667eea, bg #0a0a12 } }
 preset card { bg card, r 12px, p 2rem }
 
 page / {
@@ -56,11 +56,11 @@ page /register {
 }
 ```
 
-This generates: `index.html`, `register/index.html`, AND `server.js` (10 CRUD endpoints + JWT auth + SQLite). Zero config.
+Generates: `index.html`, `register/index.html`, AND `server.js` with 10 CRUD endpoints, JWT auth, and SQLite. Zero config.
 
 ## React vs NyxCode
 
-**React — 20+ lines:**
+**React — 20+ lines, 80+ tokens:**
 ```jsx
 import React, { useState, useEffect } from 'react';
 export default function UserList() {
@@ -80,7 +80,7 @@ export default function UserList() {
 }
 ```
 
-**NyxCode — 4 lines:**
+**NyxCode — 4 lines, 26 tokens:**
 ```nyx
 page /users {
   data users = get /api/users
@@ -90,123 +90,39 @@ page /users {
 
 Same result. 76% fewer lines. 68% fewer tokens.
 
-## v0.30.0 — The Language Release 🔥
+---
 
-NyxCode is now a **programming language**, not just a DSL. New backend primitives:
+## v0.51 — Beautiful Defaults ✨
 
-### `let` — Variable Bindings
-```nyx
-api GET /api/stats auth {
-  let users = query "SELECT COUNT(*) as n FROM users"
-  let posts = query "SELECT COUNT(*) as n FROM posts"
-  respond 200 { status "ok" }
-}
-```
+Every NyxCode page now ships with **professional defaults** — zero CSS required.
 
+🎨 **[See it live → demo.nyxcode.io](https://demo.nyxcode.io)**
 
-### `let` — Reactive Page-Local Variables (v0.33.0)
-```nyx
-page '/counter' {
-  let count = 0
-  let name = "Nyx"
-  const label = "Counter"
+**What you get for free:**
+- **Typography** — `clamp()` fluid sizing, -0.025em letter-spacing on headings, 1.7 line-height on body text
+- **Buttons** — Rounded, hover states, active scale, disabled opacity
+- **Inputs/Select/Textarea** — Focus glow, placeholder styling, border transitions
+- **Select dropdowns** — Readable options on any background (light or dark)
+- **Links** — Smooth color transitions, underline-offset on hover
+- **Tables** — Collapsed borders, uppercase headers, consistent padding
+- **Code** — Monospace font stack, subtle background, padded pre blocks
+- **Details/Summary** — Styled accordion with border and open-state separator
+- **Lists** — Proper padding, disc/decimal markers
+- **Scroll** — Smooth scrolling
+- **Focus** — `:focus-visible` only (no ugly outlines on click)
+- **Selection** — Themed purple highlight
+- **Disabled** — 50% opacity + `pointer-events: none`
 
-  h1 "Hello ${name}!"
-  p "${label}: ${count}"
-  button "+" @click { count += 1 }
-}
-```
+All defaults use `:where()` — zero specificity. Your styles always win.
 
-`let` in pages/components creates reactive variables — changes auto-update the DOM. `const` is compile-time inlined with zero runtime cost.
-### `action` — Reusable Server Functions
-```nyx
-action sendWelcome(email) {
-  email to=email subject="Welcome!" body="Thanks for joining."
-  on error { respond 500 { error "Email failed" } }
-}
-```
+---
 
-### `on` — Table Lifecycle Events
-```nyx
-on users.created {
-  email to=row.email subject="Welcome!" body="You're in!"
-}
-```
+## Features at a Glance
 
-### `env` — Environment Variables
-```nyx
-env {
-  DATABASE_URL required
-  STRIPE_KEY required
-  DEBUG default="false"
-}
-```
-
-### `email` — First-Class Email
-```nyx
-email to=user.email subject="Order confirmed" body="Your order is ready."
-```
-
-### `use` — Three-Tier Package System
-```nyx
-use stripe           # Tier 1: built-in adapter (auto-init from env)
-use nodemailer       # Tier 1: SMTP + sendEmail() helper
-use npm:"slugify"    # Tier 2: raw npm require (warning)
-```
-
-### `every` — Background Workers
-```nyx
-every 60s 'health-check' {
-  query "SELECT id, url FROM monitors"
-  fetch $row.url
-}
-```
-
-### `pipe` — Declarative Logic Chains (v0.32.0)
-```nyx
-pipe 'new-order' {
-  on api POST /api/orders auth
-  validate $body.email is email
-  validate $body.total is number min=1
-  query "INSERT INTO orders (email, total) VALUES ($body.email, $body.total)" as result
-  set order_id = $result.lastInsertRowid
-  notify email to=$body.email subject="Order #$order_id"
-  log "Order $order_id created"
-  respond 201 { id: $order_id, status: created }
-}
-```
-
-16 steps: `validate`, `query`, `fetch`, `set`, `transform`, `each`, `when`, `on change`, `notify` (email/sms/webhook), `log`, `respond`, `abort`, `run pipe`. Parameterized SQL, webhook security, state detection. See [NYXCODE.md](NYXCODE.md#pipe--declarative-logic-chains-v0320).
-
-### Multi-Query API Blocks
-```nyx
-api POST /api/monitors/delete auth {
-  query "DELETE FROM checks WHERE monitor_id = $id"
-  query "DELETE FROM alerts WHERE monitor_id = $id"
-  query "DELETE FROM monitors WHERE id = $id AND user_id = $req.user.id"
-}
-```
-
-### Forms Inside `each` Loops
-```nyx
-each alerts -> alert {
-  form "/api/alerts/delete" auth {
-    input id hidden value=.id
-    submit "✕" preset=btn-delete
-    success -> reload
-  }
-}
-```
-
-### Backend Auto-Detection
-No flags. If your `.nyx` has `table`/`api`/`action`/`security`/`use`/`on`/`env`/`every`/`pipe` → `server.js` generated. Otherwise → HTML only.
-
-## Features
-
-### 🎨 Design System
+### 🎨 Themes & Design Tokens
 ```nyx
 theme {
-  colors { primary #667eea, bg #0a0a12 }
+  colors { primary #667eea, bg #0a0a12, surface #1a1a2e }
   fonts { body Inter, source: google }
   body { bg #0a0a12, c #f0eaff }
   selection { bg rgba(155,142,196,0.3) }
@@ -215,19 +131,11 @@ theme {
 preset card { bg surface; r 12px; p 2rem }
 ```
 
-### ⚡ Animations
-```nyx
-keyframes drift {
-  0%, 100% { tf translate(0, 0) }
-  50% { tf translate(-2%, 1.5%) }
-}
-```
-
 ### 📱 Responsive
 ```nyx
-div grid=3@1 gap=2rem { ... }     # 3 cols desktop, 1 col mobile
-nav burger brand="MySite" { ... }  # Accessible mobile menu, zero JS
-style { @mobile { fs 0.9rem } }    # Built-in breakpoints
+div grid=3@1 gap=2rem { ... }       # 3 cols → 1 col on mobile
+nav burger brand="MySite" { ... }    # Accessible hamburger menu, zero JS
+style { @mobile { fs 0.9rem } }      # Built-in breakpoints
 ```
 
 ### 🧩 Components
@@ -242,12 +150,21 @@ component Card(title, desc, status="Active") {
 page / { use Card("Hello", "World") }
 ```
 
+### ⚡ Client-Side Reactivity
+```nyx
+page / {
+  let count = 0
+  h1 "Count: ${count}"
+  button "+" @click { count += 1 }
+}
+```
+
 ### 🔐 Auth & Security
 ```nyx
 security { table users, login email password, token jwt, protect /api/posts write }
-page /dashboard auth { ... }           # Auto-redirect if not logged in
-a "Login" visible=guest                # Show only when logged out
-a "Dashboard" visible=auth             # Show only when logged in
+page /dashboard auth { ... }
+a "Login" visible=guest
+a "Dashboard" visible=auth
 ```
 
 ### 📊 Data Binding
@@ -257,7 +174,7 @@ data posts = get /api/posts auth {
   empty -> p "No posts yet"
   error -> p "Something went wrong"
 }
-each posts -> div { h3 .title, img src=.image alt=.title }
+each posts -> div { h3 .title, p .body }
 ```
 
 ### 🗃️ Database + Auto-Migrations
@@ -265,23 +182,43 @@ each posts -> div { h3 .title, img src=.image alt=.title }
 table posts {
   title text required
   body text
-  author [users]         # Foreign key → auto JOIN
+  author [users]              # Foreign key → auto JOIN
   created auto
-  category text default="general"   # Add columns anytime — auto-migrated!
+  category text default="general"   # Add columns → auto-migrated
 }
-# Auto-generates: GET/POST/PUT/DELETE endpoints + pagination + search + filtering
-# Auto-migrates: New columns applied at startup, zero data loss
 ```
 
-### 🎯 Native Icons (v0.31.0)
+### 🔗 Pipe — Declarative Logic Chains
 ```nyx
-theme { icons: lucide }                           # Lucide, Phosphor, or Tabler
-icon "heart" size=24                               # Standalone icon
-icon "stethoscope" size=32 style={ c #2a7d5f }    # With style
-h1 "icon:map-pin Our Location"                     # Inline in text
+pipe 'new-order' {
+  on api POST /api/orders auth
+  validate $body.email is email
+  query "INSERT INTO orders (email, total) VALUES ($body.email, $body.total)" as result
+  notify email to=$body.email subject="Order #${result.id}"
+  respond 201 { id: $result.id, status: created }
+}
 ```
+
+### 🎯 Native Icons
+```nyx
+theme { icons: lucide }
+icon "heart" size=24
+h1 "icon:map-pin Our Location"
+```
+
+### 🎬 Animations
+```nyx
+keyframes fadeIn {
+  from { op 0 }
+  to { op 1 }
+}
+```
+
+---
 
 ## CSS Shorthands
+
+100+ shorthands — write less, ship faster:
 
 | Short | CSS | Short | CSS |
 |-------|-----|-------|-----|
@@ -291,12 +228,20 @@ h1 "icon:map-pin Our Location"                     # Inline in text
 | `fs` | font-size | `fw` | font-weight |
 | `r` | border-radius | `shadow` | box-shadow |
 | `d` | display | `pos` | position |
-| `op` | opacity | `cur` | cursor |
-| `td` | text-decoration | `ta` | text-align |
-| `tr` | transition | `tf` | transform |
-| `ai` | align-items | `jc` | justify-content |
+| `op` | opacity | `tr` | transition |
+| `tf` | transform | `ai` | align-items |
 
-[Full list (100+ shorthands) →](NYXCODE.md)
+[Full list →](NYXCODE.md)
+
+## Tailwind Compatibility
+
+Already know Tailwind? Use those classes in NyxCode — compiled to native CSS at build time, zero runtime:
+
+```nyx
+div class="flex items-center gap-4 p-6 rounded-xl bg-white shadow-lg" {
+  h2 class="text-2xl font-bold text-gray-900" "Hello"
+}
+```
 
 ## Architecture
 
@@ -305,11 +250,7 @@ h1 "icon:map-pin Our Location"                     # Inline in text
                                         → Express + SQLite (if backend detected)
 ```
 
-- **Lexer** — Keyword detection, hex colors, strings, comments
-- **Parser** — Recursive descent, typed AST with 40+ node types
-- **Compiler** — Scoped CSS, HTML emission, reactive JS codegen
-- **Backend Compiler** — Express routes, SQLite CRUD, JWT auth, background workers
-- **CLI** — `build`, `dev`, `parse`, `flatten`, `add`, `theme import`
+Single pipeline. No webpack. No bundler config. No `node_modules` for frontend.
 
 ## NyxStatus — The Proof
 
@@ -317,29 +258,17 @@ h1 "icon:map-pin Our Location"                     # Inline in text
 
 [nyxstatus.com](https://nyxstatus.com) — Uptime monitoring with JWT auth, SQLite DB, CRUD API, background health checks, email alerts, cascade deletes, responsive dark theme. 100% NyxCode.
 
-## Design Principles
-
-1. **Token Economy** — Every character earns its place
-2. **One Language** — Author writes only NyxCode
-3. **Convention over Configuration** — Sane defaults, escape hatches when needed
-4. **Single-Word Keywords** — No compound keywords, ever
-5. **Secure by Default** — Prepared statements, escaped output, rate limiting
-6. **The Golden Rule** — If it's not shorter than JS, it shouldn't exist in NyxCode
-
 ## Versions
 
 | Version | Highlights |
 |---------|------------|
-| **v0.32.0** | **`pipe` — Declarative Logic Chains** — 16 step types, parameterized SQL, webhook security, state detection, pipe-to-pipe |
-| **v0.30.0** | **The Language Release** — `let`, `action`, `on`, `env`, `email`, `use`, `respond`, forms in each, multi-query API |
-| v0.27.x | `page auth`, `visible=auth/guest`, `$param.id`, `every`, pagination, search |
-| v0.26.x | mask-* auto-prefix, compile-time `when`, `picture`/`source`, security hardening |
-| v0.25.x | Body styles, keyframes, ::selection, element defaults — all native |
-| v0.24.x | Burger nav, multi-file imports, Figma token import, `nyx flatten` |
-| v0.23.x | Theme composition, numeric-prefix keys |
-| v0.22.x | Full design token system, dark mode |
-| v0.20.x | Component syntax with `${}` interpolation |
-| v0.1.0 | Genesis |
+| **v0.51.0** | **Beautiful Defaults** — Professional typography, interactive elements, focus management, select fix, all zero-config |
+| **v0.50.0** | **Zero Patches** — SolidJS reactivity, custom API routes, query aliases, when-inside-each, stdlib |
+| v0.39.0 | **The Language Release II** — Arrays, objects, loops, mutable vars, reactivity |
+| v0.32.0 | `pipe` — Declarative logic chains, 16 step types |
+| v0.30.0 | **The Language Release** — `let`, `action`, `on`, `env`, `email`, `use` |
+| v0.25.x | Body styles, keyframes, selection, element defaults |
+| v0.24.x | Burger nav, multi-file imports, Figma import |
 
 ## Created By
 
@@ -356,6 +285,6 @@ MIT
 
 ---
 
-*NyxCode v0.30.0 — 365 tests — [npm](https://www.npmjs.com/package/@fabudde/nyxcode) — [NYXCODE.md](NYXCODE.md) (full AI context file) — [nyxstatus.com](https://nyxstatus.com)*
+*NyxCode v0.51.0 — 616 tests — [npm](https://www.npmjs.com/package/@fabudde/nyxcode) — [NYXCODE.md](NYXCODE.md) (full AI context) — [demo.nyxcode.io](https://demo.nyxcode.io)*
 
 🦞

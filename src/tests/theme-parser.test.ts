@@ -155,7 +155,11 @@ describe('theme dot-notation in style blocks (end-to-end)', () => {
     // Extract the second <style> block (scoped page CSS, not :root vars)
     const styleBlocks = out.html.match(/<style>[\s\S]*?<\/style>/g) || [];
     const scopedStyle = styleBlocks.length >= 2 ? styleBlocks[1] : '';
-    const colorMatches = scopedStyle.match(/\bcolor:/g) || [];
+    // v0.51: Element defaults inject 'color: inherit' in ::selection etc.
+    // Only count color: in .nyx- scoped class rules, not in element defaults
+    const nyxClassRules = scopedStyle.match(/\.nyx-[^{]*\{[^}]*\}/g) || [];
+    const classCSS = nyxClassRules.join(' ');
+    const colorMatches = classCSS.match(/\bcolor:/g) || [];
     assert.equal(colorMatches.length, 1,
       'Expected exactly 1 color: in scoped CSS, got ' + colorMatches.length);
   });
