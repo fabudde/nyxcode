@@ -1,10 +1,13 @@
 # NYXCODE.md — AI Context File (v0.51.0)
+
 # Give this to any AI. It will generate NyxCode.
 
 ## What is NyxCode?
+
 A token-efficient language replacing TypeScript/Next.js. One `.nyx` file = full-stack app with DB, Auth, API, frontend. **25% fewer tokens than Tailwind, 82% fewer than Next.js.** Now with **Tailwind CSS compatibility** — use the classes you already know, compiled to native CSS at build time. Zero runtime. Compiles to HTML+CSS+JS (frontend) and Express+SQLite (backend). Node-based runtime.
 
 ## Quick Start
+
 ```bash
 npm i -g @fabudde/nyxcode
 nyx build app.nyx              # → <input-dir>/dist-site/index.html
@@ -19,10 +22,10 @@ nyx add stripe                 # Add package + npm install
 The CLI is available as `nyx` (preferred) or `nyxcode` (alias). Both work identically.
 
 **Output path rules (v0.21.3):**
+
 - `-o path/to/file.html` → single-file output (errors on multi-page projects)
 - `-o path/to/dir/` → directory output (one `index.html` per route)
 - No flag → defaults to `<input-file-dir>/dist-site/`, NOT the current working dir
-
 
 ## Dev Server (`nyx dev`)
 
@@ -32,6 +35,7 @@ nyx dev app.nyx --port=8080    # Custom port
 ```
 
 **What it does:**
+
 - Compiles `.nyx` → HTML and serves from memory (no disk I/O)
 - Watches all source files for changes, rebuilds with debounce
 - **Live Reload** via Server-Sent Events — browser refreshes automatically
@@ -40,6 +44,7 @@ nyx dev app.nyx --port=8080    # Custom port
 - Auth (JWT login/register) works out of the box
 
 **Architecture:**
+
 ```
 Your editor → save .nyx → file watcher detects → rebuild (50ms) → SSE "reload" → browser refreshes
 ```
@@ -60,6 +65,7 @@ page / {
 `#` starts a comment until end of line. `#fff` is a hex color (alphanumeric after `#`).
 
 ## Hero Example: Full-Stack Blog (16 lines)
+
 ```nyx
 table posts { title text required, body text, created auto }
 security { table users, login email password, token jwt, protect /api/posts write }
@@ -78,6 +84,7 @@ page /register {
   form /api/auth/register { input email, input password, submit "Register", success -> redirect / }
 }
 ```
+
 This generates: `index.html`, `register/index.html`, AND `server.js` (10 CRUD endpoints + JWT auth + SQLite).
 
 ## Backend Primitives (v0.30.0) — The Language Release
@@ -85,7 +92,9 @@ This generates: `index.html`, `register/index.html`, AND `server.js` (10 CRUD en
 NyxCode is now a full programming language. These primitives enable multi-step server logic.
 
 ### `let` — Variable Bindings (Backend)
+
 Use in `api` and `action` blocks for multi-step server logic. (For frontend reactive `let`, see **Page-Local Variables** below.)
+
 ```nyx
 api GET /api/stats auth {
   let users = query "SELECT COUNT(*) as n FROM users"
@@ -93,6 +102,7 @@ api GET /api/stats auth {
   respond 200 { status "ok" }
 }
 ```
+
 **Smart detection:** `WHERE id = ?` or `LIMIT 1` → `.get()` (single row). Otherwise → `.all()` (array).
 
 **Built-in functions:** `sum(data, "field")`, `count(data)`, `avg(data, "field")`, `min`, `max`, `len`.
@@ -100,7 +110,9 @@ api GET /api/stats auth {
 **External calls:** `let session = stripe.checkout(amount)` → `await stripe.checkout(amount)`
 
 ### `action` — Reusable Server Functions
+
 Define once, call from any `api` block or other `action`.
+
 ```nyx
 action sendWelcome(email) {
   email to=email subject="Welcome!" body="Thanks for joining."
@@ -109,10 +121,13 @@ action sendWelcome(email) {
   }
 }
 ```
+
 Compiles to `async function` with try/catch. Params optionally typed: `action send(to: email)`.
 
 ### `on` — Table Lifecycle Events
+
 React to data changes automatically.
+
 ```nyx
 on users.created {
   email to=row.email subject="Welcome!" body="You're in!"
@@ -121,10 +136,13 @@ on posts.deleted {
   query "DELETE FROM comments WHERE post_id = $row.id"
 }
 ```
+
 Events: `created`, `updated`, `deleted`. Hook functions auto-injected into CRUD routes.
 
 ### `env` — Environment Variables
+
 Declare requirements. Fail fast at startup.
+
 ```nyx
 env {
   DATABASE_URL required
@@ -134,12 +152,15 @@ env {
 ```
 
 ### `email` — First-Class Email
+
 Usable inside `action` and `api` blocks.
+
 ```nyx
 email to=user.email subject="Order confirmed" body="Your order is ready."
 ```
 
 ### `use` — Package System (Three Tiers)
+
 ```nyx
 use stripe           # Tier 1: built-in adapter (auto-init from env)
 use nodemailer       # Tier 1: SMTP transport + sendEmail() helper
@@ -147,26 +168,29 @@ use uuid             # Tier 1: uuidv4() function
 use npm:"slugify"    # Tier 2: raw npm require (compiler warning)
 # use npm:"child_process"  → ❌ BLOCKED (security)
 ```
+
 **Tier 1 packages (9):** stripe, nodemailer, redis, bcrypt, jsonwebtoken, better-sqlite3, sharp, resend, uuid
 
 **CLI:** `nyx add stripe` — adds `use` statement to .nyx file + runs `npm install`.
 
 ### `respond` — Status Codes
+
 ```nyx
 respond 201 { message "Created" }
 respond 404 { error "Not found" }
 ```
 
 ### Backend Auto-Detection
+
 No flags needed. If your file has `table`/`api`/`action`/`use`/`on`/`env`/`every` → backend generated.
 If only `page`/`theme`/`component` → HTML only.
-
 
 ## Pipe — Declarative Logic Chains (v0.32.0)
 
 The `pipe` keyword lets you build multi-step workflows in a single, readable block. Think Zapier/n8n — but in 10 lines of `.nyx` instead of 100 clicks.
 
 ### Basic Example
+
 ```nyx
 pipe 'new-order' {
   on api POST /api/orders auth
@@ -181,7 +205,9 @@ pipe 'new-order' {
 ```
 
 ### Triggers (`on`)
+
 Every pipe starts with a trigger:
+
 ```nyx
 on api POST /api/path [auth]    // HTTP request
 on every 30s                     // Scheduled interval (5s minimum)
@@ -191,26 +217,27 @@ on event orders.created          // Table lifecycle event
 
 ### Steps Reference
 
-| Step | Purpose | Example |
-|------|---------|---------|
-| `validate` | Input validation, aborts 400 on fail | `validate $body.email is email` |
-| `query` | Parameterized SQL | `query "SELECT * FROM users WHERE id = $id" as rows` |
-| `fetch` | HTTP request | `fetch $url timeout=5s method=POST as response` |
-| `set` | Variable assignment | `set total = $body.price * $body.qty` |
-| `transform` | Shape output data | `transform { id: $x, total: $y }` |
-| `each` | Loop over rows/arrays | `each $items as item { ... }` |
-| `when` | Conditional branch | `when $total > 100 { ... }` |
-| `on change` | State transition detection | `on change $row.status { up -> down { ... } }` |
-| `notify email` | Send email | `notify email to=$email subject="..." body="..."` |
-| `notify sms` | Send SMS | `notify sms to="+49..." message="..."` |
-| `notify webhook` | Outgoing webhook | `notify webhook to=$url body={ key: $val }` |
-| `webhook` | Shorthand outgoing webhook | `webhook "https://..." body={ ... }` |
-| `log` | Structured logging | `log "Order $id created"` |
-| `respond` | HTTP response | `respond 201 { status: ok }` |
-| `abort` | Stop with error | `abort 400 "Invalid input"` |
-| `run pipe` | Call another pipe | `run pipe 'send-invoice' with { id: $order_id }` |
+| Step             | Purpose                              | Example                                              |
+| ---------------- | ------------------------------------ | ---------------------------------------------------- |
+| `validate`       | Input validation, aborts 400 on fail | `validate $body.email is email`                      |
+| `query`          | Parameterized SQL                    | `query "SELECT * FROM users WHERE id = $id" as rows` |
+| `fetch`          | HTTP request                         | `fetch $url timeout=5s method=POST as response`      |
+| `set`            | Variable assignment                  | `set total = $body.price * $body.qty`                |
+| `transform`      | Shape output data                    | `transform { id: $x, total: $y }`                    |
+| `each`           | Loop over rows/arrays                | `each $items as item { ... }`                        |
+| `when`           | Conditional branch                   | `when $total > 100 { ... }`                          |
+| `on change`      | State transition detection           | `on change $row.status { up -> down { ... } }`       |
+| `notify email`   | Send email                           | `notify email to=$email subject="..." body="..."`    |
+| `notify sms`     | Send SMS                             | `notify sms to="+49..." message="..."`               |
+| `notify webhook` | Outgoing webhook                     | `notify webhook to=$url body={ key: $val }`          |
+| `webhook`        | Shorthand outgoing webhook           | `webhook "https://..." body={ ... }`                 |
+| `log`            | Structured logging                   | `log "Order $id created"`                            |
+| `respond`        | HTTP response                        | `respond 201 { status: ok }`                         |
+| `abort`          | Stop with error                      | `abort 400 "Invalid input"`                          |
+| `run pipe`       | Call another pipe                    | `run pipe 'send-invoice' with { id: $order_id }`     |
 
 ### Validation Types
+
 ```nyx
 validate $body.email is email          // Email format
 validate $body.url is url              // URL format
@@ -223,6 +250,7 @@ validate $body.items is array min=1    // Non-empty array
 ```
 
 ### State Change Detection
+
 ```nyx
 pipe 'uptime-monitor' {
   on every 30s
@@ -244,12 +272,14 @@ pipe 'uptime-monitor' {
 State is tracked in `_pipe_state` table (auto-created). Only fires when value actually changes.
 
 ### Security
+
 - All SQL queries use parameterized binding (`?` placeholders) — never string concatenation
 - Webhook endpoints are rate-limited (60 req/min default)
 - `secret=` on webhooks enables HMAC-SHA256 signature verification
 - Compile-time warnings for: unvalidated user input in queries, missing `use nodemailer`/`use twilio`, SSRF risk on fetch with user-provided URLs
 
 ### Pipe-to-Pipe Calls
+
 ```nyx
 pipe 'process-order' {
   on api POST /api/orders auth
@@ -266,6 +296,7 @@ pipe 'send-invoice' {
 ```
 
 ### Required Adapters
+
 ```nyx
 use nodemailer    // Required for notify email
   SMTP_HOST default="smtp.gmail.com"
@@ -278,7 +309,6 @@ use twilio        // Required for notify sms
   TWILIO_AUTH_TOKEN required
   TWILIO_FROM required
 ```
-
 
 ## Page-Local Variables (v0.33.0)
 
@@ -333,82 +363,83 @@ p "Items: ${items.length}"     // expressions work too
 
 ### `let` vs `state` vs `store`
 
-| | `let` | `state` | `store` |
-|---|---|---|---|
-| Scope | Page/component | Page/component | Global |
-| Syntax | `let x = 0` | `state x = 0` | `store { x = 0 }` |
-| Recommended | ✅ **Yes** | Legacy | Shared state |
-| Token cost | ~70% less than React | Same as let | More boilerplate |
+|             | `let`                | `state`        | `store`           |
+| ----------- | -------------------- | -------------- | ----------------- |
+| Scope       | Page/component       | Page/component | Global            |
+| Syntax      | `let x = 0`          | `state x = 0`  | `store { x = 0 }` |
+| Recommended | ✅ **Yes**           | Legacy         | Shared state      |
+| Token cost  | ~70% less than React | Same as let    | More boilerplate  |
 
 `let` is the recommended way. `state` still works but `let` is shorter.
 
 ---
 
 ## CSS Shorthands — ALWAYS USE THESE
+
 Property shorthands work in `style {}` blocks, `preset` definitions, inline styles, and CSS rules.
 
-| Short | CSS Property | Short | CSS Property |
-|-------|-------------|-------|-------------|
-| `bg` | background | `c` | color |
-| `m` | margin | `p` | padding |
-| `mt` | margin-top | `pt` | padding-top |
-| `mb` | margin-bottom | `pb` | padding-bottom |
-| `ml` | margin-left | `pl` | padding-left |
-| `mr` | margin-right | `pr` | padding-right |
-| `mx` | margin-inline | `px` | padding-inline |
-| `my` | margin-block | `py` | padding-block |
-| `w` | width | `h` | height |
-| `mw` | max-width | `mh` | max-height |
-| `miw` | min-width | `mih` | min-height |
-| `r` | border-radius | `bw` | border-width |
-| `bc` | border-color | `bs` | border-style |
-| `d` | display | `pos` | position |
-| `t` | top | `b` | bottom |
-| `l` | left | `z` | z-index |
-| `fs` | font-size | `fw` | font-weight |
-| `ff` | font-family | `lh` | line-height |
-| `ls` | letter-spacing | `ta` | text-align |
-| `td` | text-decoration | `tt` | text-transform |
-| `ws` | white-space | `wb` | word-break |
-| `op` | opacity | `cur` | cursor |
-| `of` | overflow | `ox` / `of-x` | overflow-x |
-| `oy` / `of-y` | overflow-y | `v` | visibility |
-| `br` | border-radius | `brad` | border-radius (alias) |
-| `tr` | transition | `tf` | transform |
-| `ar` | aspect-ratio | `cv` | content-visibility |
-| `sb` | scroll-behavior | `osb` | overscroll-behavior |
-| `tof` | text-overflow | `hy` | hyphens |
-| `acc` | accent-color | `caret` | caret-color |
-| `cs` | color-scheme | `bv` | backface-visibility |
-| `ps` | perspective | `to` | transform-origin |
-| `wm` | writing-mode | `dir` | direction |
-| `ind` | text-indent | `smt` | scroll-margin-top |
-| `mi` | mask-image | `trs` | transform-style |
-| `anim` | animation | `shadow` | box-shadow |
-| `tshadow` | text-shadow | `o` | outline |
-| `oc` | outline-color | `ow` | outline-width |
-| `ai` | align-items | `ac` | align-content |
-| `as` | align-self | `jc` | justify-content |
-| `ji` | justify-items | `js` | justify-self |
-| `fi` | flex | `fb` | flex-basis |
-| `fg` | flex-grow | `fsk` | flex-shrink |
-| `fd` | flex-direction | `fw` | flex-wrap |
-| `gtc` | grid-template-columns | `gtr` | grid-template-rows |
-| `gc` | grid-column | `gr` | grid-row |
-| `ga` | grid-area | `pe` | pointer-events |
-| `us` | user-select | `ap` | appearance |
-| `rs` | resize | `ol` | outline |
-| `wc` | will-change | `ct` | content |
-| `gg` | gap | `iso` | isolation |
-| `obf` | object-fit | `obp` | object-position |
-| `bgi` | background-image | `bgs` | background-size |
-| `bgp` | background-position | `bgr` | background-repeat |
-| `bgc` | background-color | `bgclip` | background-clip |
-| `bdf` / `bf` | backdrop-filter | | |
-| `fi` / `fil` | filter | `mix` | mix-blend-mode |
-| `tf` | transform | `tr` | transition |
-| `anim` | animation |  |  |
-| `si` | scroll-snap-type | `sa` | scroll-snap-align |
+| Short         | CSS Property          | Short         | CSS Property          |
+| ------------- | --------------------- | ------------- | --------------------- |
+| `bg`          | background            | `c`           | color                 |
+| `m`           | margin                | `p`           | padding               |
+| `mt`          | margin-top            | `pt`          | padding-top           |
+| `mb`          | margin-bottom         | `pb`          | padding-bottom        |
+| `ml`          | margin-left           | `pl`          | padding-left          |
+| `mr`          | margin-right          | `pr`          | padding-right         |
+| `mx`          | margin-inline         | `px`          | padding-inline        |
+| `my`          | margin-block          | `py`          | padding-block         |
+| `w`           | width                 | `h`           | height                |
+| `mw`          | max-width             | `mh`          | max-height            |
+| `miw`         | min-width             | `mih`         | min-height            |
+| `r`           | border-radius         | `bw`          | border-width          |
+| `bc`          | border-color          | `bs`          | border-style          |
+| `d`           | display               | `pos`         | position              |
+| `t`           | top                   | `b`           | bottom                |
+| `l`           | left                  | `z`           | z-index               |
+| `fs`          | font-size             | `fw`          | font-weight           |
+| `ff`          | font-family           | `lh`          | line-height           |
+| `ls`          | letter-spacing        | `ta`          | text-align            |
+| `td`          | text-decoration       | `tt`          | text-transform        |
+| `ws`          | white-space           | `wb`          | word-break            |
+| `op`          | opacity               | `cur`         | cursor                |
+| `of`          | overflow              | `ox` / `of-x` | overflow-x            |
+| `oy` / `of-y` | overflow-y            | `v`           | visibility            |
+| `br`          | border-radius         | `brad`        | border-radius (alias) |
+| `tr`          | transition            | `tf`          | transform             |
+| `ar`          | aspect-ratio          | `cv`          | content-visibility    |
+| `sb`          | scroll-behavior       | `osb`         | overscroll-behavior   |
+| `tof`         | text-overflow         | `hy`          | hyphens               |
+| `acc`         | accent-color          | `caret`       | caret-color           |
+| `cs`          | color-scheme          | `bv`          | backface-visibility   |
+| `ps`          | perspective           | `to`          | transform-origin      |
+| `wm`          | writing-mode          | `dir`         | direction             |
+| `ind`         | text-indent           | `smt`         | scroll-margin-top     |
+| `mi`          | mask-image            | `trs`         | transform-style       |
+| `anim`        | animation             | `shadow`      | box-shadow            |
+| `tshadow`     | text-shadow           | `o`           | outline               |
+| `oc`          | outline-color         | `ow`          | outline-width         |
+| `ai`          | align-items           | `ac`          | align-content         |
+| `as`          | align-self            | `jc`          | justify-content       |
+| `ji`          | justify-items         | `js`          | justify-self          |
+| `fi`          | flex                  | `fb`          | flex-basis            |
+| `fg`          | flex-grow             | `fsk`         | flex-shrink           |
+| `fd`          | flex-direction        | `fw`          | flex-wrap             |
+| `gtc`         | grid-template-columns | `gtr`         | grid-template-rows    |
+| `gc`          | grid-column           | `gr`          | grid-row              |
+| `ga`          | grid-area             | `pe`          | pointer-events        |
+| `us`          | user-select           | `ap`          | appearance            |
+| `rs`          | resize                | `ol`          | outline               |
+| `wc`          | will-change           | `ct`          | content               |
+| `gg`          | gap                   | `iso`         | isolation             |
+| `obf`         | object-fit            | `obp`         | object-position       |
+| `bgi`         | background-image      | `bgs`         | background-size       |
+| `bgp`         | background-position   | `bgr`         | background-repeat     |
+| `bgc`         | background-color      | `bgclip`      | background-clip       |
+| `bdf` / `bf`  | backdrop-filter       |               |                       |
+| `fi` / `fil`  | filter                | `mix`         | mix-blend-mode        |
+| `tf`          | transform             | `tr`          | transition            |
+| `anim`        | animation             |               |                       |
+| `si`          | scroll-snap-type      | `sa`          | scroll-snap-align     |
 
 ## Tailwind CSS Compatibility (v0.38.0) 🌀
 
@@ -430,30 +461,33 @@ div style={ grid, grid-cols-3, gap-4, mt-8 } {
 ```
 
 Compiles to clean inline CSS:
+
 ```html
-<div style="display:flex; align-items:center; justify-content:space-between; padding:1rem;
+<div
+  style="display:flex; align-items:center; justify-content:space-between; padding:1rem;
   background-color:#3b82f6; color:#fff; border-radius:0.5rem;
-  box-shadow:0 4px 6px -1px rgb(0 0 0/0.1)">
+  box-shadow:0 4px 6px -1px rgb(0 0 0/0.1)"
+></div>
 ```
 
 ### Supported Tailwind Classes
 
-| Category | Classes |
-|----------|--------|
-| **Display** | `block`, `inline-block`, `flex`, `inline-flex`, `grid`, `inline-grid`, `hidden`, `contents` |
-| **Flex** | `flex-row`, `flex-col`, `flex-wrap`, `flex-nowrap`, `flex-1`, `flex-auto`, `flex-none`, `grow`, `shrink` |
-| **Alignment** | `items-start/center/end/baseline/stretch`, `justify-start/center/end/between/around/evenly`, `self-*` |
-| **Spacing** | `p-{0-96}`, `px/py/pt/pr/pb/pl-*`, `m-{0-96}`, `mx/my/mt/mr/mb/ml-*`, `gap-*`, `gap-x/y-*` |
-| **Sizing** | `w-full/screen/auto/fit`, `h-full/screen/auto`, `min-h-screen`, `max-w-sm/md/lg/xl/2xl-7xl/prose` |
-| **Typography** | `text-xs/sm/base/lg/xl/2xl-5xl`, `text-left/center/right`, `font-thin..extrabold`, `italic`, `underline`, `uppercase` |
-| **Colors** | `text-{color}-{shade}`, `bg-{color}-{shade}`, `border-{color}-{shade}` — slate, gray, red, blue, green, yellow, purple, pink, indigo, cyan, emerald, amber, rose, sky, orange |
-| **Border** | `rounded`, `rounded-sm/md/lg/xl/2xl/3xl/full/none`, `border`, `border-0/2/4`, `border-solid/dashed/none` |
-| **Shadow** | `shadow`, `shadow-sm/md/lg/xl/2xl/none` |
-| **Position** | `static`, `fixed`, `absolute`, `relative`, `sticky`, `inset-0`, `top/right/bottom/left-0` |
-| **Grid** | `grid-cols-{1-12}`, `col-span-{1-6}/full`, `place-items-center`, `place-content-center` |
-| **Effects** | `opacity-{0/50/75/100}`, `transition`, `transition-all/colors/none`, `duration-{75-500}`, `ease-*` |
-| **Z-Index** | `z-{0/10/20/30/40/50}` |
-| **Misc** | `cursor-pointer/default/not-allowed`, `pointer-events-none/auto`, `select-none/all`, `overflow-hidden/auto/scroll`, `object-cover/contain` |
+| Category       | Classes                                                                                                                                                                       |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Display**    | `block`, `inline-block`, `flex`, `inline-flex`, `grid`, `inline-grid`, `hidden`, `contents`                                                                                   |
+| **Flex**       | `flex-row`, `flex-col`, `flex-wrap`, `flex-nowrap`, `flex-1`, `flex-auto`, `flex-none`, `grow`, `shrink`                                                                      |
+| **Alignment**  | `items-start/center/end/baseline/stretch`, `justify-start/center/end/between/around/evenly`, `self-*`                                                                         |
+| **Spacing**    | `p-{0-96}`, `px/py/pt/pr/pb/pl-*`, `m-{0-96}`, `mx/my/mt/mr/mb/ml-*`, `gap-*`, `gap-x/y-*`                                                                                    |
+| **Sizing**     | `w-full/screen/auto/fit`, `h-full/screen/auto`, `min-h-screen`, `max-w-sm/md/lg/xl/2xl-7xl/prose`                                                                             |
+| **Typography** | `text-xs/sm/base/lg/xl/2xl-5xl`, `text-left/center/right`, `font-thin..extrabold`, `italic`, `underline`, `uppercase`                                                         |
+| **Colors**     | `text-{color}-{shade}`, `bg-{color}-{shade}`, `border-{color}-{shade}` — slate, gray, red, blue, green, yellow, purple, pink, indigo, cyan, emerald, amber, rose, sky, orange |
+| **Border**     | `rounded`, `rounded-sm/md/lg/xl/2xl/3xl/full/none`, `border`, `border-0/2/4`, `border-solid/dashed/none`                                                                      |
+| **Shadow**     | `shadow`, `shadow-sm/md/lg/xl/2xl/none`                                                                                                                                       |
+| **Position**   | `static`, `fixed`, `absolute`, `relative`, `sticky`, `inset-0`, `top/right/bottom/left-0`                                                                                     |
+| **Grid**       | `grid-cols-{1-12}`, `col-span-{1-6}/full`, `place-items-center`, `place-content-center`                                                                                       |
+| **Effects**    | `opacity-{0/50/75/100}`, `transition`, `transition-all/colors/none`, `duration-{75-500}`, `ease-*`                                                                            |
+| **Z-Index**    | `z-{0/10/20/30/40/50}`                                                                                                                                                        |
+| **Misc**       | `cursor-pointer/default/not-allowed`, `pointer-events-none/auto`, `select-none/all`, `overflow-hidden/auto/scroll`, `object-cover/contain`                                    |
 
 ### Mix with NyxCode Shorthands
 
@@ -472,6 +506,7 @@ div style={ flex, items-center, bg red, fs 2rem, p-4, shadow-lg } "Mixed!"
 - **Cherry-pick**: Use Tailwind for layout (`flex, items-center, p-4`) and NyxCode for design (`bg theme.primary, shadow 0 2px 10px`).
 
 ## Layout Attributes — On Any Element
+
 ```nyx
 div flex=col center gap=2rem { ... }     # Flexbox column, centered, 2rem gap
 div flex=row between wrap { ... }         # Flex row, space-between, wrapping
@@ -479,22 +514,23 @@ div grid=3 gap=1rem { ... }              # 3-column grid
 div grid=3@1 gap=2rem { ... }            # 3 cols desktop, 1 col mobile! (v0.9.7+)
 ```
 
-| Attribute | Effect |
-|-----------|--------|
-| `flex=col` | `display:flex; flex-direction:column` |
-| `flex=row` | `display:flex; flex-direction:row` |
-| `flex=wrap` | `display:flex; flex-wrap:wrap` |
-| `grid=N` | `display:grid; grid-template-columns:repeat(N,1fr)` |
-| `grid=N@M` | N cols desktop, M cols mobile (auto @media) (v0.9.7+) |
-| `gap=X` | `gap: X` |
-| `center` | `align-items:center; justify-content:center` |
-| `between` | `justify-content:space-between` |
-| `around` | `justify-content:space-around` |
-| `evenly` | `justify-content:space-evenly` |
-| `wrap` | `flex-wrap:wrap` |
-| `place=center` | `place-items:center` |
+| Attribute      | Effect                                                |
+| -------------- | ----------------------------------------------------- |
+| `flex=col`     | `display:flex; flex-direction:column`                 |
+| `flex=row`     | `display:flex; flex-direction:row`                    |
+| `flex=wrap`    | `display:flex; flex-wrap:wrap`                        |
+| `grid=N`       | `display:grid; grid-template-columns:repeat(N,1fr)`   |
+| `grid=N@M`     | N cols desktop, M cols mobile (auto @media) (v0.9.7+) |
+| `gap=X`        | `gap: X`                                              |
+| `center`       | `align-items:center; justify-content:center`          |
+| `between`      | `justify-content:space-between`                       |
+| `around`       | `justify-content:space-around`                        |
+| `evenly`       | `justify-content:space-evenly`                        |
+| `wrap`         | `flex-wrap:wrap`                                      |
+| `place=center` | `place-items:center`                                  |
 
 ## Style Presets — Define Once, Use Everywhere
+
 ```nyx
 preset card { bg #1a1a2e; r 12px; p 2rem; shadow 0 4px 12px rgba(0,0,0,0.2) }
 preset label { fs 0.7rem; fw 700; tt uppercase; ls 0.05em; c #888 }
@@ -503,13 +539,14 @@ page / {
   div preset=card { h2 "Hello", span "Tag" preset=label }
 }
 ```
+
 Generates `.nyx-p_card` and `.nyx-p_label` CSS classes. Saves 30-40% tokens on repeated styling.
 
 ## Theme — Design Tokens (v0.22.0, patched v0.22.1)
 
 Full design-token system: colors, spacing, radius, shadows, fonts, layouts, borders, breakpoints.
 
-*v0.22.1 fixed two bugs found during real-world migration: `borders {}` composite shorthand values (`1px solid color.X`) no longer split into zombie vars, and dot-notation refs no longer emit trailing ` ;;`. See CHANGELOG for details.*
+_v0.22.1 fixed two bugs found during real-world migration: `borders {}` composite shorthand values (`1px solid color.X`) no longer split into zombie vars, and dot-notation refs no longer emit trailing ` ;;`. See CHANGELOG for details._
 
 ```nyx
 theme {
@@ -544,6 +581,7 @@ theme {
 ### Dot-Notation Token References
 
 Reference any token by its section:
+
 ```nyx
 style {
   color: color.primary          # → var(--colors-primary)
@@ -572,6 +610,7 @@ theme dark {
 ```
 
 Emits both:
+
 - `@media (prefers-color-scheme: dark) { :root { ... } }` — auto dark based on OS
 - `[data-theme="dark"] { ... }` — toggle-able via JavaScript
 
@@ -587,10 +626,15 @@ fonts {
 ```
 
 Compiler injects into `<head>`:
+
 ```html
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Inter&family=Open+Sans&display=swap">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  crossorigin="anonymous"
+  href="https://fonts.googleapis.com/css2?family=Inter&family=Open+Sans&display=swap"
+/>
 ```
 
 - `source: google` → auto-inject Google Fonts CDN links
@@ -618,7 +662,9 @@ page home {
 - Without `breakpoints {}`: defaults to `768px / 1024px / 1280px` (backward compat)
 
 ### Theme Presets (v0.17.0)
+
 One line = entire visual identity:
+
 ```nyx
 theme "brutalist"       # Mono font, hard borders, raw industrial
 theme "glassmorphism"   # Blur, transparency, soft gradients
@@ -626,6 +672,7 @@ theme "editorial"       # Serif fonts, clean typography, whitespace
 theme "neon"            # Dark bg, glowing green accents, monospace
 theme "minimal-dark"    # Subtle dark theme, indigo accents
 ```
+
 Optional overrides: `theme "neon" { colors { primary: #ff6600 } }`
 
 ### Theme Composition (v0.23.0)
@@ -720,9 +767,10 @@ Because `:where()` has zero specificity, any local `style {}` on an element will
 
 ### Auto-Injected Defaults (v0.51.0)
 
-NyxCode automatically injects professional defaults for elements used on the page — **tree-shaken** (only elements you actually use get CSS). No configuration needed.
+NyxCode automatically injects professional defaults. **Interactive elements** (button, input, select, textarea, a) are tree-shaken — only elements you actually use get CSS. Typography defaults (headings, code, blockquote, table, hr) are always included. No configuration needed.
 
 **Typography:**
+
 - `h1`–`h6`: Fluid `clamp()` sizing, tightened letter-spacing, proper line-height
 - `p`: 1.7 line-height
 - `code`/`pre`: Monospace font stack (`ui-monospace, Cascadia Code, Fira Code`), background, padding
@@ -731,12 +779,14 @@ NyxCode automatically injects professional defaults for elements used on the pag
 - `table`/`th`/`td`: Collapsed borders, uppercase headers, consistent padding
 
 **Interactive elements (only injected when used):**
+
 - `button`: Rounded, hover/active/disabled states, flex layout, smooth transitions
 - `input`/`select`/`textarea`: Border, padding, focus glow (`#667eea`), placeholder styling
 - `select option`: Explicit `Canvas`/`CanvasText` system colors + `color-scheme: light dark` — readable on any background
 - `a`: Themed color, smooth hover transition, underline-offset
 
 **Global:**
+
 - `::selection`: Purple highlight
 - `:focus-visible`: Blue outline (keyboard only — no ugly outlines on click)
 - `::placeholder`: Subtle gray, slightly smaller
@@ -806,17 +856,17 @@ Compiles to a native HTML5 `<details>`/`<summary>` pair with responsive CSS that
 
 ### Options
 
-| Attribute                   | Default            | Description                                            |
-|-----------------------------|--------------------|--------------------------------------------------------|
-| `burger`                    | `768px` breakpoint | Bare flag enables the collapsible behavior.            |
-| `burger=<breakpoint>`       | —                  | Use a theme breakpoint token (`sm`, `md`, `lg`, etc.). |
-| `icon="..."`                | `Menu`             | Closed-state label. Accepts text or glyphs.            |
-| `open-label="..."`          | `Close`            | Open-state label.                                      |
-| `aria-label="..."`          | `Main navigation`  | `aria-label` on the inner `<nav>`.                     |
-| `summary-aria-label="..."`  | `Toggle menu`      | `aria-label` on the `<summary>` toggle.                |
-| `brand="..."`               | —                  | Site name displayed as text logo (left side).          |
-| `logo="..."`                | —                  | Image path for logo (left side, replaces text brand).  |
-| `logo-height="..."`         | `32px`             | Custom logo image height.                              |
+| Attribute                  | Default            | Description                                            |
+| -------------------------- | ------------------ | ------------------------------------------------------ |
+| `burger`                   | `768px` breakpoint | Bare flag enables the collapsible behavior.            |
+| `burger=<breakpoint>`      | —                  | Use a theme breakpoint token (`sm`, `md`, `lg`, etc.). |
+| `icon="..."`               | `Menu`             | Closed-state label. Accepts text or glyphs.            |
+| `open-label="..."`         | `Close`            | Open-state label.                                      |
+| `aria-label="..."`         | `Main navigation`  | `aria-label` on the inner `<nav>`.                     |
+| `summary-aria-label="..."` | `Toggle menu`      | `aria-label` on the `<summary>` toggle.                |
+| `brand="..."`              | —                  | Site name displayed as text logo (left side).          |
+| `logo="..."`               | —                  | Image path for logo (left side, replaces text brand).  |
+| `logo-height="..."`        | `32px`             | Custom logo image height.                              |
 
 ### Examples
 
@@ -914,7 +964,7 @@ nyx theme import tokens.json --name brand     # theme as "brand" { ... }
 ### Supported `$type` → section mapping
 
 | Figma / DTCG `$type`        | NyxCode section |
-|-----------------------------|-----------------|
+| --------------------------- | --------------- |
 | `color`                     | `colors`        |
 | `dimension` / `spacing`     | `spacing`       |
 | `borderRadius`              | `radius`        |
@@ -940,7 +990,7 @@ Input (`figma-tokens.json` from Tokens Studio):
   "global": {
     "color": {
       "brand": {
-        "primary":   { "$value": "#8b5cf6", "$type": "color" },
+        "primary": { "$value": "#8b5cf6", "$type": "color" },
         "secondary": { "$value": "#ec4899", "$type": "color" }
       }
     },
@@ -951,11 +1001,19 @@ Input (`figma-tokens.json` from Tokens Studio):
       "lg": { "$value": "12px", "$type": "borderRadius" }
     },
     "fontFamily": {
-      "body": { "$value": ["Inter", "system-ui", "sans-serif"], "$type": "fontFamily" }
+      "body": {
+        "$value": ["Inter", "system-ui", "sans-serif"],
+        "$type": "fontFamily"
+      }
     },
     "shadow": {
       "card": {
-        "$value": { "offsetX": 0, "offsetY": 4, "blur": 12, "color": "rgba(0,0,0,0.1)" },
+        "$value": {
+          "offsetX": 0,
+          "offsetY": 4,
+          "blur": 12,
+          "color": "rgba(0,0,0,0.1)"
+        },
         "$type": "shadow"
       }
     }
@@ -1008,28 +1066,32 @@ page / {
 
 Figma JSON is **third-party input**. Since v0.24.1, the importer validates every token value against per-type allowlists before emitting it:
 
-| Token type | Allowed patterns | Rejected examples |
-|------------|-----------------|-------------------|
-| Color | hex, `rgb()`, `hsl()`, CSS named colors | `javascript:`, `url()`, `expression()` |
-| Spacing/Radius | `<number><unit>` (px, rem, em, %, vw, vh…) | `calc()`, `url()`, `expression()` |
-| Font-family | Alphanumeric + spaces + hyphens + quotes | `url()`, backslashes, angle brackets |
-| Shadow | Structured: offsets + blur + spread + color | Free-form strings, `javascript:` |
-| Border | `<width> <style> <color>` | Anything with `url()` or script vectors |
+| Token type     | Allowed patterns                            | Rejected examples                       |
+| -------------- | ------------------------------------------- | --------------------------------------- |
+| Color          | hex, `rgb()`, `hsl()`, CSS named colors     | `javascript:`, `url()`, `expression()`  |
+| Spacing/Radius | `<number><unit>` (px, rem, em, %, vw, vh…)  | `calc()`, `url()`, `expression()`       |
+| Font-family    | Alphanumeric + spaces + hyphens + quotes    | `url()`, backslashes, angle brackets    |
+| Shadow         | Structured: offsets + blur + spread + color | Free-form strings, `javascript:`        |
+| Border         | `<width> <style> <color>`                   | Anything with `url()` or script vectors |
 
 Invalid tokens are **skipped with a warning** — they never reach the output. A belt-and-suspenders `hasDangerousSubstring()` guard rejects `javascript:`, `data:`, `expression(`, `@import`, control chars etc. before per-type validation even runs.
 
 ## CSS Functions (v0.17.0)
+
 ```nyx
 div { style { w calc(100% - 2rem); fs clamp(1rem, 2vw, 2rem); h min(100vh, 800px) } }
 ```
 
 ## Nested Selectors (v0.17.0)
+
 Child/sibling selectors inside style blocks:
+
 ```nyx
 nav { style { > a { c white; td none }; ~ p { m 0 }; + div { bt 1px solid #eee } } }
 ```
 
 ## Extended Pseudo-Classes (v0.17.0)
+
 ```nyx
 style {
   first-child { fw bold }
@@ -1039,20 +1101,24 @@ style {
   focus-visible { outline 2px solid blue }
 }
 ```
+
 All: first-child, last-child, nth-child(), nth-of-type(), disabled, enabled, checked, required, optional, focus-within, focus-visible, visited, empty, first-of-type, last-of-type, only-child, not(), placeholder, placeholder-shown.
 
 ## Grid Template Areas (v0.17.1)
+
 ```nyx
 div { style { d grid; areas "header header" "sidebar main" "footer footer" } }
 div "Header" { style { area header } }
 ```
 
 ## Container Queries (v0.17.1)
+
 ```nyx
 div { style { container inline-size; @container(min-width: 400px) { fs 1.5rem } } }
 ```
 
 ## Media Queries & Feature Queries (v0.19.0)
+
 Three flavors of responsive CSS, all with full shorthand + theme resolution inside:
 
 ```nyx
@@ -1071,6 +1137,7 @@ style {
 All at-rules support multi-property steps with commas: `{ fs 3rem, c primary }`.
 
 ## Typography Utilities (v0.17.1)
+
 ```nyx
 h1 { style { tracking 0.05em; balance } }      # letter-spacing + text-wrap: balance
 p { style { truncate; w 200px } }                 # overflow:hidden + text-overflow:ellipsis
@@ -1078,10 +1145,12 @@ div { style { line-clamp 3 } }                    # multiline truncation
 p { style { leading 1.8; indent 2rem; pretty } }  # line-height + text-indent + text-wrap:pretty
 span { style { caps } }                            # text-transform: uppercase
 ```
+
 Shorthands: tracking, leading, indent, wb (word-break), ww (overflow-wrap), hyphens, columns, col-gap, col-count.
 Utilities: truncate, line-clamp N, balance, pretty, caps, lowercase, capitalize.
 
 ## Footnotes (v0.19.0)
+
 Editorial-grade footnotes with auto-linking and backlinks.
 
 ```nyx
@@ -1104,6 +1173,7 @@ page / {
 - IDs can be numeric (`1`) or named (`note-a`, `intro`)
 
 ## Inline SVG (v0.19.0)
+
 SVG elements are first-class — 33 tags supported. Attribute case is preserved (`viewBox`, `stroke-width`, `text-anchor` etc.).
 
 ```nyx
@@ -1125,6 +1195,7 @@ svg viewBox="0 0 400 400" width="400" height="400" {
 ```
 
 Supported tags:
+
 - **Shapes**: svg, g, path, circle, ellipse, rect, line, polyline, polygon
 - **Paint**: defs, linearGradient, radialGradient, stop, pattern, mask, clipPath
 - **Filters**: filter, feGaussianBlur, feColorMatrix, feBlend, feOffset, feMerge, feMergeNode, feFlood, feComposite, feMorphology, feTurbulence, feDisplacementMap
@@ -1162,6 +1233,7 @@ page / {
 - Also available as top-level: `animate name { ... }`
 
 ## Declarative `meta {}` Block (v0.18.0)
+
 Drop the HTML and let NyxCode generate `<title>`, Open Graph, Twitter Card, favicon, canonical URLs, etc.
 
 ```nyx
@@ -1190,6 +1262,7 @@ page / { h1 "Hi" }
 - Auto-deduplication: if your meta sets `title` or `description`, NyxCode won't re-emit its defaults
 
 ## Multi-Page Builds (v0.18.0)
+
 One `.nyx` file → multiple HTML files via `page /path/ {}`.
 
 ```nyx
@@ -1201,6 +1274,7 @@ page /blog/ { h1 "Blog" }
 ```
 
 Build output:
+
 ```
 dist-site/
 ├── index.html          ← page /
@@ -1214,6 +1288,7 @@ dist-site/
 - Use case: static sites, documentation, blogs, landing pages with sub-pages
 
 ## Canvas, Audio, Video & Iframe (v0.18.0)
+
 Interactive media elements are now first-class:
 
 ```nyx
@@ -1228,6 +1303,7 @@ iframe src="https://example.com" width="100%" height="400" { }
 - Boolean attributes like `controls` need explicit `controls=true` (Lexer limitation)
 
 ## Unicode Escapes in Strings (v0.18.0)
+
 Full escape sequence support in string literals:
 
 ```nyx
@@ -1240,34 +1316,44 @@ p "Whitespace: \n \t \r"                    # Newline, tab, carriage return
 Previous versions rendered `\u2192` as literal `u2192`. Fixed in v0.18.0.
 
 ## Pages & Routing
+
 ```nyx
 page / { h1 "Home" }                    # → index.html
 page /about { h1 "About" }              # → about/index.html
 page /blog { h1 "Blog" }                # → blog/index.html
 ```
+
 - 2+ pages = multi-file static output (SSG), one HTML per page.
 - 1 page = single HTML file with SPA routing.
 - Each page auto-gets `<title>`, `<meta description>`, `<link rel="canonical">`.
 
 ## Elements
+
 All standard HTML elements are recognized:
 
 ### Text
+
 `h1`-`h6`, `p`, `span`, `text` (→span), `link` (→a)
 
 ### Interactive
+
 `button`, `input`, `select`, `checkbox`, `radio`, `toggle`, `slider`, `textarea`, `submit`
 
 ### Media
+
 `img`, `video`
+
 - `img` auto-gets `loading="lazy"` (v0.9.7+)
 - `img "alt text" src="url"` → `<img alt="alt text" src="url" loading="lazy" />` (v0.12.0+)
 
 ### Structure
+
 `div`, `section`, `header`, `footer`, `nav`, `aside`, `main`, `article`, `figure`, `figcaption`, `container`, `card`, `row`, `col`, `grid`, `stack`, `ul`, `ol`, `li`, `a`, `strong`, `em`, `small`, `sup`, `sub`, `blockquote`, `pre`, `code`, `label`, `details`, `summary`, `table`, `thead`, `tbody`, `tr`, `td`, `th`
 
 ### Void Elements
+
 `br`, `hr`, `img`, `input` — self-closing, no children needed.
+
 ```nyx
 p "Line one"
 br
@@ -1275,19 +1361,21 @@ p "Line two"
 ```
 
 ### Semantic Aliases
-| NyxCode | HTML |
-|---------|------|
-| `link` | `<a>` |
-| `a` | `<a>` (native, v0.12.0+) |
-| `text` | `<span>` |
-| `card` | `<div>` |
-| `container` | `<div>` |
-| `row` | `<div>` (with flex) |
-| `col` | `<div>` |
-| `grid` | `<div>` (with grid) |
-| `stack` | `<div>` |
+
+| NyxCode     | HTML                     |
+| ----------- | ------------------------ |
+| `link`      | `<a>`                    |
+| `a`         | `<a>` (native, v0.12.0+) |
+| `text`      | `<span>`                 |
+| `card`      | `<div>`                  |
+| `container` | `<div>`                  |
+| `row`       | `<div>` (with flex)      |
+| `col`       | `<div>`                  |
+| `grid`      | `<div>` (with grid)      |
+| `stack`     | `<div>`                  |
 
 ### Element Syntax
+
 ```nyx
 h1 "Hello World"                         # Text content
 link "Click me" href="/about"            # Content + attributes
@@ -1300,6 +1388,7 @@ div preset=card { p "Content" }          # Preset class
 ```
 
 ### IMPORTANT: Sibling Elements
+
 ```nyx
 # WRONG — `link` becomes attribute of `p`
 p "Hello" link "Click" href="/x"
@@ -1310,23 +1399,26 @@ div {
   link "Click" href="/x"
 }
 ```
+
 Elements on the same line merge. Use a wrapping `div {}` or put on separate lines inside a block.
 
 ## Styling (3 Tiers)
 
 ### Unified Style Syntax (v0.12+)
 
- uses NyxCode shorthand syntax (same as presets and style blocks).
- CSS-syntax still works for backward compatibility.
+uses NyxCode shorthand syntax (same as presets and style blocks).
+CSS-syntax still works for backward compatibility.
 
-**\ shorthand:**  instead of  — saves tokens!
+**\ shorthand:** instead of — saves tokens!
 
 ### Tier 1: Inline Style (quick)
+
 ```nyx
 h1 "Title" style="fs: 2rem; fw: 700; c: primary"
 ```
 
 ### Tier 2: Style Block (hover, responsive, animations)
+
 ```nyx
 div {
   style {
@@ -1339,6 +1431,7 @@ div {
 ```
 
 ### Tier 3: CSS Rules in Style Blocks (v0.9.4+)
+
 ```nyx
 page / {
   style {
@@ -1356,10 +1449,12 @@ page / {
   div class="card" { p "Styled!" }
 }
 ```
+
 CSS rules support: `.class`, `tag`, `*`, `.class:pseudo`, `::pseudo-element`, `@keyframes`.
 All CSS shorthands work inside rules. Vendor prefixes (`-webkit-*`) supported (v0.9.5+).
 
 ### Pseudo-classes & Responsive
+
 ```nyx
 style {
   bg blue
@@ -1372,6 +1467,7 @@ style {
 ```
 
 ## State & Reactivity
+
 ```nyx
 page / {
   state count = 0
@@ -1379,6 +1475,7 @@ page / {
   p "Count is: {count}"
 }
 ```
+
 - `state name = value` declares reactive state
 - `{name}` interpolates state/computed in text content (e.g. `p "Count: {count}"`)
 - Works in any nested element depth — compiles to reactive template bindings
@@ -1387,6 +1484,7 @@ page / {
 ### Events (v0.12.0+, @event shorthand v0.33.3)
 
 **Recommended: `@event` shorthand (v0.33.3+):**
+
 ```nyx
 button "+" @click { count += 1 }
 button "-" @click { count -= 1 }
@@ -1394,6 +1492,7 @@ button "Set" @click { msg = "hello" }
 ```
 
 **Legacy syntax (still works):**
+
 ```nyx
 button "Click" on:click -> count = count + 1
 button "Reset" on:click -> count = 0
@@ -1407,6 +1506,7 @@ button "Reset" on:click -> count = 0
 | `on event ->` | `on click -> count = count + 1` |
 
 **Modifiers:**
+
 ```nyx
 button "Submit" @click.prevent { save() }
 input @keydown.enter { submit() }
@@ -1414,18 +1514,19 @@ input @keydown.ctrl.s { save() }
 button @click.stop { handle() }
 ```
 
-| Modifier | Effect |
-|---|---|
-| `.prevent` | `event.preventDefault()` |
-| `.stop` | `event.stopPropagation()` |
-| `.enter` | Only on Enter key |
-| `.escape` | Only on Escape key |
-| `.ctrl`, `.alt`, `.shift`, `.meta` | Modifier keys |
-| `.ctrl.z` | Combo: Ctrl+Z |
+| Modifier                           | Effect                    |
+| ---------------------------------- | ------------------------- |
+| `.prevent`                         | `event.preventDefault()`  |
+| `.stop`                            | `event.stopPropagation()` |
+| `.enter`                           | Only on Enter key         |
+| `.escape`                          | Only on Escape key        |
+| `.ctrl`, `.alt`, `.shift`, `.meta` | Modifier keys             |
+| `.ctrl.z`                          | Combo: Ctrl+Z             |
 
 Events work inline on elements AND inside when/else blocks.
 
 ### Store — Global State (v0.16.0+)
+
 ```nyx
 store user {
   name = "Guest"
@@ -1446,6 +1547,7 @@ page / {
   button on:click -> cart.items = cart.items + 1 { text "Add" }
 }
 ```
+
 - `store name { }` declares global state (shared across ALL pages)
 - Fields: `name = value` (strings, numbers, booleans, arrays)
 - Computed: `computed total = items * price` (derived, auto-resolves own fields)
@@ -1455,6 +1557,7 @@ page / {
 - Page-level `state` is local; `store` is global
 
 ### Computed Properties (v0.16.0+)
+
 ```nyx
 page / {
   state count = 0
@@ -1464,17 +1567,18 @@ page / {
   button on:click -> count = count + 1 { text "+1" }
 }
 ```
+
 - `computed name = expression` — derived from state, auto-updates
 - Supports ternary: `computed label = count > 0 ? "positive" : "zero"`
 - Interpolate in text: `p "Status: {label}"` — reactively updates
 - Works in both `page` blocks and `store` blocks
 
-
-
 ## Form Blocks (v0.6+)
+
 Native forms with zero JS. Compiler generates `<form>` + `fetch()` + auth + error handling.
 
 ### Basic Form
+
 ```nyx
 form /api/posts auth {
   input title placeholder="Post title"
@@ -1486,6 +1590,7 @@ form /api/posts auth {
 ```
 
 ### Form Features
+
 - `form /api/endpoint` — POST to endpoint automatically
 - `form /api/endpoint auth` — includes JWT Bearer token
 - `input fieldname` — field name becomes JSON key
@@ -1498,6 +1603,7 @@ form /api/posts auth {
 - Field IDs auto-generated: `form-{endpoint}-{field}`
 
 ### Login/Register Forms
+
 ```nyx
 form /api/auth/register {
   input email placeholder="Email"
@@ -1517,6 +1623,7 @@ form /api/auth/login {
 ## Components
 
 ### Preferred syntax (v0.20.0+)
+
 Parameter list in parentheses, `${expr}` interpolation for everything:
 
 ```nyx
@@ -1554,6 +1661,7 @@ page /citations/ {
 - Component names can be lowercase or uppercase
 
 ### Legacy block-form syntax (still supported)
+
 ```nyx
 component Card {
   props title subtitle="Default"
@@ -1569,6 +1677,7 @@ page / {
   Card title="Hello" { p "Slotted content!" }
 }
 ```
+
 - `props` declares accepted properties with optional defaults (space-separated).
 - Type annotations like `name: string` are parsed and ignored (NyxCode is dynamically typed).
 - `slot` renders children passed to the component.
@@ -1576,6 +1685,7 @@ page / {
 - Components with no `style {}` render with NO wrapper div (v0.20.0+).
 
 ### Component Style Blocks (v0.10.0+)
+
 ```nyx
 component Card {
   props title desc
@@ -1587,10 +1697,12 @@ component Card {
   }
 }
 ```
+
 Style blocks directly on `.prop` elements — no inline `style="..."` needed!
 Supports hover, focus, active, @mobile, @tablet inside the block.
 
 ## Layout (wraps all pages)
+
 ```nyx
 layout {
   nav { link "Home" href="/", link "About" href="/about" }
@@ -1598,6 +1710,7 @@ layout {
   footer { p "© 2026" }
 }
 ```
+
 The `layout` block wraps ALL pages automatically. Only one layout per file.
 
 ## Imports — Multi-File Projects (v0.21.0)
@@ -1626,11 +1739,11 @@ meta { title "My App" }
 
 ### Structure recommendation
 
-| Project size | Approach |
-|---|---|
-| < 500 lines | One file (the default) |
+| Project size   | Approach                            |
+| -------------- | ----------------------------------- |
+| < 500 lines    | One file (the default)              |
 | 500-1500 lines | Main file + `components/` directory |
-| 1500+ lines | Page-per-file + shared imports |
+| 1500+ lines    | Page-per-file + shared imports      |
 
 ```
 myapp/
@@ -1678,6 +1791,7 @@ page / {
 String argument = load file. Identifier = instantiate component. No ambiguity in practice.
 
 ## Iteration & Conditionals
+
 ```nyx
 # Loop over data
 data users = get /api/users
@@ -1699,6 +1813,7 @@ when .premium -> badge "PRO"
 ```
 
 ## Forms (v0.6+)
+
 ```nyx
 form /api/posts auth {
   input title placeholder="Post title"
@@ -1708,6 +1823,7 @@ form /api/posts auth {
   error -> toast "Failed to create post"
 }
 ```
+
 - `auth` → auto-includes JWT Bearer token
 - `input fieldname` → `name="fieldname"`, `id="form-endpoint-fieldname"`
 - `success -> reload|redirect /path|toast "msg"|clear`
@@ -1715,6 +1831,7 @@ form /api/posts auth {
 - Generates complete `<form>` + `fetch()` + error handling. Zero JS.
 
 ## Script Block (escape hatch)
+
 ```nyx
 page / {
   script {
@@ -1724,6 +1841,7 @@ page / {
   }
 }
 ```
+
 Raw JavaScript captured at lexer level. Use sparingly — NyxCode native features preferred.
 
 ## Icons (v0.31.0)
@@ -1731,6 +1849,7 @@ Raw JavaScript captured at lexer level. Use sparingly — NyxCode native feature
 Native icon pack support. Declare once in theme, use everywhere.
 
 ### Theme Declaration
+
 ```nyx
 theme {
   icons: lucide           # Lucide Icons (default, 1400+ icons)
@@ -1750,20 +1869,24 @@ Supported packs:
 All versions pinned for supply-chain safety.
 
 ### Standalone Icon Element
+
 ```nyx
 icon "heart"                              # basic
 icon "stethoscope" size=32                # with size (px)
 icon "map-pin" size=24 style={ c red }    # with inline styles
 icon "settings" style={ c #2a7d5f; fs 2rem }
 ```
+
 Compiles to: `<i class="icon-heart" aria-hidden="true"></i>`
 
 ### Inline Icons in Text
+
 ```nyx
 h1 "icon:heart Welcome"
 p "Visit us at icon:map-pin our location"
 p "icon:star Rated icon:thumbs-up Approved"   # multiple per line
 ```
+
 Compiles to: `<h1><i class="icon-heart" aria-hidden="true"></i> Welcome</h1>`
 
 **Note:** Inline `icon:name` syntax requires `theme { icons: ... }`. Without it, standalone `icon` elements still work with default `icon-` prefix.
@@ -1771,6 +1894,7 @@ Compiles to: `<h1><i class="icon-heart" aria-hidden="true"></i> Welcome</h1>`
 ## Head Injection
 
 > **v0.25.0:** Most head injection use cases are now covered natively:
+>
 > - Body styles → `theme { body { } }`
 > - Keyframes → top-level `keyframes name { }`
 > - Selection → `theme { selection { } }`
@@ -1785,12 +1909,15 @@ page / {
   h1 "Page with third-party libs"
 }
 ```
+
 - Raw HTML string injected into `<head>`.
 - Use for third-party CDNs, custom meta tags, complex CSS that needs `{}` in strings.
 - If `head` contains `<title>`, compiler skips auto-generated title.
 
 ### Meta Precedence (v0.24.2)
+
 Page-level `meta {}` keys **override** site-level keys of the same name:
+
 ```nyx
 meta { title "My Site", description "Site desc" }  # site-level
 page /about {
@@ -1798,17 +1925,21 @@ page /about {
   h1 "About"
 }
 ```
-Only one `<title>` emitted. Applies to title, description, og:*, twitter:*, canonical.
+
+Only one `<title>` emitted. Applies to title, description, og:_, twitter:_, canonical.
 
 ## `__version__` Keyword (v0.9.3+)
+
 ```nyx
 p "Built with NyxCode __version__"
 ```
+
 Auto-replaced with current NyxCode version at compile time.
 
 ## Full-Stack Backend
 
 ### Tables (= Database)
+
 ```nyx
 table users {
   name text required
@@ -1818,6 +1949,7 @@ table users {
   created auto
 }
 ```
+
 **Types:** `text`, `email` → TEXT | `number`, `int` → INTEGER | `float`, `decimal` → REAL | `bool` → INTEGER | `auto` → DATETIME | `[tablename]` → FOREIGN KEY
 
 **Constraints:** `required` → NOT NULL | `unique` → UNIQUE | `default="value"` → DEFAULT 'value'
@@ -1839,6 +1971,7 @@ project/
 ```
 
 **Override with env var:**
+
 ```bash
 DATABASE_PATH=/var/data/myapp.db node server.js
 ```
@@ -1860,6 +1993,7 @@ table posts { title text required, body text, category text default="general", v
 ```
 
 **How it works:**
+
 1. At startup, compares `.nyx` schema with existing DB via `PRAGMA table_info()`
 2. New columns → `ALTER TABLE ADD COLUMN` with correct type + defaults
 3. UNIQUE columns → adds a separate `CREATE UNIQUE INDEX` (SQLite limitation)
@@ -1868,6 +2002,7 @@ table posts { title text required, body text, category text default="general", v
 6. Idempotent — multiple restarts only apply changes once
 
 **Limitations (SQLite):**
+
 - Cannot drop columns (data safety)
 - Cannot change column types
 - Cannot add `NOT NULL` without a `DEFAULT` to tables with existing data
@@ -1890,18 +2025,21 @@ GET /api/posts?search=foo&status=active&page=2  → all compose together
 - **Search** does case-insensitive LIKE across all `text` and `email` columns
 
 ### File Upload (v0.15.0+)
+
 ```nyx
 table posts {
   title text required
   image upload
 }
 ```
+
 - `upload` column type → multer middleware, files stored in `./uploads/`.
 - POST uses `multipart/form-data` automatically.
 - Static serving: `/uploads/filename.jpg`.
 - Deps: `multer`.
 
 ### WebSocket / Realtime (v0.15.0+)
+
 ```nyx
 table messages {
   text text required realtime
@@ -1913,12 +2051,14 @@ page / {
   each msgs -> m { p .text }
 }
 ```
+
 - `realtime` constraint → WebSocket broadcast on INSERT.
 - `data x = live /path` → client auto-subscribes via WebSocket.
 - Auto-reconnects, handles insert/update/delete events.
 - Deps: `ws`.
 
 ### Role-Based Access Control (v0.15.0+)
+
 ```nyx
 security {
   auth jwt
@@ -1929,11 +2069,13 @@ api GET /api/admin/users guard=admin {
   query "SELECT id, email, role FROM users"
 }
 ```
+
 - `guard=admin` on api blocks → auth + role check middleware.
 - `protect /path all role=X` → role-restricted routes.
 - `roleGuard()` queries user's `role` column from DB.
 
 ### Config Block (v0.15.0+)
+
 ```nyx
 config {
   env JWT_SECRET required
@@ -1942,6 +2084,7 @@ config {
   cors "*"
 }
 ```
+
 - `env NAME required` → crash on startup if missing.
 - `env NAME default=VALUE` → fallback value.
 - `cors "origin"` → auto-generates CORS middleware.
@@ -1978,16 +2121,19 @@ every 1h 'cleanup' {
 - **Zero dependencies** — pure `setInterval`, no Bull/Redis/cron
 
 ### Before/After Hooks (v0.15.0+)
+
 ```nyx
 before POST /api/posts {
   query "UPDATE counters SET value = value + 1 WHERE name = 'posts'"
 }
 ```
+
 - `before METHOD /path { }` → runs BEFORE the route handler.
 - `after METHOD /path { }` → runs AFTER response is sent.
 - Can contain `query` statements for side effects.
 
 ### Validation (v0.15.0+)
+
 ```nyx
 table users {
   name text required min=2 max=50
@@ -1996,13 +2142,16 @@ table users {
   password password required min=8
 }
 ```
+
 **Keywords:** `required`, `min=N`, `max=N`, `format=email|url`, `pattern="regex"`, `unique`.
+
 - Text: min/max = character length. Number: min/max = value range.
 - `format=email` → regex validation. `format=url` → https check.
 - Auto-generates server-side validation on POST and auth register (v0.15.0+).
 - Error: `{ "error": "name must be at least 2 characters" }`
 
 ### Custom API Routes (v0.15.0+)
+
 ```nyx
 api GET /api/stats {
   query "SELECT COUNT(*) as total FROM posts"
@@ -2017,6 +2166,7 @@ api GET /api/posts/:id/views auth {
   query "SELECT views FROM posts WHERE id = $id LIMIT 1"
 }
 ```
+
 - `api METHOD /path [auth] { }` — custom Express endpoints.
 - `query "SQL"` — raw SQL. `$field` → parameterized (no injection).
 - `validate { field rules }` — same rules as tables (`required`, `min`, `max`, `format`).
@@ -2046,6 +2196,7 @@ api POST /api/ask {
   respond 200 $fetchResult
 }
 ```
+
 - `fetch "url" { method, headers, body }` — non-streaming HTTP, result in `$fetchResult`
 - `let x = fetch "url" { ... }` — fetch result assigned to variable `x`
 - `let x = file "path"` — read file at runtime into variable `x`
@@ -2091,6 +2242,7 @@ each alerts -> alert {
 - Confirm dialog auto-added for safety
 
 ### Table Relations (v0.11+)
+
 ```nyx
 table posts {
   title text required
@@ -2106,17 +2258,21 @@ table comments {
   created_at auto
 }
 ```
+
 `[tablename]` creates a foreign key. The compiler auto-generates:
+
 - **LEFT JOIN** queries → nested JSON responses
 - **Password exclusion** → JOINed user never includes password
 - **Cascade deletes** → delete user → auto-deletes their posts + comments
 
 GET /api/posts returns nested author:
+
 ```json
 [{ "title": "Hello", "author": { "id": 1, "name": "Fabian", "email": "..." } }]
 ```
 
 ### CRUD Endpoints (per table)
+
 - `GET /api/tablename` — list all (with JOINs if relations exist)
 - `GET /api/tablename/:id` — get by id (with JOINs)
 - `POST /api/tablename` — create
@@ -2124,6 +2280,7 @@ GET /api/posts returns nested author:
 - `DELETE /api/tablename/:id` — delete
 
 ### Security (= Auth)
+
 ```nyx
 security {
   table users
@@ -2134,6 +2291,7 @@ security {
   protect /api/users all       # ALL methods need auth (including GET)
 }
 ```
+
 Auto-generates: Register (`POST /api/auth/register`), Login (`POST /api/auth/login`), Me (`GET /api/auth/me`), JWT middleware, bcrypt hashing, rate limiting.
 
 **Auto-generated users table (v0.21.1+):** If you don't declare `table users { ... }` explicitly, NyxCode synthesizes one from the `login` rule (identity field as required+unique, password required). Declare it yourself to add extra columns like `name`, `role`, etc.
@@ -2158,6 +2316,7 @@ security { table users, login email password, token jwt }
 **Token auto-save (v0.11.4+):** Form blocks that receive a JWT token auto-save it to `localStorage`. Subsequent `auth` requests include `Authorization: Bearer` header automatically.
 
 **Security features (v0.9.6+):**
+
 - Table name validation against SQL injection
 - JWT_SECRET hard-fails in production (no random fallback)
 - Rate limiting on auth endpoints (20 req/15min)
@@ -2166,6 +2325,7 @@ security { table users, login email password, token jwt }
 - Passwords auto-excluded from all API responses (GET, POST, JOIN)
 
 ### Form Blocks with Auth
+
 ```nyx
 form /api/auth/register {
   input name placeholder="Name"
@@ -2189,17 +2349,21 @@ form /api/posts auth {              # auth → includes Bearer token from localS
   success -> reload
 }
 ```
+
 `auth` keyword on form → auto-includes `Authorization: Bearer` header from localStorage.
 Success handlers: `reload`, `redirect /path`, `toast "message"`, `clear`.
 
 ### Data Binding (Frontend to Backend)
+
 ```nyx
 data posts = get /api/posts              # Public data
 data posts = get /api/posts auth         # Authenticated (sends JWT)
 ```
+
 Generates `fetch()` calls with optional Bearer token from localStorage.
 
 ### Loading/Error/Empty States (v0.12.0+)
+
 ```nyx
 data posts = get /api/posts auth {
   loading -> p "Loading posts..."
@@ -2210,6 +2374,7 @@ each posts -> post {
   Card title=.title body=.body author=.author.name
 }
 ```
+
 - `.field` = data path → `${item.field}` in JS template.
 - `.author.name` = nested → `${item.author?.name}` (optional chaining, safe on null).
 - Components resolved to HTML in templates (v0.12.5+).
@@ -2219,6 +2384,7 @@ each posts -> post {
 # Inline each (no component):
 each posts -> post { div { h3 .title, span .author.name } }
 ```
+
 - `loading` → shown during fetch, hidden when done
 - `error` → hidden by default, shown on fetch failure
 - `empty` → hidden by default, shown when data is empty array
@@ -2244,6 +2410,7 @@ each users -> user {
 ```
 
 **Rules:**
+
 - `.field` as entire value: `src=.avatar` → `src="${item.avatar}"`
 - `.field` mixed with static text: `href="/users/.id"` → `href="/users/${item.id}"`
 - Nested fields: `.author.name` → `${item.author?.name}` (optional chaining)
@@ -2260,6 +2427,7 @@ page /dashboard auth {
 ```
 
 The `auth` keyword after the page path generates a client-side guard:
+
 - Checks `localStorage.getItem("token")`
 - Redirects to `/login` if missing
 - No JavaScript needed in .nyx source
@@ -2314,6 +2482,7 @@ each user -> u { h1 .name, p .email }
 ```
 
 ## Default Props (v0.3+)
+
 ```nyx
 component Badge {
   props label, color="blue"
@@ -2324,9 +2493,11 @@ Badge label="Hot" color="red"             # override
 ```
 
 ## Element CSS Defaults
+
 Buttons, inputs, selects, textareas auto-get base CSS (font, padding, border-radius, border). Uses `:where()` for zero specificity — your styles always win.
 
 ## Common Mistakes
+
 ```nyx
 # ❌ WRONG: head with CSS containing {} (breaks parser)
 head "<style>.foo { color: red; }</style>"
@@ -2342,17 +2513,19 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 ```
 
 ## Troubleshooting
-| Problem | Solution |
-|---------|----------|
-| `Unexpected token at top level` | Element not in ELEMENT_TAGS, or missing page wrapper |
-| `{}` in head string breaks parser | Use CSS rules in `style {}` blocks instead |
-| Sibling elements merge | Wrap in `div {}` or put inside page/component block |
-| Inline style commas | Use `;` not `,` in `style="..."` attributes |
-| Theme color not resolving | Must be defined in `theme { colors { name value } }` |
-| `img` shows `value=` instead of `alt=` | Update to v0.12.0+ |
-| `div` absorbed into previous element | Update to v0.9.7+ (div now in ELEMENT_TAGS) |
+
+| Problem                                | Solution                                             |
+| -------------------------------------- | ---------------------------------------------------- |
+| `Unexpected token at top level`        | Element not in ELEMENT_TAGS, or missing page wrapper |
+| `{}` in head string breaks parser      | Use CSS rules in `style {}` blocks instead           |
+| Sibling elements merge                 | Wrap in `div {}` or put inside page/component block  |
+| Inline style commas                    | Use `;` not `,` in `style="..."` attributes          |
+| Theme color not resolving              | Must be defined in `theme { colors { name value } }` |
+| `img` shows `value=` instead of `alt=` | Update to v0.12.0+                                   |
+| `div` absorbed into previous element   | Update to v0.9.7+ (div now in ELEMENT_TAGS)          |
 
 ## AI Rules
+
 1. **USE SHORTHANDS** — `bg` not `background`, `c` not `color`, `r` not `border-radius`
 2. **USE PRESETS** for repeated styling — define once, apply with `preset=name`
 3. **USE LAYOUT ATTRS** — `flex=col center gap=2rem` not separate style blocks
@@ -2365,13 +2538,16 @@ style { @keyframes spin { 0% { transform rotate(0deg) } 100% { transform rotate(
 10. **CSS RULES** in style blocks for global/class styling (v0.9.4+).
 
 ## Token Comparison (measured with cl100k_base)
-| What | NyxCode | Alternative | Savings |
-|------|---------|-------------|---------|
-| Static page | 187 tokens | Tailwind HTML: 251 | **-25%** |
+
+| What            | NyxCode    | Alternative                  | Savings  |
+| --------------- | ---------- | ---------------------------- | -------- |
+| Static page     | 187 tokens | Tailwind HTML: 251           | **-25%** |
 | Full-stack blog | 169 tokens | Next.js+Prisma+NextAuth: 964 | **-82%** |
 
 ## Middleware (v0.16.2)
+
 Define reusable Express middleware, attach to routes:
+
 ```nyx
 middleware logger {
   console.log(req.method, req.url)
@@ -2385,17 +2561,22 @@ api GET /api/stats [logger, rateLimit] auth {
   respond 200 "ok"
 }
 ```
+
 Middleware names in `[]` before `auth`/`{`. Multiple comma-separated. Body is raw JS with `req`, `res`, `next`.
 
 ## Declarative Error Handling (v0.16.2)
+
 Status-specific catch blocks after `data` or `form`:
+
 ```nyx
 data posts = get /api/posts auth
 catch 401 -> redirect "/login"
 catch 403 -> toast "Forbidden"
 catch * -> show "Something went wrong"
 ```
+
 Also works on forms:
+
 ```nyx
 form /api/auth/login {
   input email placeholder="Email"
@@ -2406,9 +2587,11 @@ form /api/auth/login {
 catch 401 -> toast "Wrong credentials"
 catch 429 -> toast "Too many attempts"
 ```
+
 **Actions:** `redirect "/path"`, `toast "message"`, `show "message"`. Wildcard `*` = catch-all.
 
 ## Event Modifiers (v0.16.1)
+
 ```nyx
 button on:click.prevent="doThing()"  # preventDefault
 a on:click.stop="handle()"           # stopPropagation
@@ -2416,9 +2599,11 @@ input on:keydown.enter="submit()"     # key filter
 input on:keydown.ctrl.s="save()"      # modifier combo
 button on:click.once="init()"         # fires once
 ```
+
 Modifiers: `.prevent`, `.stop`, `.once`, `.self`, `.enter`, `.escape`, `.space`, `.ctrl`, `.shift`, `.alt`, `.meta` + any key name.
 
 ## Lifecycle Hooks (v0.16.1)
+
 ```nyx
 onMount {
   console.log("page loaded")
@@ -2429,17 +2614,22 @@ onDestroy {
   clearInterval(timer)
 }
 ```
+
 `onMount` = DOMContentLoaded. `onDestroy` = beforeunload.
 
 ## Element Refs (v0.16.1)
+
 ```nyx
 div ref=container { p "Hello" }
 button on:click="refs.container.style.color='red'" { text "Paint" }
 ```
+
 `ref=name` → access via `refs.name` (auto-generates `getElementById`).
 
-## Auto-prefix mask-* (v0.26.0)
+## Auto-prefix mask-\* (v0.26.0)
+
 All `mask-*` CSS properties auto-emit `-webkit-` prefixed versions for Safari:
+
 ```nyx
 div {
   style {
@@ -2448,10 +2638,13 @@ div {
   }
 }
 ```
+
 Emits both `-webkit-mask-image` and `mask-image`. Shorthands: `mi`/`mimg` → `mask-image`.
 
 ## Compile-time Conditionals (v0.26.0)
+
 Strip or include content at build time:
+
 ```nyx
 when __env__ == "production" {
   script src="analytics.js"
@@ -2460,13 +2653,17 @@ when __debug__ {
   div { p "Debug mode" }
 }
 ```
+
 CLI: `nyx build app.nyx --define env=production --define debug=true`
+
 - `__double_underscore__` refs = compile-time (stripped if falsy)
 - `.dot` refs = runtime (generates JS, unchanged)
 - Supports `==`, `!=`, `&&`, `||`, bare truthy
 
 ## Native picture/source (v0.26.0)
+
 Responsive images with native HTML5 `<picture>`:
+
 ```nyx
 picture {
   source srcset="hero.avif" type="image/avif"
@@ -2474,33 +2671,37 @@ picture {
   img src="hero.jpg" alt="Hero"
 }
 ```
+
 `source` is void (self-closing). Supports `media` attribute for art direction.
 
 ## New CSS Shorthands (v0.26.0)
-| Short | CSS Property | Example |
-|-------|-------------|----------|
-| `cv` | content-visibility | `cv auto` |
-| `sb` | scroll-behavior | `sb smooth` |
-| `ar` | aspect-ratio | `ar 16/9` |
-| `tof` | text-overflow | `tof ellipsis` |
-| `acc` | accent-color | `acc #ff0` |
-| `caret` | caret-color | `caret red` |
-| `cs` | color-scheme | `cs dark` |
-| `hy` | hyphens | `hy auto` |
-| `bv` | backface-visibility | `bv hidden` |
-| `ps` | perspective | `ps 1000px` |
-| `to` | transform-origin | `to center top` |
-| `wm` | writing-mode | `wm vertical-rl` |
-| `dir` | direction | `dir rtl` |
-| `ind` | text-indent | `ind 2rem` |
-| `osb` | overscroll-behavior | `osb contain` |
-| `smt` | scroll-margin-top | `smt 80px` |
-| `trs` | transform-style | `trs preserve-3d` |
-| `pso` | perspective-origin | `pso center` |
-| `mi` | mask-image | `mi url(mask.svg)` |
+
+| Short   | CSS Property        | Example            |
+| ------- | ------------------- | ------------------ |
+| `cv`    | content-visibility  | `cv auto`          |
+| `sb`    | scroll-behavior     | `sb smooth`        |
+| `ar`    | aspect-ratio        | `ar 16/9`          |
+| `tof`   | text-overflow       | `tof ellipsis`     |
+| `acc`   | accent-color        | `acc #ff0`         |
+| `caret` | caret-color         | `caret red`        |
+| `cs`    | color-scheme        | `cs dark`          |
+| `hy`    | hyphens             | `hy auto`          |
+| `bv`    | backface-visibility | `bv hidden`        |
+| `ps`    | perspective         | `ps 1000px`        |
+| `to`    | transform-origin    | `to center top`    |
+| `wm`    | writing-mode        | `wm vertical-rl`   |
+| `dir`   | direction           | `dir rtl`          |
+| `ind`   | text-indent         | `ind 2rem`         |
+| `osb`   | overscroll-behavior | `osb contain`      |
+| `smt`   | scroll-margin-top   | `smt 80px`         |
+| `trs`   | transform-style     | `trs preserve-3d`  |
+| `pso`   | perspective-origin  | `pso center`       |
+| `mi`    | mask-image          | `mi url(mask.svg)` |
 
 ## Partials (v0.26.0)
+
 Components without props ARE partials — no new keyword needed:
+
 ```nyx
 component social-links() {
   a "Twitter" href="https://x.com"
@@ -2510,6 +2711,7 @@ page / { footer { use social-links() } }
 ```
 
 ## Version
+
 v0.30.0 — The Language Release. DSL → Programming Language.
 Backend primitives: let, action, on, env, email, use, respond.
 Designed by the Rudel: Nyx 🧠, Tyto 🦉, Kiro 🐺, Fabian 🐻 (RFC #132).
@@ -2518,6 +2720,7 @@ Security audit pending for release. Dogfooded on NyxStatus.com.
 ## v0.34.0 — Functions, Pattern Matching, Types, Tests
 
 ### `fn` — User-Defined Functions
+
 ```nyx
 fn double(x) = x * 2                    # short form
 
@@ -2529,9 +2732,11 @@ fn shipping(weight, country = "DE") {    # block form with defaults
   }
 }
 ```
+
 **Rules:** No `$` prefix inside fn. Bare param names. Default params supported.
 
 ### `match` — Pattern Matching
+
 ```nyx
 match status {
   "active" -> "Running"
@@ -2539,39 +2744,48 @@ match status {
   _ -> "Unknown"
 }
 ```
+
 Use `match` for value matching, `when` for boolean checks.
 
 ### `when`/`else` in fn
+
 ```nyx
 when x > 10 { return "big" } else { return "small" }
 ```
 
 ### `try`/`catch` + `throw`
+
 ```nyx
 try { risky() } catch e { return "error: " + e }
 throw "Something went wrong"
 ```
 
 ### `each` in fn
+
 ```nyx
 each items -> item { set sum = sum + item }
 ```
 
 ### `type` — Data Shapes
+
 ```nyx
 type User { name: string, email: email, age?: number }
 ```
+
 Compiles to `validateUser(obj)` runtime validator.
 
 ### `test` — Built-in Tests
+
 ```nyx
 test "math works" { assertEq 1 + 1, 2; assert true }
 ```
+
 Keywords: `assert`, `assertEq`, `assertThrows`.
 
 ## v0.35.0 — SSE Streaming
 
 ### `stream fetch` — Server-Sent Events in Pipes
+
 ```nyx
 pipe 'chat' {
   on api POST /api/chat auth
@@ -2582,23 +2796,31 @@ pipe 'chat' {
   }
 }
 ```
+
 **Backend:** Generates SSE response (`text/event-stream`), proxies chunked upstream responses.
 **Frontend:** `__nyx_sse(url, body, onChunk, onDone)` helper auto-injected when used.
 **~60% fewer tokens** than equivalent Express.js SSE code.
 
 ### Frontend SSE Consumer
+
 ```js
 // Auto-injected by NyxCode when stream is used:
-__nyx_sse('/api/chat', { message: input }, (chunk) => {
-  messages += chunk;  // reactive update
-}, () => {
-  console.log('done');
-});
+__nyx_sse(
+  "/api/chat",
+  { message: input },
+  (chunk) => {
+    messages += chunk; // reactive update
+  },
+  () => {
+    console.log("done");
+  },
+);
 ```
 
 ## v0.36.0 — Custom Logic in API Blocks
 
 ### `fetch` in API Blocks — Non-Streaming HTTP Requests
+
 ```nyx
 api POST /api/ask {
   fetch "https://api.openai.com/v1/chat/completions" {
@@ -2609,9 +2831,11 @@ api POST /api/ask {
   respond 200 $fetchResult
 }
 ```
+
 **`$body`** = `req.body`, **`$env.X`** = `process.env.X`, **`$fetchResult`** = parsed JSON response.
 
 ### `stream fetch` in API Blocks — SSE Proxy
+
 ```nyx
 api POST /api/chat {
   stream fetch "https://api.openai.com/v1/chat/completions" {
@@ -2621,9 +2845,11 @@ api POST /api/chat {
   }
 }
 ```
+
 Same as pipe `stream fetch`, but directly in `api` blocks. No `pipe` wrapper needed.
 
 ### `file` — Read Files at Runtime
+
 ```nyx
 api POST /api/chat {
   file "./SYSTEM_PROMPT.md"
@@ -2634,9 +2860,11 @@ api POST /api/chat {
   respond 200 $fetchResult
 }
 ```
+
 Reads file contents into `__file_content` variable at request time.
 
 ### Why This Matters
+
 Before v0.36.0, any API orchestration (AI chat, payment webhooks, third-party integrations) required a separate `.js` file. Now it's 100% NyxCode — one `.nyx` file = complete app.
 
 ## v0.37.0 — Full Expressiveness Engine
@@ -2644,13 +2872,16 @@ Before v0.36.0, any API orchestration (AI chat, payment webhooks, third-party in
 NyxCode can now build **anything** for the web. Complete expression engine overhaul.
 
 ### Arithmetic: `+` `-` `*` `/` `%`
+
 ```nyx
 when .count + 1 > 0 { div "has items" }
 when .price * .qty > 100 { span "expensive" }
 ```
+
 Precedence: `*`/`/`/`%` → `+`/`-` → comparisons → `and`/`or`.
 
 ### Logic: `and` `or` `not`
+
 ```nyx
 when .active and .visible { div "shown" }
 when .admin or .editor { nav "Dashboard" }
@@ -2658,6 +2889,7 @@ when not .hidden { section "Content" }
 ```
 
 ### Member Access & Method Calls
+
 ```nyx
 when user.profile.name == "Nyx" { ... }
 when items[0].price > 50 { ... }
@@ -2665,6 +2897,7 @@ when items.includes("hello") { ... }
 ```
 
 ### Pipe Built-ins (30+)
+
 ```nyx
 items | len | filter price > 10 | map name | sort price desc
 name | uppercase | trim | split "," | join " "
@@ -2674,28 +2907,31 @@ items | first | last | reverse | unique | take 5 | skip 10
 ```
 
 ### Ternary, Booleans, Arrays
+
 ```nyx
 condition ? "yes" : "no"
 .active == true
 [1, 2, 3] | len
 ```
 
-
 ## v0.39.0 — Full Programming Language
 
 ### Arrays & Objects (#189)
+
 ```nyx
 let colors = ["red", "green", "blue"]
 let config = { theme: "dark", lang: "en" }
 ```
 
 ### Mutable Variables — `set` (#184)
+
 ```nyx
 let count = 0
 button "+" on:click { set count = count + 1 }
 ```
 
 ### Array Mutations — `push`, `pop`, `shift` (#184)
+
 ```nyx
 let items = []
 button "Add" on:click { push items "new item" }
@@ -2703,14 +2939,17 @@ button "Remove" on:click { pop items }
 ```
 
 ### Loops — `while` and `for` (#183)
+
 ```nyx
 while count < 10 { set count = count + 1 }
 for i in 0..5 { span "{i}" }
 for i in 0..100 step 10 { span "{i}" }
 ```
+
 Frontend: `for` loops statically unroll. `while` has 10k iteration guard.
 
 ### Client-Side Reactivity (#185)
+
 ```nyx
 page / {
   let count = 0
@@ -2722,6 +2961,7 @@ page / {
 ```
 
 ### Component Events — `emit` (#192)
+
 ```nyx
 component Counter {
   let count = 0
@@ -2730,11 +2970,13 @@ component Counter {
 ```
 
 ### WebSocket (#187)
+
 ```nyx
 socket /ws { on message -> data { respond "Echo: {data}" } }
 ```
 
 ### HTTP Client — `fetch` in API (#190)
+
 ```nyx
 api /weather {
   fn getWeather(city) {
@@ -2745,12 +2987,14 @@ api /weather {
 ```
 
 ### SPA Routing (#188)
+
 ```nyx
 page / { h1 "Home" }
 page /about { h1 "About" }
 ```
 
 ### Route Handlers (#191)
+
 ```nyx
 route /api/custom {
   fn GET(req) { respond { status: "ok" } }
@@ -2761,6 +3005,7 @@ route /api/custom {
 ## v0.40.0 — NyxForms Feature Set (Frontend Complete)
 
 ### Client-Side Conditionals — `when` in pages (#202)
+
 ```nyx
 page / {
   let showForm = false
@@ -2774,6 +3019,7 @@ page / {
 ```
 
 ### Dynamic Data Fetching (#198)
+
 ```nyx
 page /dashboard auth {
   data forms = fetch GET /api/forms auth {
@@ -2786,6 +3032,7 @@ page /dashboard auth {
 ```
 
 ### Dynamic Lists (#199)
+
 ```nyx
 let todos = ["Buy milk"]
 button "Add" on:click { push todos "New" }
@@ -2793,6 +3040,7 @@ each todos -> todo { div "{todo}" }
 ```
 
 ### Auth-Protected Routes (#197)
+
 ```nyx
 page / { h1 "Public" }
 page /dashboard auth { h1 "Protected" }
@@ -2800,6 +3048,7 @@ page /login { h1 "Login" }
 ```
 
 ### Multi-Step Wizard (#200)
+
 ```nyx
 wizard {
   step { h2 "Name", input value=".name" }
@@ -2807,9 +3056,11 @@ wizard {
   step { h2 "Done!", p "Thanks!" }
 }
 ```
+
 Features: progress bar, slide animations, Enter to advance, back/next, auto-focus.
 
 ### Rich Inputs (#201)
+
 ```nyx
 rating max=5 value=".score"
 toggle value=".darkMode" "Dark Mode"
@@ -2817,6 +3068,7 @@ choice options="TypeScript,Python,Rust,Go" value=".answer"
 ```
 
 ### Event Handlers — `on:click`
+
 ```nyx
 button "Click" on:click { set count = count + 1 }
 button "Add" on:click { push items "new" }
@@ -3256,11 +3508,11 @@ This adds `Authorization: Bearer <token>` header to the fetch request. The token
 
 `nyx build` auto-generates these auth endpoints when any page uses `auth`:
 
-| Endpoint | Method | Body | Description |
-|----------|--------|------|-------------|
-| `/api/auth/register` | POST | `{username, password}` | Create account, returns `{token}` |
-| `/api/auth/login` | POST | `{username, password}` | Login, returns `{token}` |
-| `/api/auth/me` | GET | — | Get current user (needs Bearer token) |
+| Endpoint             | Method | Body                   | Description                           |
+| -------------------- | ------ | ---------------------- | ------------------------------------- |
+| `/api/auth/register` | POST   | `{username, password}` | Create account, returns `{token}`     |
+| `/api/auth/login`    | POST   | `{username, password}` | Login, returns `{token}`              |
+| `/api/auth/me`       | GET    | —                      | Get current user (needs Bearer token) |
 
 Passwords are hashed with bcrypt. Tokens are JWT (24h expiry).
 
@@ -3270,13 +3522,13 @@ Passwords are hashed with bcrypt. Tokens are JWT (24h expiry).
 
 ### `data` vs `let`
 
-| Feature | `data` | `let` |
-|---------|--------|-------|
-| **Source** | Fetched from API (async) | Declared in page (sync) |
-| **Timing** | Loads after page render | Available immediately |
-| **Reactivity** | Updates DOM when fetch completes | Updates DOM on every `set` |
-| **Use for** | API data, server state | UI state, counters, inputs |
-| **Initial value** | `null` until fetch completes | Whatever you assign |
+| Feature           | `data`                           | `let`                      |
+| ----------------- | -------------------------------- | -------------------------- |
+| **Source**        | Fetched from API (async)         | Declared in page (sync)    |
+| **Timing**        | Loads after page render          | Available immediately      |
+| **Reactivity**    | Updates DOM when fetch completes | Updates DOM on every `set` |
+| **Use for**       | API data, server state           | UI state, counters, inputs |
+| **Initial value** | `null` until fetch completes     | Whatever you assign        |
 
 ```nyx
 page / {
@@ -3354,13 +3606,13 @@ dist/
 
 For each `table` in your .nyx file, the compiler generates:
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/{table}` | GET | List all rows (supports filtering) |
-| `/api/{table}` | POST | Create new row |
-| `/api/{table}/:id` | GET | Get single row |
-| `/api/{table}/:id` | PUT | Update row |
-| `/api/{table}/:id` | DELETE | Delete row |
+| Endpoint           | Method | Description                        |
+| ------------------ | ------ | ---------------------------------- |
+| `/api/{table}`     | GET    | List all rows (supports filtering) |
+| `/api/{table}`     | POST   | Create new row                     |
+| `/api/{table}/:id` | GET    | Get single row                     |
+| `/api/{table}/:id` | PUT    | Update row                         |
+| `/api/{table}/:id` | DELETE | Delete row                         |
 
 ### Custom API Routes
 

@@ -1,8 +1,18 @@
+## v0.51.1 — Patch (2026-05-02)
+
+**Fixed:**
+
+- Docs: Clarified tree-shaking scope — interactive elements (button/input/select/textarea/a) are tree-shaken, typography defaults (headings, code, blockquote, table) are always included (Kiro #209)
+- Verified: textarea defaults DO work correctly when textarea element is used — padding, border, focus glow all applied (Kiro #208 — could not reproduce, textarea was already in the interactive element group)
+
+---
+
 ## v0.51.0 — "Beautiful Defaults" (2026-05-01)
 
 Every NyxCode page now ships with professional, zero-config defaults. No CSS required for great-looking pages.
 
 **New:**
+
 - Auto-injected typography defaults: fluid `clamp()` headings, 1.7 line-height, monospace code blocks, styled blockquotes/hr/tables
 - Auto-injected interactive element defaults: buttons with hover/active/disabled, inputs/select/textarea with focus glow, links with smooth transitions
 - Select dropdown fix: `color-scheme: light dark` + `Canvas`/`CanvasText` system colors — options readable on any background (light or dark)
@@ -13,6 +23,7 @@ Every NyxCode page now ships with professional, zero-config defaults. No CSS req
 - All defaults use `:where()` — zero specificity, your styles always win
 
 **Docs:**
+
 - README.md completely rewritten — cleaner structure, v0.51 defaults section, updated benchmarks
 - NYXCODE.md updated with "Auto-Injected Defaults" section documenting all new defaults
 
@@ -39,6 +50,7 @@ NyxCode is now a complete full-stack programming language. One `.nyx` file = pro
 ## New Features
 
 ### #189: Array & Object Literals
+
 ```nyx
 api GET /api/colors {
   let colors = ["red", "green", "blue"]
@@ -48,6 +60,7 @@ api GET /api/colors {
 ```
 
 ### #184: Mutable Variables (`set`, `push`, `pop`, `shift`)
+
 ```nyx
 api POST /api/process {
   let count = 0
@@ -61,6 +74,7 @@ api POST /api/process {
 ```
 
 ### #183: While & For Loops
+
 ```nyx
 api GET /api/fibonacci {
   let a = 0
@@ -83,29 +97,33 @@ api GET /api/countdown {
   respond 200 { done: true }
 }
 ```
+
 ⚠️ Infinite loop guard: throws after 10,000 iterations.  
 Custom step: `for i in 0..100 step 5 { }`
 
 ### #185: Client-side Reactivity
+
 ```nyx
 page / {
   let count = 0
   let todos = []
-  
+
   h1 "Count: {count}"
   button "+" on:click { set count = count + 1 }
   button "Add Todo" on:click { push todos "new item" }
-  
+
   each todos -> todo {
     p "{todo}"
   }
 }
 ```
+
 - State changes auto-update DOM (template bindings)
 - Array mutations trigger list re-render via `__nyx.notify()`
 - Two-way binding with `model=` attribute
 
 ### #192: Component Events (`emit`)
+
 ```nyx
 component Counter {
   let count = 0
@@ -116,10 +134,12 @@ page / {
   Counter on:increment { set total = total + 1 }
 }
 ```
+
 - `emit eventName [data]` → dispatches CustomEvent with bubbling
 - Parents listen with `on:eventName { }`
 
 ### #187: WebSocket
+
 ```nyx
 socket /ws/chat {
   on connect { }
@@ -127,24 +147,28 @@ socket /ws/chat {
   on close { }
 }
 ```
+
 - Generates WebSocketServer (ws package)
 - Auto-broadcast on message
 - Path-based routing for multiple endpoints
 - Client ID tracking
 
 ### #186, #188, #190, #191: Already Implemented!
+
 - **File Upload** (#186): `table photos { image upload }` → multer middleware
 - **SPA Routing** (#188): Multiple `page` blocks → client-side pushState router
 - **HTTP Client** (#190): `fetch "url" { method, headers, body } as result`
 - **Async/Await** (#191): All API handlers are async, fetch awaits automatically
 
 ## Stats
+
 - **572 tests**, 0 failures
 - **+54 tests** since v0.38.3 (518 → 572)
 - All 10 issues (#183-#192) closed
 - 7 commits in one session
 
 ## Breaking Changes
+
 - `let` in API blocks now generates `let` (not `const`) to allow reassignment
 - None other — fully backward compatible
 
@@ -153,11 +177,13 @@ socket /ws/chat {
 # NyxCode v0.38.3 — Fix: Double colons in inline style={} (Regression #182)
 
 ### Bug Fixes
+
 - **#182**: Fixed double colons (`::`) in inline `style={}` when using CSS-style syntax (`bg: red` instead of `bg red`)
 - **#182**: Fixed double semicolons (`;;`) when using `;` as separator in inline styles
 - Both CSS-style (`bg: red; p: 1rem`) and NyxCode-style (`bg red, p 1rem`) now work correctly
 
 ### Stats
+
 - 549 tests, 0 failures (+3 new regression tests)
 - Reported by Kiro 🐺 QA
 
@@ -166,11 +192,13 @@ socket /ws/chat {
 # NyxCode v0.38.2 — Bugfixes: Vendor Prefix Parsing + JWT Persistence
 
 ### Bug Fixes
+
 - **#181**: Fixed vendor prefix parsing (`-webkit-*`, `-moz-*`, `-ms-*`) in both style blocks and inline `style={}` attributes. Hyphenated property names after vendor prefix now parse correctly.
 - **#181**: Added `bgclip` shorthand → `background-clip` (with auto `-webkit-` prefix). Previously `bgc` was incorrectly documented as `background-clip` — it's `background-color`.
 - **#172**: JWT secret now persists across server restarts via `.nyx-data/.jwt-secret` file. Priority: env var `JWT_SECRET` > file > random.
 
 ### Stats
+
 - 546 tests, 0 failures (+8 new tests)
 - Fixed docs: `bgc` = `background-color`, `bgclip` = `background-clip`
 
@@ -190,6 +218,7 @@ socket /ws/chat {
 Every AI already knows Tailwind. Now they can use that knowledge directly in NyxCode's `style={}` blocks. Classes compile to native CSS at build time — no PostCSS, no Tailwind runtime, no 300KB framework.
 
 ### What's New
+
 - **200+ Tailwind utility classes** recognized in `style={}` blocks
 - **Dynamic spacing**: `p-4`, `m-8`, `gap-2`, `px-6`, `mt-12` etc. (full Tailwind spacing scale)
 - **Dynamic colors**: `text-blue-500`, `bg-red-600`, `border-gray-200` (slate/gray/red/blue/green/yellow/purple/pink/indigo/cyan/emerald/amber/rose/sky/orange)
@@ -204,7 +233,9 @@ Every AI already knows Tailwind. Now they can use that knowledge directly in Nyx
 - **20 new tests** (538 total, 0 failures)
 
 ### Token Efficiency
+
 Tailwind in NyxCode is ~20% more token-efficient than Tailwind in JSX:
+
 ```
 // JSX + Tailwind: 89 tokens
 <div className="flex items-center justify-between p-4 bg-blue-500 text-white rounded-lg shadow-md">
@@ -224,30 +255,37 @@ maintaining ≥15% token efficiency over JavaScript.
 ## 🔥 Expression Engine Overhaul
 
 ### Arithmetic Operators
+
 ```nyx
 when .count + 1 > 0 { ... }
 when .price * .qty > 100 { ... }
 when (.a + .b) * .c == 42 { ... }
 ```
+
 Full operator precedence: `*`/`/`/`%` before `+`/`-` before `==`/`!=`/`<`/`>` before `and`/`or`.
 
 ### Logic Operators — Human-Readable!
+
 ```nyx
 when .active and .visible { div "shown" }
 when .admin or .editor { nav "Dashboard" }
 when not .hidden { section "Content" }
 ```
+
 `and` → `&&`, `or` → `||`, `not` → `!`. More readable, same power. (~0% size difference vs symbols.)
 
 ### Member Access & Chaining
+
 ```nyx
 when user.active { ... }
 when user.profile.name == "Nyx" { ... }
 when order.items[0].price > 50 { ... }
 ```
+
 Dot access, bracket access, and method calls on any expression.
 
 ### Pipe Built-ins — The Killer Feature
+
 ```nyx
 // Array operations
 items | filter price > 10 | map name     // 40% shorter than JS!
@@ -283,11 +321,13 @@ obj | values                              // Object.values()
 ```
 
 ### Ternary Expressions
+
 ```nyx
 when .count > 0 ? "has items" : "empty" { ... }
 ```
 
 ### Boolean & Array Literals
+
 ```nyx
 when .active == true { ... }
 when .active == false { ... }
@@ -295,6 +335,7 @@ when [1, 2, 3] | len > 0 { ... }
 ```
 
 ### Unary Expressions
+
 ```nyx
 when not .hidden { ... }
 when -.offset > 0 { ... }
@@ -308,15 +349,16 @@ when -.offset > 0 { ... }
 
 ## 📊 Token Efficiency
 
-| Operation | JavaScript | NyxCode | Savings |
-|-----------|-----------|---------|---------|
-| Filter + Map | `items.filter(x => x.price > 10).map(x => x.name)` | `items \| filter price > 10 \| map name` | **~40%** |
-| Sort desc | `items.sort((a, b) => b.price - a.price)` | `items \| sort price desc` | **~60%** |
-| Length | `items.length` | `items \| len` | **~8%** |
-| Uppercase | `str.toUpperCase()` | `str \| uppercase` | **~25%** |
-| Logic | `active && visible \|\| admin` | `active and visible or admin` | **~0%** (readable!) |
+| Operation    | JavaScript                                         | NyxCode                                  | Savings             |
+| ------------ | -------------------------------------------------- | ---------------------------------------- | ------------------- |
+| Filter + Map | `items.filter(x => x.price > 10).map(x => x.name)` | `items \| filter price > 10 \| map name` | **~40%**            |
+| Sort desc    | `items.sort((a, b) => b.price - a.price)`          | `items \| sort price desc`               | **~60%**            |
+| Length       | `items.length`                                     | `items \| len`                           | **~8%**             |
+| Uppercase    | `str.toUpperCase()`                                | `str \| uppercase`                       | **~25%**            |
+| Logic        | `active && visible \|\| admin`                     | `active and visible or admin`            | **~0%** (readable!) |
 
 ## 📈 Stats
+
 - **497/497 tests passing** (0 failures — fixed 2 pre-existing picture/source bugs!)
 - **17 new expression engine tests**
 - **30+ pipe built-ins**
@@ -337,6 +379,7 @@ Built on [NyxCode v0.30.0 "The Language Release"](https://github.com/fabudde/nyx
 Three icon packs, three ways to use them:
 
 ### Theme Declaration
+
 ```nyx
 theme {
   icons: lucide           # Lucide (1400+ icons, default)
@@ -346,6 +389,7 @@ theme {
 ```
 
 ### Standalone Icon Element
+
 ```nyx
 icon "heart" size=24
 icon "stethoscope" size=32 style={ c #2a7d5f }
@@ -353,6 +397,7 @@ icon "map-pin" style={ c red; fs 2rem }
 ```
 
 ### Inline in Text
+
 ```nyx
 h1 "icon:heart Welcome to NyxCode"
 p "Visit us at icon:map-pin our location"
@@ -374,6 +419,7 @@ Add columns to your tables — existing data stays, new columns appear. Zero com
 ```
 
 **How it works:**
+
 - `PRAGMA table_info()` diff at startup
 - `ALTER TABLE ADD COLUMN` for new columns
 - UNIQUE columns → separate `CREATE UNIQUE INDEX` (SQLite limitation)
@@ -404,4 +450,3 @@ Add columns to your tables — existing data stays, new columns appear. Zero com
 - 🐺 **Kiro** — QA, dogfooding, bug reports (#133-#141)
 
 ---
-
