@@ -83,6 +83,14 @@ export interface StoreNode extends BaseNode {
   type: 'Store';
   name: string;
   body: StoreField[];
+  persist?: boolean;
+  methods?: StoreMethod[];
+}
+
+export interface StoreMethod {
+  name: string;
+  params: string[];
+  body: string;
 }
 
 /** `theme { ... }` or `theme dark { ... }` */
@@ -539,6 +547,7 @@ export interface StoreField {
   value?: string;
   isAction: boolean;
   actionBody?: string;
+  actionParams?: string[];
 }
 
 export interface ThemeSection {

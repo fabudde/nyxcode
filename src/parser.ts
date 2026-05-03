@@ -45,6 +45,7 @@ import {
   PropDef,
   ColumnDef,
   StoreField,
+  StoreMethod,
   ThemeSection,
   ValidateStatement,
   ValidateField,
@@ -1852,9 +1853,18 @@ export class Parser {
   private parseStore(): StoreNode {
     const start = this.consume(TokenType.Store);
     const name = this.consumeIdentifier();
+
+    // v0.52.0 — `store settings persist { ... }`
+    let persist = false;
+    if (this.peek().value === "persist") {
+      this.advance();
+      persist = true;
+    }
+
     this.consume(TokenType.LeftBrace);
 
     const body: StoreField[] = [];
+    const methods: StoreMethod[] = [];
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       const fieldToken = this.peek();
       let visibility: "public" | "private" = "public";
@@ -1905,6 +1915,20 @@ export class Parser {
 
       const fieldName = this.consumeIdentifier();
 
+      // v0.52.0 — Method with params: `increment(amount) { ... }`
+      if (this.check(TokenType.LeftParen)) {
+        this.advance(); // (
+        const params: string[] = [];
+        while (!this.check(TokenType.RightParen) && !this.isAtEnd()) {
+          params.push(this.consumeIdentifier());
+          if (this.check(TokenType.Comma)) this.advance();
+        }
+        this.consume(TokenType.RightParen);
+        const methodBody = this.consumeBlock();
+        methods.push({ name: fieldName, params, body: methodBody });
+        continue;
+      }
+
       if (this.check(TokenType.Arrow)) {
         // Action: name -> { ... }
         this.advance(); // ->
@@ -1913,15 +1937,41 @@ export class Parser {
       } else if (this.check(TokenType.Equals)) {
         // Field: name = value
         this.advance(); // =
-        const value = this.advance().value;
-        body.push({ name: fieldName, visibility, value, isAction: false });
+        // v0.52.0 — Support complex values: arrays, objects, multi-token
+        let value = "";
+        let depth = 0;
+        while (!this.isAtEnd()) {
+          const next = this.peek();
+          if (next.type === TokenType.LeftBracket || next.type === TokenType.LeftBrace) depth++;
+          if (next.type === TokenType.RightBracket) depth--;
+          if (next.type === TokenType.RightBrace) {
+            if (depth > 0) { depth--; } else { break; }
+          }
+          // Stop at next field/method/computed declaration (only at depth 0)
+          if (depth === 0 && (
+            next.type === TokenType.State ||
+            next.type === TokenType.Computed ||
+            (next.type === TokenType.Identifier && (
+              this.peekAt(1)?.type === TokenType.Equals ||
+              this.peekAt(1)?.type === TokenType.Arrow ||
+              this.peekAt(1)?.type === TokenType.LeftParen
+            ))
+          )) break;
+          const tok = this.advance();
+          if (tok.type === TokenType.String) {
+            value += '"' + tok.value + '"';
+          } else {
+            value += (value ? " " : "") + tok.value;
+          }
+        }
+        body.push({ name: fieldName, visibility, value: value.trim(), isAction: false });
       } else {
         body.push({ name: fieldName, visibility, isAction: false });
       }
     }
 
     this.consume(TokenType.RightBrace);
-    return { type: "Store", name, body, line: start.line, col: start.col };
+    return { type: "Store", name, body, methods, persist, line: start.line, col: start.col };
   }
 
   /**

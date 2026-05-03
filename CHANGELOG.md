@@ -450,3 +450,18 @@ Add columns to your tables — existing data stays, new columns appear. Zero com
 - 🐺 **Kiro** — QA, dogfooding, bug reports (#133-#141)
 
 ---
+
+## v0.52.0 — Store System v2 (2026-05-03)
+
+### Added
+- **Store Methods with Parameters** — `increment(amount) { set count count + amount }` (#220)
+- **Persistent Stores** — `store settings persist { ... }` auto-saves/loads from localStorage (#221)
+- **`$reset()` method** — Reset all store fields to initial values in a single batch (#222)
+- **`$patch()` method** — Update multiple store fields at once with batch rendering (#223)
+- **Complex initial values** — Store fields now support arrays and objects (`items = []`, `meta = { ... }`)
+- **8 new tests** for Store v2 features
+
+### Unchanged
+- Legacy arrow syntax (`name -> { ... }`) still supported
+- Computed values in stores unchanged
+- All 627 existing tests pass (1 pre-existing v0.37 pipe test excluded)

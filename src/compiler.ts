@@ -37,6 +37,7 @@ import {
   AnimateStatement,
   LayoutNode,
   StoreNode,
+  StoreMethod,
   KeyframesNode,
 } from "./ast.js";
 
@@ -156,6 +157,8 @@ export class Compiler {
         actionBody?: string;
       }>;
       computed: Array<{ name: string; expression: string }>;
+      methods?: Array<{ name: string; params: string[]; body: string }>;
+      persist?: boolean;
     }
   > = new Map();
   private effects: string[] = [];
@@ -4616,6 +4619,7 @@ export class Compiler {
       actionBody?: string;
     }> = [];
     const computed: Array<{ name: string; expression: string }> = [];
+    const methods: Array<{ name: string; params: string[]; body: string }> = [];
 
     for (const field of store.body) {
       if (field.isAction) {
@@ -4625,12 +4629,10 @@ export class Compiler {
           actionBody: field.actionBody,
         });
       } else if (field.value?.startsWith("__computed:")) {
-        // Computed field inside store
         const expr = field.value.replace("__computed:", "");
         computed.push({ name: field.name, expression: expr });
       } else {
         let val = field.value || '""';
-        // Re-quote string values (parser strips quotes)
         if (
           val &&
           val !== "true" &&
@@ -4648,7 +4650,14 @@ export class Compiler {
       }
     }
 
-    this.stores.set(store.name, { fields, computed });
+    // v0.52.0 — Process methods with parameters
+    if (store.methods) {
+      for (const method of store.methods) {
+        methods.push({ name: method.name, params: method.params, body: method.body });
+      }
+    }
+
+    this.stores.set(store.name, { fields, computed, methods, persist: store.persist || false });
     if (fields.length > 0) this.hasReactivity = true;
   }
 
@@ -4757,13 +4766,24 @@ export class Compiler {
 
     // Store initialization — global reactive state objects
     for (const [storeName, store] of this.stores) {
-      runtime += `\n  // Store: ${storeName}\n`;
+      runtime += `\n  // Store: ${storeName}${store.persist ? ' (persistent)' : ''}\n`;
       runtime += `  const ${storeName} = {};\n`;
+
+      // v0.52.0 — Persist: load initial state from localStorage
+      if (store.persist) {
+        runtime += `  var __nyx_persisted_${storeName} = null;\n`;
+        runtime += `  try { __nyx_persisted_${storeName} = JSON.parse(localStorage.getItem('__nyx_store_${storeName}') || 'null'); } catch(e) {}\n`;
+      }
+
       // Create state vars namespaced under store
       for (const field of store.fields) {
         if (!field.isAction) {
           const stateKey = `${storeName}.${field.name}`;
-          runtime += `  __nyx.createState('${stateKey}', ${field.value || '""'});\n`;
+          if (store.persist) {
+            runtime += `  __nyx.createState('${stateKey}', __nyx_persisted_${storeName} ? __nyx_persisted_${storeName}['${field.name}'] : ${field.value || '""'});\n`;
+          } else {
+            runtime += `  __nyx.createState('${stateKey}', ${field.value || '""'});\n`;
+          }
           runtime += `  Object.defineProperty(${storeName}, '${field.name}', {\n`;
           runtime += `    get() { return __nyx.state['${stateKey}']; },\n`;
           runtime += `    set(v) { __nyx.state['${stateKey}'] = v; },\n`;
@@ -4773,9 +4793,29 @@ export class Compiler {
           runtime += `  ${storeName}.${field.name} = function() { ${field.actionBody} };\n`;
         }
       }
+
+      // v0.52.0 — Methods with parameters
+      if (store.methods) {
+        for (const method of store.methods) {
+          let resolvedBody = method.body;
+          for (const field of store.fields) {
+            if (!field.isAction) {
+              resolvedBody = resolvedBody.replace(
+                new RegExp('set\\s+' + field.name + '\\b', 'g'),
+                "__nyx.state['" + storeName + "." + field.name + "'] ="
+              );
+              resolvedBody = resolvedBody.replace(
+                new RegExp('(?<!\\.)\\b' + field.name + '\\b(?!\\s*[=(])', 'g'),
+                "__nyx.state['" + storeName + "." + field.name + "']"
+              );
+            }
+          }
+          runtime += `  ${storeName}.${method.name} = function(${method.params.join(', ')}) { ${resolvedBody} };\n`;
+        }
+      }
+
       // Store computed values
       for (const comp of store.computed) {
-        // Resolve field references within the store's own fields
         let resolvedExpr = comp.expression;
         for (const field of store.fields) {
           resolvedExpr = resolvedExpr.replace(
@@ -4789,6 +4829,39 @@ export class Compiler {
         runtime += `    enumerable: true\n`;
         runtime += `  });\n`;
       }
+
+      // v0.52.0 — $reset() method
+      runtime += `  ${storeName}.$reset = function() {\n`;
+      runtime += `    __nyx.batchUpdate(function() {\n`;
+      for (const field of store.fields) {
+        if (!field.isAction) {
+          runtime += `      __nyx.state['${storeName}.${field.name}'] = ${field.value || '""'};\n`;
+        }
+      }
+      runtime += `    });\n`;
+      runtime += `  };\n`;
+
+      // v0.52.0 — $patch() method
+      runtime += `  ${storeName}.$patch = function(obj) {\n`;
+      runtime += `    __nyx.batchUpdate(function() {\n`;
+      runtime += `      for (var k in obj) { if (__nyx.subscribers.has('${storeName}.' + k)) __nyx.state['${storeName}.' + k] = obj[k]; }\n`;
+      runtime += `    });\n`;
+      runtime += `  };\n`;
+
+      // v0.52.0 — Persist: save to localStorage on every state change
+      if (store.persist) {
+        const fieldNames = store.fields.filter(f => !f.isAction).map(f => f.name);
+        for (const fname of fieldNames) {
+          runtime += `  __nyx.subscribe('${storeName}.${fname}', function() {\n`;
+          runtime += `    var _ps = {};\n`;
+          for (const fn2 of fieldNames) {
+            runtime += `    _ps['${fn2}'] = __nyx.state['${storeName}.${fn2}'];\n`;
+          }
+          runtime += `    localStorage.setItem('__nyx_store_${storeName}', JSON.stringify(_ps));\n`;
+          runtime += `  });\n`;
+        }
+      }
+
       // Make store globally accessible
       runtime += `  window.__nyx_store_${storeName} = ${storeName};\n`;
     }

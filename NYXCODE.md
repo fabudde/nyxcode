@@ -1,4 +1,4 @@
-# NYXCODE.md — AI Context File (v0.51.0)
+# NYXCODE.md — AI Context File (v0.52.0)
 
 # Give this to any AI. It will generate NyxCode.
 
