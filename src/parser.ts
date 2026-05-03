@@ -6328,6 +6328,8 @@ export class Parser {
             modifiers.push(this.consumeIdentifier());
           }
           if (this.check(TokenType.Arrow)) this.advance(); // ->
+          // v0.52.0: Also handle on:click={expr} syntax (= followed by {block})
+          if (this.check(TokenType.Equals)) this.advance(); // = (JSX-style binding)
           let action = "";
           while (!this.isAtEnd() && !this.isStatementStart()) {
             const cur = this.peek();
@@ -6354,6 +6356,9 @@ export class Parser {
                 }
                 // Preserve string quotes inside brace blocks
                 if (t.type === TokenType.String) action += ' "' + t.value + '"';
+                // v0.52.0: $ followed by identifier → join without space ($reset, $patch)
+                else if (t.type === TokenType.Dollar) action += " $";
+                else if (action.endsWith("$")) action += t.value;
                 else action += " " + t.value;
               }
               break; // v0.50 fix: handler block complete, don't consume element text
@@ -6361,6 +6366,9 @@ export class Parser {
               const tok = this.advance();
               if (tok.type === TokenType.String)
                 action += (action ? " " : "") + '"' + tok.value + '"';
+              // v0.52.0: $ followed by identifier → join without space ($reset, $patch)
+              else if (tok.type === TokenType.Dollar) action += (action ? " " : "") + "$";
+              else if (action.endsWith("$")) action += tok.value;
               else action += (action ? " " : "") + tok.value;
             }
           }

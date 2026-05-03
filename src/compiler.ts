@@ -4790,7 +4790,17 @@ export class Compiler {
           runtime += `    enumerable: true\n`;
           runtime += `  });\n`;
         } else if (field.actionBody) {
-          runtime += `  ${storeName}.${field.name} = function() { ${field.actionBody} };\n`;
+          // v0.52.0: Resolve field references in legacy arrow actions
+          let resolvedAction = field.actionBody;
+          for (const f2 of store.fields) {
+            if (!f2.isAction) {
+              resolvedAction = resolvedAction.replace(
+                new RegExp('\\b' + f2.name + '\\b', 'g'),
+                "__nyx.state['" + storeName + "." + f2.name + "']"
+              );
+            }
+          }
+          runtime += `  ${storeName}.${field.name} = function() { ${resolvedAction} };\n`;
         }
       }
 
@@ -6072,7 +6082,10 @@ async function __nyx_sse(url, body, onChunk, onDone) {
         const rest = code.slice(i);
         const matchedKw = allKeywords.find(k => rest.startsWith(k));
         // v0.50: Don't split if keyword follows 'then ' (it belongs to the fetch)
-        if (matchedKw && current.trim() && !current.trimEnd().endsWith('then')) {
+        // v0.52.0: Don't split if keyword is part of an identifier (e.g. $reset, forEach)
+        const prevChar = i > 0 ? code[i - 1] : ' ';
+        const isWordBoundary = !/[a-zA-Z0-9_$.]/.test(prevChar);
+        if (matchedKw && current.trim() && !current.trimEnd().endsWith('then') && isWordBoundary) {
           statements.push(current.trim());
           current = '';
         }
