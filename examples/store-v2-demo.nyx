@@ -1,0 +1,46 @@
+theme {
+  colors { primary #667eea, bg #0a0a12, text #e2e8f0 }
+  body { bg var(--colors-bg), c var(--colors-text), ff sans-serif }
+}
+
+// Counter with methods
+store counter {
+  count = 0
+
+  increment() { set count count + 1 }
+  decrement() { set count count - 1 }
+  add(amount) { set count count + amount }
+}
+
+// Settings with persist
+store settings persist {
+  darkMode = true
+  language = "de"
+}
+
+// Cart with computed
+store cart {
+  items = []
+  computed total = items.length
+}
+
+page / {
+  section style="max-width: 600px; margin: 2rem auto; padding: 2rem;" {
+    h1 "Store v2 Demo" style="color: var(--colors-primary);"
+    
+    div style="margin: 2rem 0; padding: 1rem; background: #1a1a2e; border-radius: 8px;" {
+      h2 "Counter"
+      p "Count: {counter.count}"
+      button on:click={counter.increment()} "+"
+      button on:click={counter.decrement()} "-"
+      button on:click={counter.add(10)} "+10"
+      button on:click={counter.$reset()} "Reset"
+    }
+
+    div style="margin: 2rem 0; padding: 1rem; background: #1a1a2e; border-radius: 8px;" {
+      h2 "Settings (persistent)"
+      p "Dark Mode: {settings.darkMode}"
+      p "Language: {settings.language}"
+    }
+  }
+}
