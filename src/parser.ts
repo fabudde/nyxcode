@@ -1948,10 +1948,16 @@ export class Parser {
             if (depth > 0) { depth--; } else { break; }
           }
           // Stop at next field/method/computed declaration (only at depth 0)
+          // v0.52.1: Also check keywords that could be field names (config, theme, etc.)
+          const isFieldLike = next.type === TokenType.Identifier ||
+            next.type === TokenType.Config || next.type === TokenType.Theme ||
+            next.type === TokenType.Page || next.type === TokenType.Data ||
+            next.type === TokenType.Table || next.type === TokenType.Layout ||
+            next.type === TokenType.On || next.type === TokenType.Use;
           if (depth === 0 && (
             next.type === TokenType.State ||
             next.type === TokenType.Computed ||
-            (next.type === TokenType.Identifier && (
+            (isFieldLike && (
               this.peekAt(1)?.type === TokenType.Equals ||
               this.peekAt(1)?.type === TokenType.Arrow ||
               this.peekAt(1)?.type === TokenType.LeftParen
@@ -6331,11 +6337,14 @@ export class Parser {
           // v0.52.0: Also handle on:click={expr} syntax (= followed by {block})
           if (this.check(TokenType.Equals)) this.advance(); // = (JSX-style binding)
           let action = "";
+          let parenDepth = 0; // v0.52.1: Track parens for $patch({...})
           while (!this.isAtEnd() && !this.isStatementStart()) {
             const cur = this.peek();
-            if (cur.type === TokenType.RightBrace) break;
+            if (cur.type === TokenType.RightBrace && parenDepth === 0) break;
+            if (cur.type === TokenType.LeftParen) parenDepth++;
+            if (cur.type === TokenType.RightParen) parenDepth--;
             if (cur.type === TokenType.LeftBrace) {
-              if (action.trim().length > 0) break; // Action complete — { starts element children
+              if (action.trim().length > 0 && parenDepth <= 0) break; // Action complete — { starts element children
               action += " {";
               this.advance();
               let depth = 1;
@@ -6361,7 +6370,9 @@ export class Parser {
                 else if (action.endsWith("$")) action += t.value;
                 else action += " " + t.value;
               }
-              break; // v0.50 fix: handler block complete, don't consume element text
+              if (parenDepth <= 0) break; // v0.50 fix: handler block complete, don't consume element text
+              // v0.52.1: If inside parens, continue collecting (e.g. $patch({...}) )
+              continue;
             } else {
               const tok = this.advance();
               if (tok.type === TokenType.String)
