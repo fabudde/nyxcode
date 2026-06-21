@@ -13,6 +13,7 @@ npm i -g @fabudde/nyxcode
 nyx build app.nyx              # → <input-dir>/dist-site/index.html
 nyx build app.nyx -o build.html  # single-file output
 nyx build app.nyx -o public/   # custom directory
+nyx check app.nyx              # Validate only — no output (exit 1 on error; --strict fails on warnings)
 nyx dev app.nyx                # Dev server + hot reload
 nyx parse app.nyx              # Debug AST output
 nyx flatten app.nyx > flat.nyx # Multi-file → single file

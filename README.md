@@ -32,6 +32,7 @@ AI writes most code in 2026. But it still thinks in React, Vue, and raw HTML —
 npm i -g @fabudde/nyxcode
 nyx build app.nyx -o dist/        # Static site
 nyx build app.nyx                 # Full-stack (auto-detects tables/api)
+nyx check app.nyx                 # Validate only, no output (great for CI / AI loops)
 nyx dev app.nyx                   # Dev server + hot reload
 nyx add stripe                    # Add package + npm install
 ```
