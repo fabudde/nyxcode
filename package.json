@@ -19,8 +19,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "parse": "node dist/cli.js",
-    "test": "node --test 'dist/tests/*.test.js'",
-    "test:e2e": "node --test --test-timeout=120000 'dist/tests/e2e/*.test.js'",
+    "test": "node --test dist/tests/*.test.js",
+    "test:e2e": "node --test --test-timeout=120000 dist/tests/e2e/*.test.js",
     "test:all": "npm run build && npm test && npm run test:e2e",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
