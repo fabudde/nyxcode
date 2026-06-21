@@ -292,7 +292,7 @@ export interface FormStatement extends BaseNode {
 }
 
 export interface FormAction {
-  kind: 'reload' | 'redirect' | 'clear' | 'toast';
+  kind: 'reload' | 'redirect' | 'navigate' | 'go' | 'clear' | 'toast';
   value?: string; // redirect path or toast message
 }
 

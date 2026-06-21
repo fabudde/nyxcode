@@ -4695,7 +4695,12 @@ export class Parser {
         this.consume(TokenType.Arrow);
         const actionKind = this.advance().value as FormAction["kind"];
         let actionValue: string | undefined;
-        if (actionKind === "redirect" || actionKind === "toast") {
+        if (
+          actionKind === "redirect" ||
+          actionKind === "toast" ||
+          actionKind === "navigate" ||
+          actionKind === "go"
+        ) {
           actionValue = this.check(TokenType.String)
             ? this.consume(TokenType.String).value
             : this.consumeIdentifier();

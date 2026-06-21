@@ -4288,6 +4288,8 @@ export class Compiler {
       case "reload":
         return "location.reload()";
       case "redirect":
+      case "navigate": // alias — same word used by event handlers, for consistency
+      case "go":
         return "location.href='" + (action.value || "/") + "'";
       case "clear":
         return "this.reset();msg.textContent='Done!';msg.style.color='#4ade80'";
