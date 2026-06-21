@@ -1,0 +1,180 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "NyxCode",
+  "scopeName": "source.nyx",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#colors" },
+    { "include": "#keywords" },
+    { "include": "#operators" },
+    { "include": "#routes" },
+    { "include": "#functions" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.nyx",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.nyx",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.nyx",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "name": "constant.character.escape.nyx", "match": "\\\\." },
+            { "include": "#interpolation" }
+          ]
+        },
+        {
+          "name": "string.quoted.single.nyx",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            { "name": "constant.character.escape.nyx", "match": "\\\\." },
+            { "include": "#interpolation" }
+          ]
+        },
+        {
+          "name": "string.template.nyx",
+          "begin": "`",
+          "end": "`",
+          "patterns": [
+            { "name": "constant.character.escape.nyx", "match": "\\\\." },
+            { "include": "#interpolation" }
+          ]
+        }
+      ]
+    },
+    "interpolation": {
+      "name": "meta.embedded.expression.nyx",
+      "begin": "\\$\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.embedded.begin.nyx" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.embedded.end.nyx" }
+      },
+      "patterns": [
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#operators" },
+        { "include": "#keywords" },
+        { "include": "#identifiers" }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.nyx",
+          "match": "\\b\\d+(\\.\\d+)?(px|rem|em|vh|vw|%|s|ms|deg|fr)?\\b"
+        }
+      ]
+    },
+    "colors": {
+      "name": "constant.other.color.nyx",
+      "match": "#[0-9a-fA-F]{3,8}\\b"
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.flow.nyx",
+          "match": "\\b(when|else|each|match|if|return|try|catch|defer|throw|await|stream|every|in)\\b"
+        },
+        {
+          "name": "keyword.declaration.nyx",
+          "match": "\\b(page|component|table|store|theme|layout|security|api|action|pipe|config|env|head|preset|keyframes|animate|type|test|data|form|middleware|socket|route)\\b"
+        },
+        {
+          "name": "storage.type.nyx",
+          "match": "\\b(state|effect|computed|let|const|props|fn)\\b"
+        },
+        {
+          "name": "keyword.operator.word.nyx",
+          "match": "\\b(and|or|not)\\b"
+        },
+        {
+          "name": "keyword.other.nyx",
+          "match": "\\b(use|import|from|as|expect|validate|respond|limit|rate|before|after|on|auth|raw|query|email|style|script)\\b"
+        },
+        {
+          "name": "constant.language.nyx",
+          "match": "\\b(true|false|null|required|unique|admin)\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.nullish.nyx",
+          "match": "\\?\\?"
+        },
+        {
+          "name": "keyword.operator.optional.nyx",
+          "match": "\\?\\."
+        },
+        {
+          "name": "keyword.operator.arrow.nyx",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.pipe.nyx",
+          "match": "(?<!\\|)\\|(?!\\|)"
+        },
+        {
+          "name": "keyword.operator.comparison.nyx",
+          "match": "(==|!=|<=|>=|<|>)"
+        },
+        {
+          "name": "keyword.operator.ternary.nyx",
+          "match": "[?:]"
+        },
+        {
+          "name": "keyword.operator.arithmetic.nyx",
+          "match": "(\\+|\\*|%|=)"
+        }
+      ]
+    },
+    "routes": {
+      "name": "string.unquoted.route.nyx",
+      "match": "(?<=\\b(page|api|use|form|before|after|protect|stream|socket|route)\\s)(/[A-Za-z0-9_:./-]*)"
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.nyx",
+          "match": "(?<=\\bfn\\s)([A-Za-z_][A-Za-z0-9_]*)"
+        },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "name": "entity.name.function.call.nyx"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "entity.name.tag.component.nyx",
+          "match": "\\b([A-Z][A-Za-z0-9_]*)\\b"
+        },
+        {
+          "name": "variable.other.nyx",
+          "match": "\\b([a-z_][A-Za-z0-9_]*)\\b"
+        }
+      ]
+    }
+  }
+}

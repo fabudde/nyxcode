@@ -1,0 +1,35 @@
+{
+  "name": "nyxcode",
+  "displayName": "NyxCode",
+  "description": "Syntax highlighting and language configuration for NyxCode (.nyx) — the AI-native full-stack language.",
+  "version": "0.53.0",
+  "publisher": "fabudde",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": ["Programming Languages"],
+  "keywords": ["nyxcode", "nyx", "ai-native", "full-stack"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fabudde/nyxcode.git",
+    "directory": "editors/vscode"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "nyxcode",
+        "aliases": ["NyxCode", "nyx"],
+        "extensions": [".nyx"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "nyxcode",
+        "scopeName": "source.nyx",
+        "path": "./syntaxes/nyxcode.tmLanguage.json"
+      }
+    ]
+  }
+}
