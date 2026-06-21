@@ -2,8 +2,9 @@
 
 **The AI-native programming language. One `.nyx` file = full-stack app.**
 
+[![CI](https://github.com/fabudde/nyxcode/actions/workflows/ci.yml/badge.svg)](https://github.com/fabudde/nyxcode/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@fabudde/nyxcode)](https://www.npmjs.com/package/@fabudde/nyxcode)
-[![Tests](https://img.shields.io/badge/tests-616-brightgreen)](#)
+[![Tests](https://img.shields.io/badge/tests-717%20unit%20%2B%209%20e2e-brightgreen)](#development--testing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 🌐 **[nyxcode.io](https://nyxcode.io)** · 🎨 **[demo.nyxcode.io](https://demo.nyxcode.io)** · 📊 **[NyxStatus.com](https://nyxstatus.com)** (378 lines of NyxCode)
@@ -252,6 +253,33 @@ div class="flex items-center gap-4 p-6 rounded-xl bg-white shadow-lg" {
 
 Single pipeline. No webpack. No bundler config. No `node_modules` for frontend.
 
+A full-stack build emits a runnable backend: `server.js` **plus** a `package.json`
+(pinned deps + `npm start`) and a README — so `npm install && npm start` just works.
+
+## Editor Support
+
+Syntax highlighting and editor config for VS Code live in [`editors/vscode`](editors/vscode).
+
+```bash
+cp -r editors/vscode ~/.vscode/extensions/nyxcode-0.53.0   # then reload VS Code
+```
+
+## Development & Testing
+
+```bash
+npm install        # install toolchain + backend deps (for e2e)
+npm run build      # tsc -> dist/
+npm run typecheck  # strict type-check, no emit
+npm test           # 717 unit tests (lexer/parser/compiler/security/...)
+npm run test:e2e   # 9 end-to-end tests: boot the generated server, hit it over HTTP
+npm run test:all   # build + unit + e2e
+```
+
+Unit tests assert on generated output; the **end-to-end** suite compiles real apps
+with the CLI, starts the generated Express + SQLite server, and exercises live HTTP
+(CRUD persistence, validation, static frontend, auth register/login/JWT). CI runs
+the whole thing on Node 20/22/24.
+
 ## NyxStatus — The Proof
 
 **378 lines. One file. Full SaaS.**
@@ -262,6 +290,8 @@ Single pipeline. No webpack. No bundler config. No `node_modules` for frontend.
 
 | Version | Highlights |
 |---------|------------|
+| **v0.53.0** | **Runnable & Reliable** — Generated backends ship a `package.json` (npm start works), `??` / `?.` operators, CI, end-to-end runtime tests, VS Code highlighting |
+| **v0.52.0** | **Store System v2** — Persistent stores, `$reset()`, `$patch()`, methods |
 | **v0.51.0** | **Beautiful Defaults** — Professional typography, interactive elements, focus management, select fix, all zero-config |
 | **v0.50.0** | **Zero Patches** — SolidJS reactivity, custom API routes, query aliases, when-inside-each, stdlib |
 | v0.39.0 | **The Language Release II** — Arrays, objects, loops, mutable vars, reactivity |
@@ -285,6 +315,6 @@ MIT
 
 ---
 
-*NyxCode v0.51.0 — 616 tests — [npm](https://www.npmjs.com/package/@fabudde/nyxcode) — [NYXCODE.md](NYXCODE.md) (full AI context) — [demo.nyxcode.io](https://demo.nyxcode.io)*
+*NyxCode v0.53.0 — 717 unit + 9 e2e tests — [npm](https://www.npmjs.com/package/@fabudde/nyxcode) — [NYXCODE.md](NYXCODE.md) (full AI context) — [demo.nyxcode.io](https://demo.nyxcode.io)*
 
 🦞
