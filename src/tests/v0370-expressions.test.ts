@@ -186,7 +186,11 @@ describe('v0.37: String literal pipe in interpolation (#170 final)', () => {
   it('string literal with uppercase pipe evaluates at compile time', () => {
     const { html } = compile('page "/" {\n  p "Upper: ${\'hello\' | uppercase}"\n}');
     assert.ok(html.includes('HELLO'), 'should evaluate to HELLO at compile time');
-    assert.ok(!html.includes("uppercase"), 'should NOT contain raw pipe name');
+    // Must not leave the raw pipe expression unevaluated. (Bare word "uppercase"
+    // can legitimately appear in injected default CSS like text-transform: uppercase,
+    // so assert on the pipe syntax specifically — not the substring.)
+    assert.ok(!html.includes('| uppercase'), 'should NOT contain raw pipe expression');
+    assert.ok(!html.includes('${'), 'should NOT contain raw interpolation');
   });
   it('string literal with lowercase pipe evaluates at compile time', () => {
     const { html } = compile('page "/" {\n  p "Lower: ${\'WORLD\' | lowercase}"\n}');

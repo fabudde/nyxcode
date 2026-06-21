@@ -20,6 +20,9 @@
     "dev": "tsc --watch",
     "parse": "node dist/cli.js",
     "test": "node --test 'dist/tests/*.test.js'",
+    "test:e2e": "node --test --test-timeout=120000 'dist/tests/e2e/*.test.js'",
+    "test:all": "npm run build && npm test && npm run test:e2e",
+    "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -50,6 +53,10 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.4.1",
+    "jsonwebtoken": "^9.0.2",
     "typescript": "^5.9.3"
   },
   "dependencies": {
