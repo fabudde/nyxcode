@@ -6838,7 +6838,7 @@ export class Parser {
 
   /** Pipe: expr | builtin args */
   private parsePipe(): Expression {
-    let expr = this.parseOr();
+    let expr = this.parseNullish();
     while (this.check(TokenType.Pipe)) {
       this.advance();
       const builtin = this.consumeIdentifier();
@@ -6885,6 +6885,24 @@ export class Parser {
       };
     }
     return expr;
+  }
+
+  /** Nullish coalescing: expr ?? expr (looser than `or`/`and`, like JS). */
+  private parseNullish(): Expression {
+    let left = this.parseOr();
+    while (this.check(TokenType.QuestionQuestion)) {
+      this.advance();
+      const right = this.parseOr();
+      left = {
+        type: "BinaryExpression",
+        left,
+        operator: "??",
+        right,
+        line: left.line,
+        col: left.col,
+      };
+    }
+    return left;
   }
 
   /** Or: expr or expr */
@@ -7034,7 +7052,8 @@ export class Parser {
   private parsePostfix(): Expression {
     let expr = this.parsePrimary();
     while (true) {
-      if (this.check(TokenType.Dot)) {
+      if (this.check(TokenType.Dot) || this.check(TokenType.QuestionDot)) {
+        const optional = this.check(TokenType.QuestionDot);
         this.advance();
         const prop = this.consumeIdentifier();
         // Check for method call: obj.method(args)
@@ -7050,6 +7069,7 @@ export class Parser {
             type: "MemberExpression",
             object: expr,
             property: prop,
+            optional,
             line: expr.line,
             col: expr.col,
           };
@@ -7065,6 +7085,7 @@ export class Parser {
             type: "MemberExpression",
             object: expr,
             property: prop,
+            optional,
             line: expr.line,
             col: expr.col,
           };

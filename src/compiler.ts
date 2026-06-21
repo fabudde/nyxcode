@@ -2770,7 +2770,7 @@ export class Compiler {
         return `(${expr.operator}${this.eachConditionToJS(expr.operand, varName)})`;
       case 'MemberExpression': {
         const obj = this.eachConditionToJS(expr.object, varName);
-        return `${obj}.${expr.property}`;
+        return `${obj}${expr.optional ? '?.' : '.'}${expr.property}`;
       }
       case 'Identifier':
         // If the identifier is the loop variable, use it directly
@@ -6585,7 +6585,7 @@ async function __nyx_sse(url, body, onChunk, onDone) {
         // .dotRef → __nyx.state.xxx
         return `__nyx.state${expr.path}`;
       case 'MemberExpression':
-        return `${this.conditionToReactiveJS(expr.object)}.${expr.property}`;
+        return `${this.conditionToReactiveJS(expr.object)}${expr.optional ? '?.' : '.'}${expr.property}`;
       case 'IndexExpression':
         return `${this.conditionToReactiveJS(expr.object)}[${this.conditionToReactiveJS(expr.index)}]`;
       case 'BinaryExpression': {
@@ -6663,7 +6663,7 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       case "PropertyAccess":
         return "data" + expr.path;
       case "MemberExpression":
-        return `${this.expressionToJS(expr.object)}.${expr.property}`;
+        return `${this.expressionToJS(expr.object)}${expr.optional ? '?.' : '.'}${expr.property}`;
       case "IndexExpression":
         return `${this.expressionToJS(expr.object)}[${this.expressionToJS(expr.index)}]`;
       case "CallExpression":

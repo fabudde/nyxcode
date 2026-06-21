@@ -526,7 +526,18 @@ export class Lexer {
       case ':': this.emit(TokenType.Colon, ch, startCol); break;
       case '@': this.emit(TokenType.At, ch, startCol); break;
       case '$': this.emit(TokenType.Dollar, ch, startCol); break;
-      case '?': this.emit(TokenType.Question, ch, startCol); break;
+      case '?':
+        if (this.peek() === '?') {
+          this.advance();
+          this.emit(TokenType.QuestionQuestion, '??', startCol);
+        } else if (this.peek() === '.' && !this.isDigit(this.peekNext() ?? '')) {
+          // Optional chaining `?.` — but not `a ? .5 : b` (ternary before a float).
+          this.advance();
+          this.emit(TokenType.QuestionDot, '?.', startCol);
+        } else {
+          this.emit(TokenType.Question, ch, startCol);
+        }
+        break;
       case '&': this.emit(TokenType.Ampersand, ch, startCol); break;
       case '|': this.emit(TokenType.Pipe, ch, startCol); break;
       case '/':

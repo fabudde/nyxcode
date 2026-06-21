@@ -455,6 +455,8 @@ export interface MemberExpression extends BaseNode {
   type: 'MemberExpression';
   object: Expression;
   property: string;
+  /** true for optional chaining: `obj?.property` (emits `?.` instead of `.`) */
+  optional?: boolean;
 }
 
 /** obj[expr] — bracket access */
