@@ -603,7 +603,7 @@ function emitBackendManifest(outDir: string, appName: string, deps: string[]): v
       dev: 'node server.js',
     },
     dependencies,
-    engines: { node: '>=18' },
+    engines: { node: '>=20' },
   };
   const pkgPath = resolve(outDir, 'package.json');
   // Don't clobber a package.json the user already customised — merge deps instead.
