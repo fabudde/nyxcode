@@ -61,9 +61,13 @@ page / {
         span "Maps" style="color:#34d399;margin-left:-0.35rem"
       }
       input bind="query" placeholder="Filter visible places…" style="flex:1;min-width:200px;max-width:420px;padding:0.6rem 0.9rem;border-radius:10px;border:1px solid rgba(52,211,153,0.22);background:rgba(255,255,255,0.04);color:#eafff3;outline:none"
-      button "🥗 Fully vegan" on:click -> set onlyVegan = not onlyVegan style="padding:0.55rem 0.9rem;border-radius:10px;border:1px solid rgba(52,211,153,0.35);background:rgba(52,211,153,0.14);color:#eafff3;font-weight:600;cursor:pointer"
-      button "📍 Near me" on:click -> locate style="padding:0.55rem 0.9rem;border-radius:10px;border:1px solid rgba(163,230,53,0.4);background:rgba(163,230,53,0.12);color:#eafff3;font-weight:600;cursor:pointer"
-      a "Sign in" href="/login" style="padding:0.55rem 0.9rem;border-radius:10px;border:1px solid rgba(52,211,153,0.25);color:#9fe9c6;text-decoration:none;font-weight:600"
+      button style="padding:0.55rem 0.9rem;border-radius:10px;border:1px solid rgba(52,211,153,0.35);background:rgba(52,211,153,0.14);color:#eafff3;font-weight:600;cursor:pointer" on:click { set onlyVegan = not onlyVegan } {
+        when onlyVegan { span "🥗 Fully vegan" } else { span "🌿 Vegan options" }
+      }
+      button "📍 Near me" style="padding:0.55rem 0.9rem;border-radius:10px;border:1px solid rgba(163,230,53,0.4);background:rgba(163,230,53,0.12);color:#eafff3;font-weight:600;cursor:pointer" on:click { locate }
+      a "Sign in" href="/login" visible="guest" style="padding:0.55rem 0.9rem;border-radius:10px;border:1px solid rgba(52,211,153,0.25);color:#9fe9c6;text-decoration:none;font-weight:600"
+      span "🌱 Signed in" visible="auth" style="padding:0.55rem 0.75rem;border-radius:10px;border:1px solid rgba(52,211,153,0.25);color:#34d399;font-weight:600;font-size:0.85rem"
+      button "Sign out" visible="auth" on:click { logout } style="padding:0.55rem 0.9rem;border-radius:10px;border:1px solid rgba(251,113,133,0.4);background:rgba(251,113,133,0.12);color:#fb7185;font-weight:600;cursor:pointer"
     }
 
     div style="display:flex;flex:1;min-height:0" {
@@ -87,6 +91,21 @@ page / {
           }
           else {
             div "Move the map to discover vegan places." style="padding:1.4rem 1rem;color:rgba(234,255,243,0.5);text-align:center;font-size:0.9rem"
+          }
+        }
+
+        div visible="auth" style="border-top:1px solid rgba(52,211,153,0.18);max-height:42%;overflow-y:auto;padding:0.7rem 0.8rem" {
+          div "★ My favorites" style="font-weight:700;color:#a3e635;font-size:0.85rem;margin-bottom:0.5rem"
+          data favorites = get /api/favorites auth {
+            empty {
+              div "No saved spots yet — tap ♥ Save on a place." style="color:rgba(234,255,243,0.5);font-size:0.82rem;padding:0.3rem"
+            }
+          }
+          each favorites -> fav {
+            div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0.4rem 0.5rem;border:1px solid rgba(163,230,53,0.14);border-radius:10px;margin-bottom:0.4rem" {
+              span "${fav.name}" style="font-size:0.84rem"
+              a "↗ Map" href="https://www.google.com/maps/dir/?api=1&destination=${fav.lat},${fav.lon}" target="_blank" style="color:#a3e635;font-size:0.76rem;text-decoration:none"
+            }
           }
         }
       }

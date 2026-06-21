@@ -1,0 +1,7 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body { background: #0b1410; color: #eafff3; font-family: 'Inter', system-ui, sans-serif; }
+.leaflet-popup-content-wrapper { background: #10231a; color: #eafff3; border-radius: 14px; border: 1px solid rgba(52,211,153,0.25); }
+.leaflet-popup-tip { background: #10231a; }
+.leaflet-container a.leaflet-popup-close-button { color: #9fe9c6; }
+.vm-card:hover { background: rgba(52,211,153,0.08); }

@@ -750,6 +750,14 @@ export class Compiler {
     const scriptContent = [reactiveRuntime, js].filter(Boolean).join("\n");
     const hasScript = scriptContent.trim().length > 0 || renderCalls.length > 0;
 
+    // v0.27.0 — visible=auth/guest toggle script. Inject here (body already compiled,
+    // so _hasVisibleDirective is known); dedupe makes it idempotent across paths.
+    if (this._hasVisibleDirective) {
+      this.headInjections.push(
+        '<script>document.addEventListener("DOMContentLoaded",function(){var t=localStorage.getItem("token");document.querySelectorAll("[data-visible]").forEach(function(el){var v=el.getAttribute("data-visible");if(v==="auth")el.style.display=t?"":"none";if(v==="guest")el.style.display=t?"none":""})});</script>',
+      );
+    }
+
     // Issue #97: dedupe singleton meta tags so page-level `meta {}` overrides site-level.
     const dedupedInjections = this.dedupeHeadInjections(this.headInjections);
     const headExtra =
@@ -5401,6 +5409,14 @@ export class Compiler {
     const scriptContent = [reactiveRuntime, js].filter(Boolean).join("\n");
     const hasScript = scriptContent.trim().length > 0 || renderCalls.length > 0;
 
+    // v0.27.0 — visible=auth/guest toggle script. Inject here (body already compiled,
+    // so _hasVisibleDirective is known); dedupe makes it idempotent across paths.
+    if (this._hasVisibleDirective) {
+      this.headInjections.push(
+        '<script>document.addEventListener("DOMContentLoaded",function(){var t=localStorage.getItem("token");document.querySelectorAll("[data-visible]").forEach(function(el){var v=el.getAttribute("data-visible");if(v==="auth")el.style.display=t?"":"none";if(v==="guest")el.style.display=t?"none":""})});</script>',
+      );
+    }
+
     // Issue #97: dedupe singleton meta tags so page-level `meta {}` overrides site-level.
     const dedupedInjections = this.dedupeHeadInjections(this.headInjections);
     const headExtra =
@@ -6307,6 +6323,13 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       return `(function(){var u='${path.replace(/'/g, "\\'")}';if(/^javascript:/i.test(u))return;window.location.href=u})()`;
     }
 
+    // v0.54: logout [ "/path" ] — clear the JWT and go home (or to a path).
+    if (action === 'logout' || action.startsWith('logout ')) {
+      const rest = action.slice(7).trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+      const dest = (rest || '/').replace(/'/g, "\\'");
+      return `(function(){try{localStorage.removeItem('token')}catch(e){}window.location.href='${dest}'})()`;
+    }
+
     // v0.54: locate [ "mapId" ] — geolocate the user and recenter a native <map>.
     if (action === 'locate' || action.startsWith('locate ')) {
       const rest = action.slice(6).trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
@@ -6506,6 +6529,14 @@ async function __nyx_sse(url, body, onChunk, onDone) {
         );
       }
     }
+    // Normalise NyxCode logical operators to JS so handler expressions like
+    // `set x = not y`, `a and b`, `a or b` produce valid JavaScript (they used to
+    // emit the literal words `not`/`and`/`or` → SyntaxError → the handler silently
+    // did nothing). Word-boundary only; runs before state resolution.
+    result = result
+      .replace(/\bnot\b/g, "!")
+      .replace(/\band\b/g, "&&")
+      .replace(/\bor\b/g, "||");
     for (const [name] of this.stateVars) {
       // Replace standalone occurrences (not inside other words)
       // v0.50 fix: Don't replace when preceded by '.' (property access like .value)

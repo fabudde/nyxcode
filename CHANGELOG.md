@@ -1,3 +1,28 @@
+## v0.54.1 — Auth UX fixes (2026-06-21)
+
+Login/registration *worked* (JWT issued, stored) but gave no visible feedback, so
+it looked broken. Fixed end-to-end:
+
+- **`success -> navigate "/path"` now works in forms.** It was parsed without its
+  value and dropped, so login/register stored the token but never redirected.
+  `navigate`/`go` are now first-class form success actions.
+- **`visible="auth"/"guest"` works on single-page apps.** The runtime toggle script
+  (show/hide by JWT presence) was only injected on the multi-page path, so a
+  single-page app never reflected logged-in state. Now injected in both.
+- **Native `logout` action** — `on:click { logout }` clears the JWT and redirects
+  (optionally `logout "/path"`).
+- **Logical operators in handler expressions.** `set x = not y`, `a and b`, `a or b`
+  used to emit the literal words `not`/`and`/`or` → invalid JS → the handler silently
+  did nothing (this is why the VeganMaps "fully vegan" toggle never flipped). They
+  now compile to `!`/`&&`/`||`.
+- VeganMaps: the toggle now flips fully-vegan ↔ vegan-options (with a reactive
+  label), and a **"My favorites"** list (logged-in only) makes saving spots useful.
+- `examples/vegan-maps.nyx` header now shows **Sign in ↔ Signed in / Sign out**,
+  verified in a real headless-Chrome run (register → redirect → logged-in header →
+  save favorite → logout). Live at vegan.heynyx.dev.
+
+---
+
 ## v0.54.0 — "Native Maps, Zero Hacks" (2026-06-21)
 
 Make whole classes of interactive apps buildable in 100% NyxCode — no `script {}`
