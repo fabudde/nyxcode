@@ -1,0 +1,246 @@
+# VeganMaps — find 100% vegan restaurants near you.
+#
+# Built in NyxCode to dogfood the language on a real, interactive app.
+#
+# Map data: OpenStreetMap tiles + the Overpass API (live `diet:vegan` data) — no
+# API key required. "Directions" buttons deep-link into the Google Maps API
+# (maps/dir endpoint, also keyless). To use the Google Maps JS tiles instead,
+# drop your key into window.__GMAPS_KEY in the script block.
+
+theme {
+  colors {
+    bg #0b1410
+    text #eafff3
+    primary #34d399
+    accent #a3e635
+    surface rgba(255, 255, 255, 0.04)
+    muted rgba(234, 255, 243, 0.55)
+    border rgba(52, 211, 153, 0.18)
+    danger #fb7185
+  }
+  fonts {
+    body "Inter", system-ui, sans-serif
+    heading "Inter", system-ui, sans-serif
+  }
+}
+
+page / {
+  head "<title>VeganMaps — 100% Vegan Restaurants Near You</title>"
+  head "<meta name='description' content='Discover fully vegan restaurants around you on a live map. Powered by OpenStreetMap & Overpass.'>"
+  head "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+  head "<link rel='icon' href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌱</text></svg>'>"
+  head "<link rel='preconnect' href='https://fonts.googleapis.com'>"
+  head "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'>"
+  head "<link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' integrity='sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=' crossorigin=''>"
+  head "<script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js' integrity='sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=' crossorigin=''></script>"
+  head "<style>*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%}body{background:#0b1410;color:#eafff3;font-family:'Inter',system-ui,sans-serif}::selection{background:rgba(52,211,153,0.3)}#map{height:100%;width:100%;background:#0b1410}.leaflet-popup-content-wrapper{background:#10231a;color:#eafff3;border-radius:14px;border:1px solid rgba(52,211,153,0.25)}.leaflet-popup-tip{background:#10231a}.leaflet-popup-content{margin:14px 16px;font-size:0.92rem;line-height:1.5}.leaflet-container a.leaflet-popup-close-button{color:#9fe9c6}.vm-card:hover{background:rgba(52,211,153,0.08);border-color:rgba(52,211,153,0.4)}.vm-card{cursor:pointer;transition:all .15s ease}.spin{width:18px;height:18px;border:2px solid rgba(52,211,153,.25);border-top-color:#34d399;border-radius:50%;animation:vmspin .7s linear infinite;display:inline-block;vertical-align:middle}@keyframes vmspin{to{transform:rotate(360deg)}}.pin{filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}</style>"
+
+  div style="display:flex;flex-direction:column;height:100vh;overflow:hidden" {
+
+    header style="display:flex;align-items:center;gap:1rem;padding:0.85rem 1.25rem;background:rgba(11,20,16,0.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(52,211,153,0.18);z-index:1000;flex-wrap:wrap" {
+      div style="display:flex;align-items:center;gap:0.6rem;font-weight:800;font-size:1.25rem;white-space:nowrap" {
+        span "🌱"
+        span "Vegan" style="color:#eafff3"
+        span "Maps" style="color:#34d399;margin-left:-0.35rem"
+      }
+
+      div style="position:relative;flex:1;min-width:200px;max-width:420px" {
+        input id="vm-search" placeholder="Filter visible places by name…" style="width:100%;padding:0.6rem 0.9rem;border-radius:10px;border:1px solid rgba(52,211,153,0.22);background:rgba(255,255,255,0.04);color:#eafff3;font-size:0.95rem;outline:none"
+      }
+
+      div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap" {
+        button id="vm-strict" style="padding:0.55rem 0.9rem;border-radius:10px;border:1px solid rgba(52,211,153,0.35);background:rgba(52,211,153,0.14);color:#eafff3;font-weight:600;font-size:0.85rem;cursor:pointer" {
+          span "🥗 Fully vegan"
+        }
+        button id="vm-near" style="padding:0.55rem 0.9rem;border-radius:10px;border:1px solid rgba(163,230,53,0.4);background:rgba(163,230,53,0.12);color:#eafff3;font-weight:600;font-size:0.85rem;cursor:pointer" {
+          span "📍 Near me"
+        }
+      }
+    }
+
+    div style="display:flex;flex:1;min-height:0" {
+
+      aside style="width:340px;max-width:42vw;display:flex;flex-direction:column;border-right:1px solid rgba(52,211,153,0.15);background:rgba(7,14,11,0.6)" {
+        div style="padding:0.9rem 1.1rem;border-bottom:1px solid rgba(52,211,153,0.12);display:flex;align-items:center;justify-content:space-between" {
+          div style="font-weight:700;font-size:0.95rem" {
+            span "Results"
+            span id="vm-count" style="margin-left:0.5rem;color:#34d399;font-weight:700" { span "0" }
+          }
+          div id="vm-status" style="font-size:0.8rem;color:rgba(234,255,243,0.55)" { span "Move the map to load" }
+        }
+        div id="vm-list" style="overflow-y:auto;flex:1;padding:0.6rem"
+      }
+
+      div style="flex:1;position:relative;min-width:0" {
+        div id="map"
+        div style="position:absolute;left:50%;bottom:1rem;transform:translateX(-50%);z-index:1000;background:rgba(11,20,16,0.9);border:1px solid rgba(52,211,153,0.25);border-radius:999px;padding:0.45rem 1rem;font-size:0.8rem;color:rgba(234,255,243,0.7);backdrop-filter:blur(10px)" {
+          span "Data © OpenStreetMap contributors · Overpass API"
+        }
+      }
+    }
+  }
+
+  script {
+    (function () {
+      // Optional: window.__GMAPS_KEY = 'YOUR_GOOGLE_MAPS_JS_KEY' to swap tiles.
+      var DEFAULT_CENTER = [52.5200, 13.4050]; // Berlin — a vegan-dense city
+      var strictVegan = true;
+      var places = [];
+      var markers = {};
+      var layer = L.layerGroup();
+      var debounceTimer = null;
+      var lastQueryKey = '';
+
+      var map = L.map('map', { zoomControl: true }).setView(DEFAULT_CENTER, 14);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19
+      }).addTo(map);
+      layer.addTo(map);
+
+      var leafIcon = L.divIcon({
+        className: '',
+        html: '<div class="pin" style="font-size:26px;line-height:26px">🌱</div>',
+        iconSize: [26, 26],
+        iconAnchor: [13, 26],
+        popupAnchor: [0, -24]
+      });
+
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+        });
+      }
+
+      function addrOf(t) {
+        var parts = [];
+        if (t['addr:street']) parts.push(t['addr:street'] + (t['addr:housenumber'] ? ' ' + t['addr:housenumber'] : ''));
+        if (t['addr:city']) parts.push(t['addr:city']);
+        return parts.join(', ');
+      }
+
+      function popupHtml(p) {
+        var t = p.tags || {};
+        var dir = 'https://www.google.com/maps/dir/?api=1&destination=' + p.lat + ',' + p.lon;
+        var rows = [];
+        rows.push('<div style="font-weight:700;font-size:1rem;margin-bottom:2px">' + esc(t.name || 'Vegan spot') + '</div>');
+        var tags = [];
+        if (t['diet:vegan'] === 'only') tags.push('<span style="background:rgba(52,211,153,.2);color:#34d399;padding:1px 7px;border-radius:999px;font-size:.72rem;font-weight:600">100% vegan</span>');
+        else if (t['diet:vegan'] === 'yes') tags.push('<span style="background:rgba(163,230,53,.18);color:#a3e635;padding:1px 7px;border-radius:999px;font-size:.72rem;font-weight:600">vegan options</span>');
+        if (t.cuisine) tags.push('<span style="color:#9fe9c6;font-size:.72rem">' + esc(t.cuisine.replace(/;/g, ', ')) + '</span>');
+        if (tags.length) rows.push('<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0">' + tags.join('') + '</div>');
+        var a = addrOf(t);
+        if (a) rows.push('<div style="color:rgba(234,255,243,.6);font-size:.82rem">' + esc(a) + '</div>');
+        if (t.opening_hours) rows.push('<div style="color:rgba(234,255,243,.5);font-size:.78rem;margin-top:2px">🕒 ' + esc(t.opening_hours) + '</div>');
+        var links = [];
+        links.push('<a href="' + dir + '" target="_blank" rel="noopener" style="color:#34d399;font-weight:600;font-size:.82rem;text-decoration:none">↗ Directions</a>');
+        if (t.website || t['contact:website']) links.push('<a href="' + esc(t.website || t['contact:website']) + '" target="_blank" rel="noopener" style="color:#a3e635;font-size:.82rem;text-decoration:none">Website</a>');
+        if (t.phone || t['contact:phone']) links.push('<a href="tel:' + esc(t.phone || t['contact:phone']) + '" style="color:#9fe9c6;font-size:.82rem;text-decoration:none">Call</a>');
+        rows.push('<div style="display:flex;gap:14px;margin-top:8px">' + links.join('') + '</div>');
+        return rows.join('');
+      }
+
+      function setStatus(html) { document.getElementById('vm-status').innerHTML = html; }
+
+      function renderList() {
+        var q = (document.getElementById('vm-search').value || '').toLowerCase();
+        var list = document.getElementById('vm-list');
+        var shown = places.filter(function (p) {
+          var name = ((p.tags && p.tags.name) || '').toLowerCase();
+          return !q || name.indexOf(q) !== -1;
+        });
+        document.getElementById('vm-count').innerHTML = '<span>' + shown.length + '</span>';
+        if (!shown.length) {
+          list.innerHTML = '<div style="padding:1.5rem 1rem;color:rgba(234,255,243,.5);text-align:center;font-size:.9rem">No vegan places in view yet. Try zooming out or moving the map.</div>';
+          return;
+        }
+        list.innerHTML = shown.map(function (p) {
+          var t = p.tags || {};
+          var badge = t['diet:vegan'] === 'only'
+            ? '<span style="color:#34d399;font-size:.72rem;font-weight:600">100% vegan</span>'
+            : '<span style="color:#a3e635;font-size:.72rem;font-weight:600">vegan options</span>';
+          return '<div class="vm-card" data-id="' + p.id + '" style="padding:0.7rem 0.8rem;border:1px solid rgba(52,211,153,.14);border-radius:12px;margin-bottom:0.5rem">' +
+            '<div style="font-weight:600;font-size:0.92rem;margin-bottom:2px">' + esc(t.name || 'Vegan spot') + '</div>' +
+            '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center">' + badge +
+            '<span style="color:rgba(234,255,243,.45);font-size:.74rem">' + esc((t.cuisine || '').split(';')[0]) + '</span></div>' +
+            '</div>';
+        }).join('');
+        Array.prototype.forEach.call(list.querySelectorAll('.vm-card'), function (el) {
+          el.addEventListener('click', function () {
+            var id = el.getAttribute('data-id');
+            var m = markers[id];
+            if (m) { map.flyTo(m.getLatLng(), Math.max(map.getZoom(), 16)); m.openPopup(); }
+          });
+        });
+      }
+
+      function renderMarkers() {
+        layer.clearLayers();
+        markers = {};
+        places.forEach(function (p) {
+          var m = L.marker([p.lat, p.lon], { icon: leafIcon }).bindPopup(popupHtml(p));
+          markers[p.id] = m;
+          layer.addLayer(m);
+        });
+      }
+
+      function load() {
+        var b = map.getBounds();
+        var bbox = b.getSouth().toFixed(4) + ',' + b.getWest().toFixed(4) + ',' + b.getNorth().toFixed(4) + ',' + b.getEast().toFixed(4);
+        var filter = strictVegan ? '"diet:vegan"="only"' : '"diet:vegan"~"yes|only"';
+        var key = filter + '|' + bbox;
+        if (key === lastQueryKey) return;
+        lastQueryKey = key;
+        var query = '[out:json][timeout:25];(nwr[' + filter + '](' + bbox + '););out center tags 200;';
+        setStatus('<span class="spin"></span> Loading…');
+        fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(query) })
+          .then(function (r) { if (!r.ok) throw new Error('Overpass ' + r.status); return r.json(); })
+          .then(function (data) {
+            var seen = {};
+            places = (data.elements || []).map(function (e) {
+              var lat = e.lat != null ? e.lat : (e.center && e.center.lat);
+              var lon = e.lon != null ? e.lon : (e.center && e.center.lon);
+              if (lat == null || lon == null) return null;
+              return { id: e.type + '/' + e.id, lat: lat, lon: lon, tags: e.tags || {} };
+            }).filter(function (p) {
+              if (!p || !(p.tags && p.tags.name)) return false;
+              if (seen[p.id]) return false; seen[p.id] = 1; return true;
+            });
+            renderMarkers();
+            renderList();
+            setStatus(places.length ? 'Showing ' + places.length + ' places' : 'No results here');
+          })
+          .catch(function (err) {
+            setStatus('<span style="color:#fb7185">Couldn\'t load — retry shortly</span>');
+            console.error(err);
+          });
+      }
+
+      function scheduleLoad() {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(load, 600);
+      }
+
+      map.on('moveend', scheduleLoad);
+      document.getElementById('vm-search').addEventListener('input', renderList);
+
+      document.getElementById('vm-strict').addEventListener('click', function () {
+        strictVegan = !strictVegan;
+        this.querySelector('span').textContent = strictVegan ? '🥗 Fully vegan' : '🌿 Vegan options';
+        this.style.background = strictVegan ? 'rgba(52,211,153,0.14)' : 'rgba(163,230,53,0.12)';
+        lastQueryKey = '';
+        load();
+      });
+
+      document.getElementById('vm-near').addEventListener('click', function () {
+        if (!navigator.geolocation) { setStatus('Geolocation unavailable'); return; }
+        setStatus('<span class="spin"></span> Locating…');
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+        }, function () { setStatus('Location denied — showing Berlin'); });
+      });
+
+      load();
+    })();
+  }
+}
