@@ -46,3 +46,19 @@ describe('v0.54: logout action', () => {
     assert.ok(html.includes("window.location.href='/login'"), 'should honor the path');
   });
 });
+
+describe('v0.54: handler logical operators compile to valid JS', () => {
+  it('set x = not y emits ! (not the literal word "not")', () => {
+    const { html } = compile(`page / {\n  state on = true\n  button "T" on:click { set on = not on }\n}`);
+    const m = html.match(/onclick="([^"]*state\.on[^"]*)"/);
+    assert.ok(m, 'toggle onclick should exist');
+    assert.ok(!/\bnot\b/.test(m[1]), 'must not emit the literal word not');
+    assert.doesNotThrow(() => new Function('__nyx', m[1]), 'must be valid JS');
+  });
+
+  it('and / or compile to && / ||', () => {
+    const { html } = compile(`page / {\n  state a = true\n  state b = false\n  button "T" on:click { set a = a and b }\n}`);
+    const m = html.match(/onclick="([^"]*state\.a =[^"]*)"/);
+    assert.ok(m && m[1].includes('&&'), 'and should become &&');
+  });
+});

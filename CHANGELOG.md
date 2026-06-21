@@ -11,6 +11,12 @@ it looked broken. Fixed end-to-end:
   single-page app never reflected logged-in state. Now injected in both.
 - **Native `logout` action** — `on:click { logout }` clears the JWT and redirects
   (optionally `logout "/path"`).
+- **Logical operators in handler expressions.** `set x = not y`, `a and b`, `a or b`
+  used to emit the literal words `not`/`and`/`or` → invalid JS → the handler silently
+  did nothing (this is why the VeganMaps "fully vegan" toggle never flipped). They
+  now compile to `!`/`&&`/`||`.
+- VeganMaps: the toggle now flips fully-vegan ↔ vegan-options (with a reactive
+  label), and a **"My favorites"** list (logged-in only) makes saving spots useful.
 - `examples/vegan-maps.nyx` header now shows **Sign in ↔ Signed in / Sign out**,
   verified in a real headless-Chrome run (register → redirect → logged-in header →
   save favorite → logout). Live at vegan.heynyx.dev.

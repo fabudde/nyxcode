@@ -6529,6 +6529,14 @@ async function __nyx_sse(url, body, onChunk, onDone) {
         );
       }
     }
+    // Normalise NyxCode logical operators to JS so handler expressions like
+    // `set x = not y`, `a and b`, `a or b` produce valid JavaScript (they used to
+    // emit the literal words `not`/`and`/`or` → SyntaxError → the handler silently
+    // did nothing). Word-boundary only; runs before state resolution.
+    result = result
+      .replace(/\bnot\b/g, "!")
+      .replace(/\band\b/g, "&&")
+      .replace(/\bor\b/g, "||");
     for (const [name] of this.stateVars) {
       // Replace standalone occurrences (not inside other words)
       // v0.50 fix: Don't replace when preceded by '.' (property access like .value)
