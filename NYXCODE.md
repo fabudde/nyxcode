@@ -2896,6 +2896,38 @@ when items[0].price > 50 { ... }
 when items.includes("hello") { ... }
 ```
 
+### Nullish Coalescing `??` and Optional Chaining `?.` (v0.53)
+
+First-class operators, valid in **every** expression context (`when`, `computed`,
+`${…}`, ternary branches, `fn` bodies) — not just interpolation.
+
+```nyx
+p "Welcome ${user?.name ?? "guest"}"      // safe access + fallback
+computed price = product?.price ?? 0
+when user?.role == "admin" { nav "Admin" }
+```
+
+- `a ?? b` → `b` only when `a` is `null`/`undefined` (not for `0` or `""`).
+- `a?.b` → `undefined` instead of throwing when `a` is nullish.
+- Both compile straight to the matching JavaScript operators.
+
+### Full Operator Precedence (tightest → loosest)
+
+| Tier | Operators |
+| ---- | --------- |
+| 1 | member `.` / optional `?.`, index `[]`, call `()` |
+| 2 | unary `not` / `!` / `-` |
+| 3 | `*` `/` `%` |
+| 4 | `+` `-` |
+| 5 | comparisons `==` `!=` `<` `>` `<=` `>=` |
+| 6 | `and` |
+| 7 | `or` |
+| 8 | nullish `??` |
+| 9 | pipe `\|` |
+| 10 | ternary `? :` |
+
+Use parentheses to override; e.g. `(a ?? b) > 0`.
+
 ### Pipe Built-ins (30+)
 
 ```nyx

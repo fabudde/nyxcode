@@ -1,3 +1,46 @@
+## v0.53.0 — "Runnable & Reliable" (2026-06-21)
+
+The release that makes generated apps actually run and closes long-standing
+language inconsistencies.
+
+**New:**
+
+- **Generated backends are runnable out of the box.** `nyx build` now emits a
+  `package.json` (pinned deps + `npm start`) and a run-README next to `server.js`.
+  Previously the generated server `require()`d express/better-sqlite3/bcryptjs/
+  jsonwebtoken but never declared them, so it couldn't start without a hand-written
+  manifest. An existing `package.json` is merged non-destructively.
+- **Nullish coalescing `??` and optional chaining `?.` are now real operators** in
+  every expression context (`when`, `computed`, `${…}`, ternary, `fn`). They
+  previously only survived inside interpolation by raw passthrough and threw a parse
+  error elsewhere. See the new operator-precedence table in NYXCODE.md.
+
+**Engineering:**
+
+- **CI:** GitHub Actions runs typecheck + build + unit tests + a new end-to-end
+  runtime suite on Node 20/22/24.
+- **Real end-to-end tests:** the new `src/tests/e2e` suite compiles apps with the
+  real CLI, boots the generated server, and exercises it over HTTP (custom routes,
+  SQLite persistence, required-field validation, static frontend, auth
+  register/login/JWT, protected routes). `npm run test:all` runs everything.
+
+**Fixed:**
+
+- `engines` corrected to `>=20` — better-sqlite3 ^12 never supported Node 18, so the
+  advertised `>=18` was wrong for any full-stack build.
+- Removed a stale over-broad test assertion that matched injected default CSS.
+
+---
+
+## v0.52.0–v0.52.2 — "Store System v2" (2026-05-03)
+
+- Store System v2: `methods`, `persist`, `$reset()`, `$patch()`, v2 event binding,
+  and legacy-action compatibility.
+- DB-safe fixes: auto-serialize objects/arrays for SQLite `.run()`/`.get()` via an
+  injected `__dbSafe` helper; `$patch` arrow, complex values, and keyword fields.
+
+---
+
 ## v0.51.1 — Patch (2026-05-02)
 
 **Fixed:**
