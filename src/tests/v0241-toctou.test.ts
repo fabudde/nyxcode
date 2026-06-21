@@ -2,6 +2,8 @@ import { test, describe } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { mkdirSync, writeFileSync, rmSync, symlinkSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
 /**
  * v0.24.1 — TOCTOU hardening for the CLI import resolver (Issue #92)
@@ -32,7 +34,9 @@ import { execSync } from 'node:child_process';
  *   - The canonical (realpath) bookkeeping prevents double-import via two paths.
  */
 
-const CLI = '/root/.openclaw/workspace/nyxcode/dist/cli.js';
+// Resolve the CLI relative to this compiled test file (dist/tests -> dist/cli.js)
+// so the suite is portable across checkouts / CI runners — never a hardcoded path.
+const CLI = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'cli.js');
 const TMP = '/tmp/nyxcode-toctou-test';
 const OUTSIDE = '/tmp/nyxcode-toctou-outside';
 
