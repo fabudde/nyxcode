@@ -330,3 +330,85 @@ table posts {
     assert.ok(r.json.some((p: any) => p.author?.name === 'Ada'));
   });
 });
+
+describe('e2e: validation, full CRUD lifecycle, search & pagination', () => {
+  const port = freePort() + 3;
+  let server: ChildProcess | undefined;
+
+  before(async () => {
+    const outDir = buildApp(
+      'validated',
+      `table users {
+  email text required unique format=email
+  name text required min=2 max=20
+  age number
+}`,
+    );
+    server = await startServer(outDir, port);
+  });
+
+  after(async () => {
+    await stopServer(server);
+  });
+
+  it('rejects an invalid email (format=email)', async () => {
+    const r = await request(port, 'POST', '/api/users', { email: 'notanemail', name: 'Bob' });
+    assert.equal(r.status, 400);
+  });
+
+  it('rejects a too-short name (min=2)', async () => {
+    const r = await request(port, 'POST', '/api/users', { email: 'a@b.com', name: 'X' });
+    assert.equal(r.status, 400);
+  });
+
+  it('accepts a valid user (201)', async () => {
+    const r = await request(port, 'POST', '/api/users', { email: 'a@b.com', name: 'Alice', age: 30 });
+    assert.equal(r.status, 201);
+    assert.equal(r.json?.name, 'Alice');
+  });
+
+  it('enforces UNIQUE (duplicate email rejected, not a 500)', async () => {
+    const r = await request(port, 'POST', '/api/users', { email: 'a@b.com', name: 'Alice2' });
+    assert.ok(r.status >= 400 && r.status < 500, `dup should be 4xx, got ${r.status}`);
+  });
+
+  it('updates a row (PUT) and reflects it on read', async () => {
+    await request(port, 'POST', '/api/users', { email: 'c@d.com', name: 'Carol', age: 25 });
+    // Carol is some id; find her.
+    const list = await request(port, 'GET', '/api/users');
+    const carol = list.json.find((u: any) => u.email === 'c@d.com');
+    assert.ok(carol, 'Carol should exist');
+    const upd = await request(port, 'PUT', `/api/users/${carol.id}`, {
+      email: 'c@d.com',
+      name: 'Caroline',
+      age: 26,
+    });
+    assert.ok(upd.status >= 200 && upd.status < 300, `update failed: ${upd.body}`);
+    const after = await request(port, 'GET', `/api/users/${carol.id}`);
+    assert.equal(after.json?.name, 'Caroline');
+    assert.equal(after.json?.age, 26);
+  });
+
+  it('deletes a row (DELETE) and it disappears from the list', async () => {
+    const created = await request(port, 'POST', '/api/users', { email: 'gone@x.com', name: 'Ghost' });
+    const id = created.json.id;
+    const del = await request(port, 'DELETE', `/api/users/${id}`);
+    assert.ok(del.status >= 200 && del.status < 300);
+    const after = await request(port, 'GET', `/api/users/${id}`);
+    assert.equal(after.status, 404, 'deleted row should 404');
+  });
+
+  it('search matches by partial text', async () => {
+    const r = await request(port, 'GET', '/api/users?search=Alice');
+    assert.equal(r.status, 200);
+    assert.ok(r.json.some((u: any) => u.name === 'Alice'));
+  });
+
+  it('pagination returns data + correct metadata', async () => {
+    const r = await request(port, 'GET', '/api/users?page=1&limit=1');
+    assert.equal(r.status, 200);
+    assert.equal(r.json?.data?.length, 1);
+    assert.ok(r.json?.pagination?.total >= 2, 'total should count all rows');
+    assert.equal(r.json?.pagination?.limit, 1);
+  });
+});
