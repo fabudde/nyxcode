@@ -26,6 +26,11 @@ language inconsistencies.
 
 **Fixed:**
 
+- **Relations now resolve in list endpoints.** `GET /api/<table>` (and its paginated
+  form) returned `null` for related objects because the list query used `SELECT *`
+  while the nested-object mapper needed the joined columns. The list now uses the
+  join-aware SELECT; WHERE/search columns are table-qualified to avoid ambiguity.
+  GET-one and POST responses were already correct.
 - `engines` corrected to `>=20` — better-sqlite3 ^12 never supported Node 18, so the
   advertised `>=18` was wrong for any full-stack build.
 - Removed a stale over-broad test assertion that matched injected default CSS.

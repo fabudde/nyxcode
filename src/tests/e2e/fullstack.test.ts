@@ -274,3 +274,59 @@ table notes {
     assert.ok(r.status >= 400, 'wrong password should fail');
   });
 });
+
+describe('e2e: relations resolve to nested objects in every read path', () => {
+  const port = freePort() + 2;
+  let server: ChildProcess | undefined;
+
+  before(async () => {
+    const outDir = buildApp(
+      'relations',
+      `table authors {
+  name text required
+}
+
+table posts {
+  title text required
+  author [authors]
+}`,
+    );
+    server = await startServer(outDir, port);
+    // Seed: one author, one post referencing it.
+    await request(port, 'POST', '/api/authors', { name: 'Ada' });
+    await request(port, 'POST', '/api/posts', { title: 'Hello', author: 1 });
+  });
+
+  after(async () => {
+    await stopServer(server);
+  });
+
+  it('GET one nests the related author object', async () => {
+    const r = await request(port, 'GET', '/api/posts/1');
+    assert.equal(r.status, 200);
+    assert.equal(r.json?.author?.id, 1);
+    assert.equal(r.json?.author?.name, 'Ada');
+  });
+
+  it('GET list nests the related author object (the list-JOIN fix)', async () => {
+    const r = await request(port, 'GET', '/api/posts');
+    assert.equal(r.status, 200);
+    assert.ok(Array.isArray(r.json));
+    const post = r.json.find((p: any) => p.id === 1);
+    assert.ok(post, 'seeded post should be present');
+    assert.equal(post.author?.name, 'Ada', 'list must resolve the relation, not return null');
+  });
+
+  it('paginated list also nests the relation', async () => {
+    const r = await request(port, 'GET', '/api/posts?page=1&limit=10');
+    assert.equal(r.status, 200);
+    assert.ok(Array.isArray(r.json?.data));
+    assert.equal(r.json.data[0]?.author?.name, 'Ada');
+  });
+
+  it('filtering by the relation column works (no ambiguous-column error)', async () => {
+    const r = await request(port, 'GET', '/api/posts?author=1');
+    assert.equal(r.status, 200, `filter should not 500: ${r.body}`);
+    assert.ok(r.json.some((p: any) => p.author?.name === 'Ada'));
+  });
+});

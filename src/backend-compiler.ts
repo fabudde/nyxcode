@@ -85,6 +85,7 @@ function buildJoinCode(table: TableNode, allTables: TableNode[]): {
   mapperFn: string;
   getAllExpr: string;
   getOneExpr: string;
+  selectSQL: string;
 } | null {
   const relations = getRelations(table);
   if (!relations.length) return null;
@@ -132,6 +133,7 @@ ${mapperLines.join('\n')}
     mapperFn,
     getAllExpr: `db.prepare('${selectSQL}').all().map(mapRow_${n})`,
     getOneExpr: `db.prepare('${selectSQL} WHERE ${n}.id = ?').get(req.params.id)`,
+    selectSQL,
   };
 }
 
@@ -232,6 +234,13 @@ function crudForTable(table: TableNode, allTables: TableNode[], onEvents: any[] 
   
   let mapperBlock = '';
   let mapperSuffix = stripPassword;
+  // List-endpoint SELECT: a join-aware SELECT when the table has relations (so the
+  // nested-object mapper has its __<col>_id columns), else a plain SELECT *.
+  let listSelectSQL = `SELECT * FROM ${n}`;
+  // Qualify WHERE/search columns with the table name when joining, to avoid
+  // "ambiguous column name" on columns that also exist in the joined table (e.g. id).
+  // Empty for non-relation tables so their generated SQL stays byte-identical.
+  let colQualify = '';
   let getOneExpr = `db.prepare('SELECT * FROM ${n} WHERE id = ?').get(req.params.id)`;
   let getOneResponse = `
   if (row.password) { const { password: _, ...safe } = row; return res.json(safe); }
@@ -246,6 +255,8 @@ function crudForTable(table: TableNode, allTables: TableNode[], onEvents: any[] 
   if (joinCode) {
     mapperBlock = '\n' + joinCode.mapperFn;
     mapperSuffix = `.map(mapRow_${n})`;
+    listSelectSQL = joinCode.selectSQL;
+    colQualify = `'${n}.' + `;
     getOneExpr = joinCode.getOneExpr;
     getOneResponse = `\n  res.json(mapRow_${n}(row));`;
     postResponse = `const created = ${joinCode.getOneExpr.replace('req.params.id', 'info.lastInsertRowid')};
@@ -286,12 +297,12 @@ app.get('/api/${n}', (req, res) => {
   for (const [key, value] of Object.entries(req.query)) {
     if (key === 'page' || key === 'limit' || key === 'search') continue;
     if (validColumns.has(key)) {
-      filters.push(key + ' = ?');
+      filters.push(${colQualify}key + ' = ?');
       params.push(value);
     }
   }
   if (req.query.search && textColumns.length > 0) {
-    filters.push('(' + textColumns.map(c => c + ' LIKE ?').join(' OR ') + ')');
+    filters.push('(' + textColumns.map(c => ${colQualify}c + ' LIKE ?').join(' OR ') + ')');
     textColumns.forEach(() => params.push('%' + req.query.search + '%'));
   }
   const where = filters.length > 0 ? ' WHERE ' + filters.join(' AND ') : '';
@@ -302,12 +313,12 @@ app.get('/api/${n}', (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
     const total = db.prepare('SELECT COUNT(*) as count FROM ${n}' + where).get(...params).count;
-    const rows = db.prepare('SELECT * FROM ${n}' + where + ' LIMIT ? OFFSET ?').all(...params, limit, offset)${mapperSuffix};
+    const rows = db.prepare('${listSelectSQL}' + where + ' LIMIT ? OFFSET ?').all(...params, limit, offset)${mapperSuffix};
     return res.json({ data: rows, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
   }
 
   // ── Default: return plain array (backwards-compatible) ──
-  const rows = db.prepare('SELECT * FROM ${n}' + where).all(...params)${mapperSuffix};
+  const rows = db.prepare('${listSelectSQL}' + where).all(...params)${mapperSuffix};
   res.json(rows);
 });
 
