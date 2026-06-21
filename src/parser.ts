@@ -88,6 +88,8 @@ import {
 
 /** Set of tags that are recognized as built-in elements */
 const ELEMENT_TAGS = new Set([
+  "map",
+  "marker",
   "h1",
   "h2",
   "h3",
@@ -3109,8 +3111,17 @@ export class Parser {
     const statements: Statement[] = [];
 
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      // Progress guard: parseStatement() must consume at least one token. If it
+      // doesn't (malformed input the grammar can't advance past), this loop would
+      // spin forever — fail with a clean parse error instead of hanging the compiler.
+      const before = this.pos;
       const stmt = this.parseStatement();
       if (stmt) statements.push(stmt);
+      if (this.pos === before) {
+        throw this.error(
+          `Unexpected token '${this.peek().value}' (parser made no progress — check the surrounding syntax)`,
+        );
+      }
     }
 
     return statements;
@@ -4684,7 +4695,12 @@ export class Parser {
         this.consume(TokenType.Arrow);
         const actionKind = this.advance().value as FormAction["kind"];
         let actionValue: string | undefined;
-        if (actionKind === "redirect" || actionKind === "toast") {
+        if (
+          actionKind === "redirect" ||
+          actionKind === "toast" ||
+          actionKind === "navigate" ||
+          actionKind === "go"
+        ) {
           actionValue = this.check(TokenType.String)
             ? this.consume(TokenType.String).value
             : this.consumeIdentifier();
@@ -6310,7 +6326,18 @@ export class Parser {
     }
 
     // Parse content and attributes
+    // Progress guard: if an iteration consumes no tokens, malformed input would spin
+    // this loop forever. Detect a stuck position and fail with a clean parse error
+    // instead of hanging the compiler. (e.g. `on:click -> fetch POST /url { ... }` —
+    // the arrow form doesn't take a method+url; use the block form `on:click { ... }`.)
+    let __elemLoopPrevPos = -1;
     while (!this.isAtEnd() && !this.check(TokenType.RightBrace)) {
+      if (this.pos === __elemLoopPrevPos) {
+        throw this.error(
+          `Unexpected token '${this.peek().value}' in element body (no progress — check the surrounding syntax, e.g. event handlers use the block form \`on:click { ... }\`)`,
+        );
+      }
+      __elemLoopPrevPos = this.pos;
       // Check if next is a new statement — but key=value is an attribute, NOT a new statement
       if (this.isStatementStart()) {
         if (this.peekAt(1)?.type === TokenType.Equals) {
@@ -6838,7 +6865,7 @@ export class Parser {
 
   /** Pipe: expr | builtin args */
   private parsePipe(): Expression {
-    let expr = this.parseOr();
+    let expr = this.parseNullish();
     while (this.check(TokenType.Pipe)) {
       this.advance();
       const builtin = this.consumeIdentifier();
@@ -6885,6 +6912,24 @@ export class Parser {
       };
     }
     return expr;
+  }
+
+  /** Nullish coalescing: expr ?? expr (looser than `or`/`and`, like JS). */
+  private parseNullish(): Expression {
+    let left = this.parseOr();
+    while (this.check(TokenType.QuestionQuestion)) {
+      this.advance();
+      const right = this.parseOr();
+      left = {
+        type: "BinaryExpression",
+        left,
+        operator: "??",
+        right,
+        line: left.line,
+        col: left.col,
+      };
+    }
+    return left;
   }
 
   /** Or: expr or expr */
@@ -7034,7 +7079,8 @@ export class Parser {
   private parsePostfix(): Expression {
     let expr = this.parsePrimary();
     while (true) {
-      if (this.check(TokenType.Dot)) {
+      if (this.check(TokenType.Dot) || this.check(TokenType.QuestionDot)) {
+        const optional = this.check(TokenType.QuestionDot);
         this.advance();
         const prop = this.consumeIdentifier();
         // Check for method call: obj.method(args)
@@ -7050,6 +7096,7 @@ export class Parser {
             type: "MemberExpression",
             object: expr,
             property: prop,
+            optional,
             line: expr.line,
             col: expr.col,
           };
@@ -7065,6 +7112,7 @@ export class Parser {
             type: "MemberExpression",
             object: expr,
             property: prop,
+            optional,
             line: expr.line,
             col: expr.col,
           };

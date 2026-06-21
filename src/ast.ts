@@ -292,7 +292,7 @@ export interface FormStatement extends BaseNode {
 }
 
 export interface FormAction {
-  kind: 'reload' | 'redirect' | 'clear' | 'toast';
+  kind: 'reload' | 'redirect' | 'navigate' | 'go' | 'clear' | 'toast';
   value?: string; // redirect path or toast message
 }
 
@@ -455,6 +455,8 @@ export interface MemberExpression extends BaseNode {
   type: 'MemberExpression';
   object: Expression;
   property: string;
+  /** true for optional chaining: `obj?.property` (emits `?.` instead of `.`) */
+  optional?: boolean;
 }
 
 /** obj[expr] — bracket access */

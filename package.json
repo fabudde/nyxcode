@@ -1,6 +1,6 @@
 {
   "name": "@fabudde/nyxcode",
-  "version": "0.52.2",
+  "version": "0.54.0",
   "description": "NyxCode — The AI-native programming language. One .nyx file = full-stack app. 3.5x fewer tokens than Next.js.",
   "type": "module",
   "main": "dist/index.js",
@@ -19,7 +19,10 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "parse": "node dist/cli.js",
-    "test": "node --test 'dist/tests/*.test.js'",
+    "test": "node --test dist/tests/*.test.js",
+    "test:e2e": "node --test --test-timeout=120000 dist/tests/e2e/*.test.js",
+    "test:all": "npm run build && npm test && npm run test:e2e",
+    "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -46,10 +49,14 @@
   "author": "Fabian Budde & Nyx",
   "license": "MIT",
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.4.1",
+    "jsonwebtoken": "^9.0.2",
     "typescript": "^5.9.3"
   },
   "dependencies": {

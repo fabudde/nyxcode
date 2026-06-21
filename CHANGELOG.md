@@ -1,3 +1,78 @@
+## v0.54.0 — "Native Maps, Zero Hacks" (2026-06-21)
+
+Make whole classes of interactive apps buildable in 100% NyxCode — no `script {}`
+escape hatch, no raw HTML/JS.
+
+**New:**
+
+- **Native `map` / `marker` element.** A first-class interactive map (Leaflet,
+  auto-injected) with a live OpenStreetMap **Overpass** data source (debounced
+  refetch on pan/zoom), reactive `strict`/`search` filters, results published to a
+  `bind` state for native `each` lists, and marker popups written in plain NyxCode.
+- **`locate` action.** `on:click -> locate` geolocates the user and recenters the
+  native map (no raw JS).
+- Proof: `examples/vegan-maps.nyx` is a complete full-stack app — user accounts
+  (`security`), a favorites table, and the live map — written entirely in NyxCode
+  with **zero** `script {}` blocks.
+
+**Fixed:**
+
+- **Parser no-progress guard.** Malformed input (e.g. the arrow handler form
+  `on:click -> fetch POST /url { … }` inside a `when/else`) used to spin the parser
+  in an infinite loop. It now fails fast with a clean parse error. Use the block
+  form `on:click { fetch POST "/url" { … } }` for multi-token handlers.
+- The validator now recognises the `map`/`marker` tags (no false "unknown tag").
+
+---
+
+## v0.53.0 — "Runnable & Reliable" (2026-06-21)
+
+The release that makes generated apps actually run and closes long-standing
+language inconsistencies.
+
+**New:**
+
+- **Generated backends are runnable out of the box.** `nyx build` now emits a
+  `package.json` (pinned deps + `npm start`) and a run-README next to `server.js`.
+  Previously the generated server `require()`d express/better-sqlite3/bcryptjs/
+  jsonwebtoken but never declared them, so it couldn't start without a hand-written
+  manifest. An existing `package.json` is merged non-destructively.
+- **Nullish coalescing `??` and optional chaining `?.` are now real operators** in
+  every expression context (`when`, `computed`, `${…}`, ternary, `fn`). They
+  previously only survived inside interpolation by raw passthrough and threw a parse
+  error elsewhere. See the new operator-precedence table in NYXCODE.md.
+
+**Engineering:**
+
+- **CI:** GitHub Actions runs typecheck + build + unit tests + a new end-to-end
+  runtime suite on Node 20/22/24.
+- **Real end-to-end tests:** the new `src/tests/e2e` suite compiles apps with the
+  real CLI, boots the generated server, and exercises it over HTTP (custom routes,
+  SQLite persistence, required-field validation, static frontend, auth
+  register/login/JWT, protected routes). `npm run test:all` runs everything.
+
+**Fixed:**
+
+- **Relations now resolve in list endpoints.** `GET /api/<table>` (and its paginated
+  form) returned `null` for related objects because the list query used `SELECT *`
+  while the nested-object mapper needed the joined columns. The list now uses the
+  join-aware SELECT; WHERE/search columns are table-qualified to avoid ambiguity.
+  GET-one and POST responses were already correct.
+- `engines` corrected to `>=20` — better-sqlite3 ^12 never supported Node 18, so the
+  advertised `>=18` was wrong for any full-stack build.
+- Removed a stale over-broad test assertion that matched injected default CSS.
+
+---
+
+## v0.52.0–v0.52.2 — "Store System v2" (2026-05-03)
+
+- Store System v2: `methods`, `persist`, `$reset()`, `$patch()`, v2 event binding,
+  and legacy-action compatibility.
+- DB-safe fixes: auto-serialize objects/arrays for SQLite `.run()`/`.get()` via an
+  injected `__dbSafe` helper; `$patch` arrow, complex values, and keyword fields.
+
+---
+
 ## v0.51.1 — Patch (2026-05-02)
 
 **Fixed:**

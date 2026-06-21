@@ -106,6 +106,8 @@ export enum TokenType {
   Bang = 'Bang',                 // !
   Dollar = 'Dollar',             // $
   Question = 'Question',         // ?
+  QuestionQuestion = 'QuestionQuestion', // ?? (nullish coalescing)
+  QuestionDot = 'QuestionDot',   // ?. (optional chaining)
   DotDot = 'DotDot',            // ..
   Slash = 'Slash',              // /
   Colon = 'Colon',              // :

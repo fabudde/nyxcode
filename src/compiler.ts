@@ -166,6 +166,7 @@ export class Compiler {
   private components: Map<string, ComponentNode> = new Map();
   private importResolver?: (path: string) => Program | null;
   private headInjections: string[] = [];
+  private mapAssetsInjected = false; // v0.54: inject Leaflet CSS/JS once on first <map>
   private globalHeadInjections: string[] = []; // From top-level `meta {}` or `head "..."` blocks — shared across all pages
   private themeVars: Map<string, string> = new Map();
   private themeDefaultElements: Set<string> = new Set();
@@ -1117,6 +1118,9 @@ export class Compiler {
         attributes: [...el.attributes, { name: "type", value: "submit" }],
       };
     }
+
+    // ===== v0.54: Native interactive map (Leaflet, zero raw JS) =====
+    if (el.tag === 'map') return this.compileMap(el);
 
     // ===== #200: Multi-Step Wizard =====
     if (el.tag === 'wizard') return this.compileWizard(el);
@@ -2606,6 +2610,153 @@ export class Compiler {
     return `${this.ind()}<div id="${id}" class="nyx-wizard">${progressHtml}${stepsHtml}${navHtml}</div>\n`;
   }
 
+  // ===== v0.54: Native interactive map =====
+
+  /**
+   * `map` — a first-class interactive map. Emits Leaflet glue so apps never need a
+   * raw `script {}` escape hatch. Batteries included: tile layers, a live Overpass
+   * data source (debounced refetch on pan/zoom), reactive `strict`/`search` state
+   * bindings, result publishing to a `bind` state (for native lists), and a marker
+   * popup template written in plain NyxCode.
+   *
+   *   map center="52.52,13.405" zoom="14" source="overpass" diet="vegan"
+   *       strict="onlyVegan" search="query" bind="places" tiles="dark" locate="true" {
+   *     marker icon="🌱" { h3 "${name}"  p "${cuisine}" }
+   *   }
+   */
+  private compileMap(el: ElementNode): string {
+    if (!this.mapAssetsInjected) {
+      this.mapAssetsInjected = true;
+      this.headInjections.push(
+        `<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous">`,
+      );
+      this.headInjections.push(
+        `<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>`,
+      );
+    }
+    const attr = (n: string): string | undefined => {
+      const a = el.attributes.find((x) => x.name === n);
+      return a ? (typeof a.value === "string" ? a.value : undefined) : undefined;
+    };
+    const id = attr("id") || this.nextId("map");
+    const center = (attr("center") || "52.52,13.405").split(",").map((s) => s.trim());
+    const lat = parseFloat(center[0]) || 52.52;
+    const lng = parseFloat(center[1]) || 13.405;
+    const zoom = parseInt(attr("zoom") || "14", 10) || 14;
+    const diet = (attr("diet") || "vegan").replace(/[^a-z_:]/gi, "");
+    const tiles = (attr("tiles") || "dark").toLowerCase();
+    const tileUrl =
+      tiles === "osm"
+        ? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        : tiles === "light"
+          ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+    const bindState = attr("bind") || "";
+    const searchState = attr("search") || "";
+    const rawStrict = attr("strict");
+    // `strict="true"/"false"` = static; anything else = a reactive state var name.
+    const strictIsState = rawStrict != null && rawStrict !== "true" && rawStrict !== "false";
+    const strictState = strictIsState ? rawStrict : "";
+    const strictDefault = rawStrict === "false" ? "false" : "true";
+    const locate = attr("locate") === "true";
+
+    const markerEl = el.children.find((c) => (c as any).tag === "marker") as ElementNode | undefined;
+    const icon = (markerEl && (markerEl.attributes.find((a) => a.name === "icon")?.value as string)) || "📍";
+    const popupExpr = markerEl ? this.compileMarkerTemplate(markerEl) : "''";
+
+    // Container style: keep the user's style/class; guarantee a height so Leaflet renders.
+    const userStyle = attr("style") || "";
+    const userClass = attr("class") ? ` ${attr("class")}` : "";
+    const style = /height\s*:/.test(userStyle) ? userStyle : `height:100%;min-height:320px;${userStyle}`;
+
+    const sJSON = (s: string) => JSON.stringify(s);
+    const js =
+      `(function(){if(typeof L==='undefined')return;` +
+      `function __mEsc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}` +
+      `var map=L.map(${sJSON(id)}).setView([${lat},${lng}],${zoom});` +
+      `L.tileLayer(${sJSON(tileUrl)},{attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:19}).addTo(map);` +
+      `var layer=L.layerGroup().addTo(map);` +
+      `var icon=L.divIcon({className:'',html:'<div style="font-size:26px;line-height:26px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))">'+${sJSON(icon)}+'</div>',iconSize:[26,26],iconAnchor:[13,26],popupAnchor:[0,-24]});` +
+      `var all=[];` +
+      `function popup(p){return ${popupExpr};}` +
+      `function shownPlaces(){var q=${searchState ? `String((window.__nyx&&__nyx.state[${sJSON(searchState)}])||'').toLowerCase()` : `''`};` +
+      `return all.filter(function(p){return !q||(String(p.name||'').toLowerCase().indexOf(q)>=0);});}` +
+      `function render(){var list=shownPlaces();layer.clearLayers();list.forEach(function(p){L.marker([p.lat,p.lon],{icon:icon}).bindPopup(popup(p)).addTo(layer);});` +
+      (bindState
+        ? `if(window.__nyx&&__nyx.state){__nyx.state[${sJSON(bindState)}]=list;}`
+        : ``) +
+      `}` +
+      `function strictOn(){return ${strictState ? `!!(window.__nyx&&__nyx.state[${sJSON(strictState)}])` : strictDefault};}` +
+      `function normalize(els){var seen={};var out=[];(els||[]).forEach(function(e){var lat=e.lat!=null?e.lat:(e.center&&e.center.lat);var lon=e.lon!=null?e.lon:(e.center&&e.center.lon);if(lat==null||lon==null)return;var t=e.tags||{};if(!t.name)return;var k=e.type+'/'+e.id;if(seen[k])return;seen[k]=1;` +
+      `var addr=[];if(t['addr:street'])addr.push(t['addr:street']+(t['addr:housenumber']?' '+t['addr:housenumber']:''));if(t['addr:city'])addr.push(t['addr:city']);` +
+      `out.push({id:k,lat:lat,lon:lon,name:t.name,cuisine:(t.cuisine||'').replace(/;/g,', '),address:addr.join(', '),hours:t.opening_hours||'',website:t.website||t['contact:website']||'',phone:t.phone||t['contact:phone']||'',diet:t['diet:${diet}']==='only'?'100% ${diet}':'${diet} options'});});return out;}` +
+      `var lastKey='';var t;` +
+      `function load(){var b=map.getBounds();var bbox=b.getSouth().toFixed(4)+','+b.getWest().toFixed(4)+','+b.getNorth().toFixed(4)+','+b.getEast().toFixed(4);` +
+      `var filter=strictOn()?'"diet:${diet}"="only"':'"diet:${diet}"~"yes|only"';var key=filter+'|'+bbox;if(key===lastKey)return;lastKey=key;` +
+      `var query='[out:json][timeout:25];(nwr['+filter+']('+bbox+'););out center tags 200;';` +
+      (bindState ? `if(window.__nyx&&__nyx.state){__nyx.state[${sJSON(bindState + "__loading")}]=true;}` : ``) +
+      `fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(query)})` +
+      `.then(function(r){return r.json();}).then(function(d){all=normalize(d.elements);render();` +
+      (bindState ? `if(window.__nyx&&__nyx.state){__nyx.state[${sJSON(bindState + "__loading")}]=false;}` : ``) +
+      `}).catch(function(){` +
+      (bindState ? `if(window.__nyx&&__nyx.state){__nyx.state[${sJSON(bindState + "__loading")}]=false;__nyx.state[${sJSON(bindState + "__error")}]=true;}` : ``) +
+      `});}` +
+      `map.on('moveend',function(){clearTimeout(t);t=setTimeout(load,600);});` +
+      (searchState ? `if(window.__nyx&&__nyx.subscribe)__nyx.subscribe(${sJSON(searchState)},render);` : ``) +
+      (strictState ? `if(window.__nyx&&__nyx.subscribe)__nyx.subscribe(${sJSON(strictState)},function(){lastKey='';load();});` : ``) +
+      `window.__nyxMaps=window.__nyxMaps||{};window.__nyxMaps[${sJSON(id)}]=map;` +
+      (locate ? `if(navigator.geolocation)navigator.geolocation.getCurrentPosition(function(pos){map.setView([pos.coords.latitude,pos.coords.longitude],15);});` : ``) +
+      `load();})();`;
+    this.scripts.push(js);
+
+    return `${this.ind()}<div id="${id}" class="nyx-map${userClass}" style="${style}"></div>\n`;
+  }
+
+  /** Compile a `marker { … }` popup body into a JS string expression over a place `p`. */
+  private compileMarkerTemplate(markerEl: ElementNode): string {
+    const interp = (raw: string): string => {
+      const parts: string[] = [];
+      let last = 0;
+      const re = /\$\{([^}]+)\}/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(raw))) {
+        if (m.index > last) parts.push(JSON.stringify(raw.slice(last, m.index)));
+        const field = m[1].trim().replace(/^p\./, "");
+        parts.push(`__mEsc(p[${JSON.stringify(field)}])`);
+        last = m.index + m[0].length;
+      }
+      if (last < raw.length) parts.push(JSON.stringify(raw.slice(last)));
+      return parts.length ? parts.join("+") : "''";
+    };
+    const MARKER_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "div", "a", "strong", "b", "em", "i", "small", "img", "br", "section"]);
+    const emit = (node: any): string => {
+      if (node.type !== "Element") return "''";
+      const tag = MARKER_TAGS.has(node.tag) ? node.tag : "span";
+      const attrPieces: string[] = [];
+      for (const a of node.attributes || []) {
+        if (typeof a.value !== "string") continue;
+        if (a.name === "icon") continue;
+        attrPieces.push(`' ${a.name}="'+(${interp(a.value)})+'"'`);
+      }
+      const attrExpr = attrPieces.length ? attrPieces.join("+") : "''";
+      const contentVal =
+        node.content && typeof node.content === "object" && "value" in node.content
+          ? (node.content.value as string)
+          : typeof node.content === "string"
+            ? node.content
+            : "";
+      const contentExpr = contentVal ? interp(contentVal) : "''";
+      const childExpr =
+        (node.children || []).filter((c: any) => c.type === "Element").map((c: any) => emit(c)).join("+") || "''";
+      if (tag === "br" || tag === "img") {
+        return `'<${tag}'+${attrExpr}+'/>'`;
+      }
+      return `'<${tag}'+${attrExpr}+'>'+${contentExpr}+${childExpr}+'</${tag}>'`;
+    };
+    const body = (markerEl.children || []).filter((c: any) => c.type === "Element").map((c: any) => emit(c)).join("+");
+    return body || "''";
+  }
+
   // ===== #201: Rich Input Components =====
 
   /** rating max=5 value=".score" → Interactive star rating */
@@ -2770,7 +2921,7 @@ export class Compiler {
         return `(${expr.operator}${this.eachConditionToJS(expr.operand, varName)})`;
       case 'MemberExpression': {
         const obj = this.eachConditionToJS(expr.object, varName);
-        return `${obj}.${expr.property}`;
+        return `${obj}${expr.optional ? '?.' : '.'}${expr.property}`;
       }
       case 'Identifier':
         // If the identifier is the loop variable, use it directly
@@ -4137,6 +4288,8 @@ export class Compiler {
       case "reload":
         return "location.reload()";
       case "redirect":
+      case "navigate": // alias — same word used by event handlers, for consistency
+      case "go":
         return "location.href='" + (action.value || "/") + "'";
       case "clear":
         return "this.reset();msg.textContent='Done!';msg.style.color='#4ade80'";
@@ -6154,6 +6307,15 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       return `(function(){var u='${path.replace(/'/g, "\\'")}';if(/^javascript:/i.test(u))return;window.location.href=u})()`;
     }
 
+    // v0.54: locate [ "mapId" ] — geolocate the user and recenter a native <map>.
+    if (action === 'locate' || action.startsWith('locate ')) {
+      const rest = action.slice(6).trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+      const target = rest
+        ? `window.__nyxMaps&&window.__nyxMaps['${rest.replace(/'/g, "\\'")}']`
+        : `window.__nyxMaps&&Object.values(window.__nyxMaps)[0]`;
+      return `(function(){var m=${target};if(!m||!navigator.geolocation)return;navigator.geolocation.getCurrentPosition(function(pos){m.setView([pos.coords.latitude,pos.coords.longitude],15)})})()`;
+    }
+
     // call fnName(args)
     if (action.startsWith('call ')) {
       const fnCall = action.slice(5).trim();
@@ -6585,7 +6747,7 @@ async function __nyx_sse(url, body, onChunk, onDone) {
         // .dotRef → __nyx.state.xxx
         return `__nyx.state${expr.path}`;
       case 'MemberExpression':
-        return `${this.conditionToReactiveJS(expr.object)}.${expr.property}`;
+        return `${this.conditionToReactiveJS(expr.object)}${expr.optional ? '?.' : '.'}${expr.property}`;
       case 'IndexExpression':
         return `${this.conditionToReactiveJS(expr.object)}[${this.conditionToReactiveJS(expr.index)}]`;
       case 'BinaryExpression': {
@@ -6663,7 +6825,7 @@ async function __nyx_sse(url, body, onChunk, onDone) {
       case "PropertyAccess":
         return "data" + expr.path;
       case "MemberExpression":
-        return `${this.expressionToJS(expr.object)}.${expr.property}`;
+        return `${this.expressionToJS(expr.object)}${expr.optional ? '?.' : '.'}${expr.property}`;
       case "IndexExpression":
         return `${this.expressionToJS(expr.object)}[${this.expressionToJS(expr.index)}]`;
       case "CallExpression":

@@ -13,6 +13,7 @@ npm i -g @fabudde/nyxcode
 nyx build app.nyx              # → <input-dir>/dist-site/index.html
 nyx build app.nyx -o build.html  # single-file output
 nyx build app.nyx -o public/   # custom directory
+nyx check app.nyx              # Validate only — no output (exit 1 on error; --strict fails on warnings)
 nyx dev app.nyx                # Dev server + hot reload
 nyx parse app.nyx              # Debug AST output
 nyx flatten app.nyx > flat.nyx # Multi-file → single file
@@ -1844,6 +1845,57 @@ page / {
 
 Raw JavaScript captured at lexer level. Use sparingly — NyxCode native features preferred.
 
+## Native Map (v0.54)
+
+A first-class, interactive map — **no `script {}` escape hatch required**. The
+compiler emits all the Leaflet glue, a live data source, and reactive bindings.
+
+```nyx
+state places = []          # the map publishes its results here
+state query = ""           # native search box
+state onlyVegan = true     # native toggle
+
+input bind="query"
+button "Near me" on:click -> locate          # native geolocation
+button "Toggle" on:click -> set onlyVegan = not onlyVegan
+
+aside {
+  each places -> spot { div { h4 "${spot.name}" span "${spot.diet}" } }
+}
+
+map center="52.52,13.405" zoom="14" source="overpass" diet="vegan"
+    strict="onlyVegan" search="query" bind="places" tiles="dark" id="map" {
+  marker icon="🌱" {
+    h3 "${name}"
+    p "${cuisine}"
+    a "Directions" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
+  }
+}
+```
+
+**`map` attributes**
+
+| Attribute | Meaning |
+| --- | --- |
+| `center="lat,lng"` | initial center (default Berlin) |
+| `zoom="14"` | initial zoom |
+| `tiles="dark\|light\|osm"` | basemap style (default `dark`) |
+| `source="overpass"` | live data provider (OpenStreetMap Overpass) |
+| `diet="vegan"` | which `diet:*` tag to query |
+| `strict="stateVar"` or `"true"/"false"` | only-vegan vs vegan-options (reactive if a state var) |
+| `search="stateVar"` | reactively filter markers by name |
+| `bind="stateVar"` | publish the visible places to a state array (for native `each` lists) |
+| `id`, `style`, `class` | applied to the map container |
+
+**`marker` popup** — written in plain NyxCode. Each place exposes the fields
+`name`, `cuisine`, `address`, `hours`, `website`, `phone`, `lat`, `lon`, `diet`.
+Reference them with `${field}` in content or attributes.
+
+**`locate` action** — `on:click -> locate` geolocates the user and recenters the
+map (`locate "mapId"` targets a specific map).
+
+The map auto-injects the Leaflet CSS/JS once; debounced refetch happens on pan/zoom.
+
 ## Icons (v0.31.0)
 
 Native icon pack support. Declare once in theme, use everywhere.
@@ -2895,6 +2947,38 @@ when user.profile.name == "Nyx" { ... }
 when items[0].price > 50 { ... }
 when items.includes("hello") { ... }
 ```
+
+### Nullish Coalescing `??` and Optional Chaining `?.` (v0.53)
+
+First-class operators, valid in **every** expression context (`when`, `computed`,
+`${…}`, ternary branches, `fn` bodies) — not just interpolation.
+
+```nyx
+p "Welcome ${user?.name ?? "guest"}"      // safe access + fallback
+computed price = product?.price ?? 0
+when user?.role == "admin" { nav "Admin" }
+```
+
+- `a ?? b` → `b` only when `a` is `null`/`undefined` (not for `0` or `""`).
+- `a?.b` → `undefined` instead of throwing when `a` is nullish.
+- Both compile straight to the matching JavaScript operators.
+
+### Full Operator Precedence (tightest → loosest)
+
+| Tier | Operators |
+| ---- | --------- |
+| 1 | member `.` / optional `?.`, index `[]`, call `()` |
+| 2 | unary `not` / `!` / `-` |
+| 3 | `*` `/` `%` |
+| 4 | `+` `-` |
+| 5 | comparisons `==` `!=` `<` `>` `<=` `>=` |
+| 6 | `and` |
+| 7 | `or` |
+| 8 | nullish `??` |
+| 9 | pipe `\|` |
+| 10 | ternary `? :` |
+
+Use parentheses to override; e.g. `(a ?? b) > 0`.
 
 ### Pipe Built-ins (30+)
 

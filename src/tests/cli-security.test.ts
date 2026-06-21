@@ -2,13 +2,17 @@ import { test, describe } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
 // v0.23.1 — CLI-level security: allowlist for import paths (use "..." and theme extends "...")
 //
 // Recommended by @TytoTheOwl 🦉: denylist of (https?|ftp|file|//) missed future schemes
 // (javascript:, data:, ws:, wss:, ssh:, git:, s3:, gs:, etc.). Switched to an allowlist.
 
-const CLI = '/root/.openclaw/workspace/nyxcode/dist/cli.js';
+// Resolve the CLI relative to this compiled test file (dist/tests -> dist/cli.js)
+// so the suite is portable across checkouts / CI runners — never a hardcoded path.
+const CLI = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'cli.js');
 const TMP = '/tmp/nyxcode-sec-test';
 
 function setup() {

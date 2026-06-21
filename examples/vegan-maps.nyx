@@ -1,0 +1,135 @@
+# VeganMaps — a complete full-stack web app, written 100% in NyxCode.
+#
+# NO `script {}` escape hatch, no raw HTML/JS hacks. Every line is native NyxCode:
+#   - `security { }`  → user accounts (register/login) with JWT, fully native
+#   - `table { }`     → SQLite + auto CRUD API for saved favorites
+#   - `map { }`       → native interactive Leaflet map with a live Overpass vegan
+#                       data source, reactive search/strict filters, marker popups
+#   - native state / each / when / bind / on:click  → all UI interactivity
+#
+# Map data: OpenStreetMap + Overpass (live `diet:vegan` places, no API key).
+
+security {
+  table users
+  login email password
+  token jwt
+  protect /api/favorites write
+}
+
+table favorites {
+  user [users]
+  name text required
+  lat float
+  lon float
+}
+
+theme {
+  colors {
+    bg #0b1410
+    text #eafff3
+    primary #34d399
+    accent #a3e635
+    surface rgba(255, 255, 255, 0.04)
+    muted rgba(234, 255, 243, 0.55)
+    border rgba(52, 211, 153, 0.18)
+    danger #fb7185
+  }
+  fonts {
+    body "Inter", system-ui, sans-serif
+    heading "Inter", system-ui, sans-serif
+  }
+}
+
+page / {
+  head "<title>VeganMaps — 100% Vegan Restaurants</title>"
+  head "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+  head "<link rel='icon' href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌱</text></svg>'>"
+  head "<link rel='preconnect' href='https://fonts.googleapis.com'>"
+  head "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'>"
+  head "<style>*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%}body{background:#0b1410;color:#eafff3;font-family:'Inter',system-ui,sans-serif}.leaflet-popup-content-wrapper{background:#10231a;color:#eafff3;border-radius:14px;border:1px solid rgba(52,211,153,0.25)}.leaflet-popup-tip{background:#10231a}.leaflet-popup-content{margin:13px 15px;font-size:.9rem;line-height:1.5}.leaflet-container a.leaflet-popup-close-button{color:#9fe9c6}.vm-card:hover{background:rgba(52,211,153,0.08)}</style>"
+
+  state places = []
+  state query = ""
+  state onlyVegan = true
+
+  div style="display:flex;flex-direction:column;height:100vh;overflow:hidden" {
+
+    header style="display:flex;align-items:center;gap:1rem;padding:0.8rem 1.2rem;background:rgba(11,20,16,0.92);border-bottom:1px solid rgba(52,211,153,0.18);flex-wrap:wrap;z-index:1000" {
+      div style="display:flex;align-items:center;gap:0.5rem;font-weight:800;font-size:1.25rem" {
+        span "🌱"
+        span "Vegan" style="color:#eafff3"
+        span "Maps" style="color:#34d399;margin-left:-0.35rem"
+      }
+      input bind="query" placeholder="Filter visible places…" style="flex:1;min-width:200px;max-width:420px;padding:0.6rem 0.9rem;border-radius:10px;border:1px solid rgba(52,211,153,0.22);background:rgba(255,255,255,0.04);color:#eafff3;outline:none"
+      button "🥗 Fully vegan" on:click -> set onlyVegan = not onlyVegan style="padding:0.55rem 0.9rem;border-radius:10px;border:1px solid rgba(52,211,153,0.35);background:rgba(52,211,153,0.14);color:#eafff3;font-weight:600;cursor:pointer"
+      button "📍 Near me" on:click -> locate style="padding:0.55rem 0.9rem;border-radius:10px;border:1px solid rgba(163,230,53,0.4);background:rgba(163,230,53,0.12);color:#eafff3;font-weight:600;cursor:pointer"
+      a "Sign in" href="/login" style="padding:0.55rem 0.9rem;border-radius:10px;border:1px solid rgba(52,211,153,0.25);color:#9fe9c6;text-decoration:none;font-weight:600"
+    }
+
+    div style="display:flex;flex:1;min-height:0" {
+
+      aside style="width:340px;max-width:42vw;display:flex;flex-direction:column;border-right:1px solid rgba(52,211,153,0.15);background:rgba(7,14,11,0.6)" {
+        div style="padding:0.9rem 1.1rem;border-bottom:1px solid rgba(52,211,153,0.12);font-weight:700" {
+          span "Results "
+          span "${places | len}" style="color:#34d399"
+        }
+        div style="overflow-y:auto;flex:1;padding:0.6rem" {
+          when places | len > 0 {
+            each places -> spot {
+              div class="vm-card" style="padding:0.7rem 0.8rem;border:1px solid rgba(52,211,153,0.14);border-radius:12px;margin-bottom:0.5rem" {
+                div style="font-weight:600;margin-bottom:2px" { span "${spot.name}" }
+                div style="display:flex;justify-content:space-between;align-items:center;gap:8px" {
+                  span "${spot.diet}" style="color:#34d399;font-size:0.74rem;font-weight:600"
+                  button "♥ Save" on:click { fetch POST "/api/favorites" auth { name: spot.name, lat: spot.lat, lon: spot.lon } then toast success "Saved!" } style="background:none;border:1px solid rgba(163,230,53,0.4);color:#a3e635;border-radius:8px;padding:2px 8px;font-size:0.74rem;cursor:pointer"
+                }
+              }
+            }
+          }
+          else {
+            div "Move the map to discover vegan places." style="padding:1.4rem 1rem;color:rgba(234,255,243,0.5);text-align:center;font-size:0.9rem"
+          }
+        }
+      }
+
+      div style="flex:1;position:relative;min-width:0" {
+        map center="52.52,13.405" zoom="14" source="overpass" diet="vegan" strict="onlyVegan" search="query" bind="places" tiles="dark" id="map" style="height:100%" {
+          marker icon="🌱" {
+            h3 "${name}" style="font-weight:700;margin-bottom:3px"
+            p "${diet}" style="color:#34d399;font-size:0.74rem;font-weight:600"
+            p "${cuisine}" style="color:#9fe9c6;font-size:0.8rem"
+            p "${address}" style="color:rgba(234,255,243,0.6);font-size:0.78rem"
+            a "↗ Directions" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" style="color:#34d399;font-weight:600;font-size:0.82rem;text-decoration:none"
+          }
+        }
+      }
+    }
+  }
+}
+
+page /login {
+  head "<title>VeganMaps — Sign in</title>"
+  head "<style>body{background:#0b1410;color:#eafff3;font-family:'Inter',system-ui,sans-serif}</style>"
+
+  div style="max-width:380px;margin:8vh auto;padding:2rem;background:rgba(255,255,255,0.03);border:1px solid rgba(52,211,153,0.18);border-radius:18px" {
+    div style="font-weight:800;font-size:1.5rem;text-align:center;margin-bottom:0.5rem" {
+      span "🌱 Vegan" span "Maps" style="color:#34d399"
+    }
+    p "Sign in to save your favorite vegan spots." style="text-align:center;color:rgba(234,255,243,0.55);margin-bottom:1.5rem;font-size:0.9rem"
+
+    form /api/auth/login {
+      input email placeholder="Email" style="width:100%;padding:0.7rem 0.9rem;margin-bottom:0.8rem;border-radius:10px;border:1px solid rgba(52,211,153,0.22);background:rgba(255,255,255,0.04);color:#eafff3"
+      input password placeholder="Password" style="width:100%;padding:0.7rem 0.9rem;margin-bottom:1rem;border-radius:10px;border:1px solid rgba(52,211,153,0.22);background:rgba(255,255,255,0.04);color:#eafff3"
+      submit "Sign in" style="width:100%;padding:0.75rem;border:none;border-radius:10px;background:#34d399;color:#07140b;font-weight:700;cursor:pointer"
+      success -> navigate "/"
+    }
+
+    p "New here? Create an account below." style="text-align:center;color:rgba(234,255,243,0.45);margin:1.2rem 0 0.6rem;font-size:0.82rem"
+    form /api/auth/register {
+      input email placeholder="Email" style="width:100%;padding:0.7rem 0.9rem;margin-bottom:0.8rem;border-radius:10px;border:1px solid rgba(52,211,153,0.22);background:rgba(255,255,255,0.04);color:#eafff3"
+      input password placeholder="Choose a password" style="width:100%;padding:0.7rem 0.9rem;margin-bottom:1rem;border-radius:10px;border:1px solid rgba(52,211,153,0.22);background:rgba(255,255,255,0.04);color:#eafff3"
+      submit "Create account" style="width:100%;padding:0.75rem;border:none;border-radius:10px;background:rgba(163,230,53,0.15);color:#a3e635;font-weight:700;cursor:pointer;border:1px solid rgba(163,230,53,0.4)"
+      success -> navigate "/"
+    }
+    a "← Back to map" href="/" style="display:block;text-align:center;margin-top:1.2rem;color:#9fe9c6;text-decoration:none;font-size:0.85rem"
+  }
+}
