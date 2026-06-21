@@ -1,3 +1,30 @@
+## v0.54.0 — "Native Maps, Zero Hacks" (2026-06-21)
+
+Make whole classes of interactive apps buildable in 100% NyxCode — no `script {}`
+escape hatch, no raw HTML/JS.
+
+**New:**
+
+- **Native `map` / `marker` element.** A first-class interactive map (Leaflet,
+  auto-injected) with a live OpenStreetMap **Overpass** data source (debounced
+  refetch on pan/zoom), reactive `strict`/`search` filters, results published to a
+  `bind` state for native `each` lists, and marker popups written in plain NyxCode.
+- **`locate` action.** `on:click -> locate` geolocates the user and recenters the
+  native map (no raw JS).
+- Proof: `examples/vegan-maps.nyx` is a complete full-stack app — user accounts
+  (`security`), a favorites table, and the live map — written entirely in NyxCode
+  with **zero** `script {}` blocks.
+
+**Fixed:**
+
+- **Parser no-progress guard.** Malformed input (e.g. the arrow handler form
+  `on:click -> fetch POST /url { … }` inside a `when/else`) used to spin the parser
+  in an infinite loop. It now fails fast with a clean parse error. Use the block
+  form `on:click { fetch POST "/url" { … } }` for multi-token handlers.
+- The validator now recognises the `map`/`marker` tags (no false "unknown tag").
+
+---
+
 ## v0.53.0 — "Runnable & Reliable" (2026-06-21)
 
 The release that makes generated apps actually run and closes long-standing

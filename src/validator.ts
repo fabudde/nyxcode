@@ -13,6 +13,7 @@ import {
 } from './ast.js';
 
 const ELEMENT_TAGS = new Set([
+  'map', 'marker',
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
   'p', 'text', 'span', 'link', 'img', 'picture', 'video', 'audio', 'source', 'track', 'iframe', 'canvas', 'icon',
   'button', 'input', 'select', 'option', 'optgroup', 'checkbox', 'radio', 'toggle', 'slider', 'textarea',

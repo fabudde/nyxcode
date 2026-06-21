@@ -88,6 +88,8 @@ import {
 
 /** Set of tags that are recognized as built-in elements */
 const ELEMENT_TAGS = new Set([
+  "map",
+  "marker",
   "h1",
   "h2",
   "h3",
@@ -3109,8 +3111,17 @@ export class Parser {
     const statements: Statement[] = [];
 
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      // Progress guard: parseStatement() must consume at least one token. If it
+      // doesn't (malformed input the grammar can't advance past), this loop would
+      // spin forever — fail with a clean parse error instead of hanging the compiler.
+      const before = this.pos;
       const stmt = this.parseStatement();
       if (stmt) statements.push(stmt);
+      if (this.pos === before) {
+        throw this.error(
+          `Unexpected token '${this.peek().value}' (parser made no progress — check the surrounding syntax)`,
+        );
+      }
     }
 
     return statements;
@@ -6310,7 +6321,18 @@ export class Parser {
     }
 
     // Parse content and attributes
+    // Progress guard: if an iteration consumes no tokens, malformed input would spin
+    // this loop forever. Detect a stuck position and fail with a clean parse error
+    // instead of hanging the compiler. (e.g. `on:click -> fetch POST /url { ... }` —
+    // the arrow form doesn't take a method+url; use the block form `on:click { ... }`.)
+    let __elemLoopPrevPos = -1;
     while (!this.isAtEnd() && !this.check(TokenType.RightBrace)) {
+      if (this.pos === __elemLoopPrevPos) {
+        throw this.error(
+          `Unexpected token '${this.peek().value}' in element body (no progress — check the surrounding syntax, e.g. event handlers use the block form \`on:click { ... }\`)`,
+        );
+      }
+      __elemLoopPrevPos = this.pos;
       // Check if next is a new statement — but key=value is an attribute, NOT a new statement
       if (this.isStatementStart()) {
         if (this.peekAt(1)?.type === TokenType.Equals) {

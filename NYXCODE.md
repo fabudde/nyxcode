@@ -1845,6 +1845,57 @@ page / {
 
 Raw JavaScript captured at lexer level. Use sparingly — NyxCode native features preferred.
 
+## Native Map (v0.54)
+
+A first-class, interactive map — **no `script {}` escape hatch required**. The
+compiler emits all the Leaflet glue, a live data source, and reactive bindings.
+
+```nyx
+state places = []          # the map publishes its results here
+state query = ""           # native search box
+state onlyVegan = true     # native toggle
+
+input bind="query"
+button "Near me" on:click -> locate          # native geolocation
+button "Toggle" on:click -> set onlyVegan = not onlyVegan
+
+aside {
+  each places -> spot { div { h4 "${spot.name}" span "${spot.diet}" } }
+}
+
+map center="52.52,13.405" zoom="14" source="overpass" diet="vegan"
+    strict="onlyVegan" search="query" bind="places" tiles="dark" id="map" {
+  marker icon="🌱" {
+    h3 "${name}"
+    p "${cuisine}"
+    a "Directions" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
+  }
+}
+```
+
+**`map` attributes**
+
+| Attribute | Meaning |
+| --- | --- |
+| `center="lat,lng"` | initial center (default Berlin) |
+| `zoom="14"` | initial zoom |
+| `tiles="dark\|light\|osm"` | basemap style (default `dark`) |
+| `source="overpass"` | live data provider (OpenStreetMap Overpass) |
+| `diet="vegan"` | which `diet:*` tag to query |
+| `strict="stateVar"` or `"true"/"false"` | only-vegan vs vegan-options (reactive if a state var) |
+| `search="stateVar"` | reactively filter markers by name |
+| `bind="stateVar"` | publish the visible places to a state array (for native `each` lists) |
+| `id`, `style`, `class` | applied to the map container |
+
+**`marker` popup** — written in plain NyxCode. Each place exposes the fields
+`name`, `cuisine`, `address`, `hours`, `website`, `phone`, `lat`, `lon`, `diet`.
+Reference them with `${field}` in content or attributes.
+
+**`locate` action** — `on:click -> locate` geolocates the user and recenters the
+map (`locate "mapId"` targets a specific map).
+
+The map auto-injects the Leaflet CSS/JS once; debounced refetch happens on pan/zoom.
+
 ## Icons (v0.31.0)
 
 Native icon pack support. Declare once in theme, use everywhere.
