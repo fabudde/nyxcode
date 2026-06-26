@@ -2,7 +2,7 @@
 
 **The AI-native programming language. One `.nyx` file = full-stack app.**
 
-[![CI](https://github.com/OCS-Open-Cosmic-Software/nyxcode/actions/workflows/ci.yml/badge.svg)](https://github.com/OCS-Open-Cosmic-Software/nyxcode/actions/workflows/ci.yml)
+[![CI](https://github.com/Open-Cosmic-Software/nyxcode/actions/workflows/ci.yml/badge.svg)](https://github.com/Open-Cosmic-Software/nyxcode/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@fabudde/nyxcode)](https://www.npmjs.com/package/@fabudde/nyxcode)
 [![Tests](https://img.shields.io/badge/tests-717%20unit%20%2B%209%20e2e-brightgreen)](#development--testing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
